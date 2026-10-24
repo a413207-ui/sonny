@@ -1,0 +1,363 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<style>html{box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}</style>
+<title>推酒杯</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bungee&family=Noto+Sans+TC:wght@500;700;900&display=swap">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<style>
+/* Layout: full-height column — status bar on top, 3D bar scene fills the rest; overlay card between levels */
+:root{
+  --bg:#1A0F0B; --panel:#2A1912; --ink:#FBEBD8; --muted:#C2A58C; --line:#4A2F22;
+  --amber:#F4A62A; --neon:#FF5E7E; --ok:#7BD88F;
+  --f-display:"Bungee","Noto Sans TC",system-ui,sans-serif;
+  --f-body:"Noto Sans TC","PingFang TC",system-ui,sans-serif;
+  color-scheme:dark;
+}
+[hidden]{display:none!important}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{height:100%;margin:0}
+body{background:var(--bg);color:var(--ink);font-family:var(--f-body);overflow:hidden;touch-action:none;-webkit-user-select:none;user-select:none;display:flex;flex-direction:column}
+.top{display:flex;align-items:stretch;gap:8px;padding-block:10px 6px;padding-left:max(12px,env(safe-area-inset-left,0px));padding-right:max(12px,env(safe-area-inset-right,0px))}
+.stat{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:6px 10px;min-width:0}
+.stat small{display:block;font-size:11px;color:var(--muted);letter-spacing:.1em;white-space:nowrap}
+.stat b{font-family:var(--f-display);font-weight:400;font-size:19px;font-variant-numeric:tabular-nums;color:var(--amber)}
+.stat.q{flex:1}
+#queue{display:flex;gap:5px;align-items:flex-end;height:22px;margin-top:2px}
+#queue i{display:block;border-radius:2px 2px 4px 4px}
+#queue i.beer{width:11px;height:16px;background:linear-gradient(#FFF6E0 0 28%,var(--amber) 28%)}
+#queue i.shot{width:8px;height:10px;background:linear-gradient(rgba(255,255,255,.35) 0 35%,#FFCE5C 35%);border:1px solid rgba(255,255,255,.5)}
+#queue i.keg{width:16px;height:18px;border-radius:5px;background:repeating-linear-gradient(#8A5A2E 0 5px,#3A2414 5px 7px)}
+#queue i.next{outline:2px solid var(--ink);outline-offset:2px}
+#stage{flex:1;min-height:0;position:relative;overflow:hidden}
+#stage canvas{position:absolute;inset:0;width:100%;height:100%;display:block}
+.hint{position:absolute;left:50%;bottom:calc(10px + env(safe-area-inset-bottom,0px));transform:translateX(-50%);background:rgba(26,15,11,.85);border:1px solid var(--line);
+  color:var(--muted);font-size:13px;padding:6px 14px;border-radius:99px;white-space:nowrap;pointer-events:none;transition:opacity .3s;max-width:calc(100% - 24px);overflow:hidden;text-overflow:ellipsis}
+.toast{position:absolute;left:50%;top:34%;transform:translate(-50%,-50%);font-family:var(--f-display);font-size:30px;color:var(--neon);
+  text-shadow:0 0 18px rgba(255,94,126,.7);pointer-events:none;opacity:0;transition:opacity .25s,transform .25s;white-space:nowrap}
+.toast.good{color:var(--ok);text-shadow:0 0 18px rgba(123,216,143,.6)}
+.toast.show{opacity:1;transform:translate(-50%,-62%)}
+.pop{position:absolute;font-family:var(--f-display);color:var(--ok);font-size:20px;text-shadow:0 2px 8px rgba(0,0,0,.6);pointer-events:none;transform:translate(-50%,-100%);white-space:nowrap}
+#overlay{position:fixed;inset:0;display:grid;place-items:center;background:rgba(14,8,5,.7);backdrop-filter:blur(4px);z-index:5;
+  padding-left:max(20px,env(safe-area-inset-left,0px));padding-right:max(20px,env(safe-area-inset-right,0px))}
+.card{width:min(100%,360px);background:var(--panel);border:1px solid var(--line);border-radius:22px;padding:24px 22px 20px;text-align:center;display:grid;gap:12px}
+.sign{font-family:var(--f-display);font-size:42px;line-height:1;color:var(--neon);text-shadow:0 0 6px rgba(255,94,126,.9),0 0 26px rgba(255,94,126,.55);letter-spacing:.04em}
+.lv{font-family:var(--f-display);font-size:13px;color:var(--amber);letter-spacing:.12em}
+.card h2{margin:0;font-size:24px;font-weight:900}
+.card p{margin:0;color:var(--muted);font-size:14px;line-height:1.7}
+.stars{font-size:30px;letter-spacing:6px;color:var(--amber)}
+.stars .off{color:var(--line)}
+.legend{display:grid;grid-template-columns:auto 1fr;gap:6px 10px;text-align:left;font-size:13px;color:var(--muted);align-items:center}
+.legend b{color:var(--ink);font-weight:700}
+.btns{display:grid;gap:8px}
+button.go{font:inherit;font-weight:900;font-size:17px;border:0;border-radius:14px;padding:13px;background:var(--amber);color:#2A1408;cursor:pointer;letter-spacing:.06em}
+button.go.alt{background:transparent;color:var(--ink);border:1px solid var(--line);font-weight:700;font-size:15px}
+button.go:focus-visible{outline:2px solid var(--ink);outline-offset:3px}
+.home{color:var(--muted);font-size:13px;text-decoration:none}
+.err{color:var(--neon)}
+@media (prefers-reduced-motion:reduce){.toast{transition:none}}
+</style>
+</head>
+<body>
+
+<div class="top">
+  <div class="stat"><small>關卡</small><b id="lvl">1</b></div>
+  <div class="stat q"><small>接下來的酒</small><div id="queue"></div></div>
+  <div class="stat" style="text-align:right"><small>總分</small><b id="score">0</b></div>
+</div>
+<div id="stage">
+  <div class="hint" id="hint">按住酒杯往前一推，放手就滑出去</div>
+  <div class="toast" id="toast"></div>
+</div>
+<div id="overlay"><div class="card" id="card"><div class="sign">推酒杯</div><p>載入中…</p></div></div>
+
+<script>
+(function(){
+const $=id=>document.getElementById(id);
+const stage=$('stage');
+if(!window.THREE){$('card').innerHTML='<div class="sign">推酒杯</div><p class="err">3D 引擎載入失敗，請檢查網路後重新整理。</p>';return}
+
+/* ===== 遊戲資料 ===== */
+// 平面座標：吧台寬 100、長 260；y=0 是吧台盡頭（過了就摔下去），y=260 是你站的地方
+const W=100,L=260,START_Y=L-18,START_LINE=START_Y-32,MAXV=250,CR=11.5,FLICK=.55;
+const TYPES={
+  beer:{name:'啤酒',R:6.2,m:1,fric:120,h:16},
+  shot:{name:'烈酒',R:4.3,m:.55,fric:75,h:8},
+  keg:{name:'大酒桶',R:9.5,m:3.2,fric:150,h:20},
+};
+const OBS={salt:{R:4.6,m:Infinity,h:11},lemon:{R:5,m:.8,fric:85,h:1.6}};
+const LEVELS=[
+ {name:'第一位客人',tip:'把啤酒推到客人面前的杯墊上就算送到。停得越正中間，小費越多！',
+  cust:[{side:'R',y:60,want:'beer'}],q:['beer','beer','beer']},
+ {name:'兩桌客人',tip:'左右兩邊都有人在等，推的時候往左或往右斜一點。',
+  cust:[{side:'L',y:95,want:'beer'},{side:'R',y:40,want:'beer'}],q:['beer','beer','beer','beer']},
+ {name:'烈酒要小心',tip:'烈酒杯又小又滑，輕輕推就會滑很遠，太大力直接飛出吧台。',
+  cust:[{side:'L',y:70,want:'shot'},{side:'R',y:30,want:'beer'}],q:['shot','beer','shot','beer']},
+ {name:'鹽罐擋路',tip:'鹽罐推不動，撞到會彈開。想辦法繞過去，也可以利用反彈。',
+  obs:[{t:'salt',x:50,y:150},{t:'salt',x:30,y:112},{t:'salt',x:70,y:112}],
+  cust:[{side:'L',y:42,want:'beer'},{side:'R',y:42,want:'shot'}],q:['beer','shot','beer','shot']},
+ {name:'打翻的酒',tip:'吧台上的酒漬很滑，杯子經過會加速滑行，力道要收一點。',
+  areas:[{t:'puddle',x:8,y:58,w:84,h:62}],
+  cust:[{side:'L',y:132,want:'beer'},{side:'R',y:28,want:'beer'},{side:'L',y:40,want:'shot'}],q:['beer','beer','shot','beer','shot']},
+ {name:'大酒桶出動',tip:'大酒桶很重，可以把檸檬片撞開。客人不喝酒桶，它是拿來清路的。',
+  obs:[{t:'lemon',x:70,y:56},{t:'lemon',x:80,y:60},{t:'lemon',x:62,y:46},{t:'lemon',x:60,y:34}],
+  cust:[{side:'R',y:40,want:'beer'},{side:'L',y:85,want:'shot'}],q:['keg','beer','shot','beer','shot']},
+ {name:'抹布區',tip:'抹布會吸住杯子，經過時速度掉很快。要推大力一點才過得去。',
+  areas:[{t:'rag',x:0,y:112,w:100,h:30}],obs:[{t:'salt',x:50,y:68}],
+  cust:[{side:'L',y:32,want:'beer'},{side:'R',y:32,want:'beer'},{side:'R',y:92,want:'shot'}],q:['beer','beer','shot','beer','keg','shot']},
+ {name:'打烊前的混亂',tip:'什麼都有。先想好順序，必要時用大酒桶清場。',
+  areas:[{t:'puddle',x:6,y:36,w:44,h:50},{t:'rag',x:50,y:122,w:50,h:26}],
+  obs:[{t:'salt',x:36,y:132},{t:'salt',x:66,y:88},{t:'lemon',x:22,y:100},{t:'lemon',x:80,y:58}],
+  cust:[{side:'L',y:26,want:'shot'},{side:'R',y:30,want:'beer'},{side:'L',y:76,want:'beer'},{side:'R',y:108,want:'shot'}],
+  q:['beer','shot','beer','shot','keg','beer','shot']},
+];
+const PEOPLE=[[0xF1C7A0,0x3B2416,0x2F6F8F],[0xD9A27A,0x121212,0x8F2F4A],[0xF6D3B5,0xC8742E,0x3E7A4A],[0xB9825A,0x5A3A22,0x6A4FA0],[0xEEC09B,0x7A7A7A,0xB0602A]];
+
+/* ===== 3D 場景 ===== */
+const renderer=new THREE.WebGLRenderer({antialias:true});
+renderer.setPixelRatio(Math.min(window.devicePixelRatio||1,2));
+renderer.shadowMap.enabled=true;renderer.shadowMap.type=THREE.PCFSoftShadowMap;
+renderer.outputEncoding=THREE.sRGBEncoding;
+stage.prepend(renderer.domElement);
+const scene=new THREE.Scene();scene.background=new THREE.Color(0x120A07);scene.fog=new THREE.Fog(0x120A07,320,620);
+const camera=new THREE.PerspectiveCamera(50,1,1,1200);
+const P=(x,y)=>new THREE.Vector3(x-W/2,0,y-L/2); // 平面座標 → 3D
+
+scene.add(new THREE.HemisphereLight(0xffe2c0,0x2a160c,.55));
+const sun=new THREE.DirectionalLight(0xffd9a8,.9);sun.position.set(-60,220,120);sun.castShadow=true;
+sun.shadow.mapSize.set(1024,1024);Object.assign(sun.shadow.camera,{left:-90,right:90,top:170,bottom:-170,near:10,far:500});scene.add(sun);
+const neonLight=new THREE.PointLight(0xff5e7e,1.4,180);neonLight.position.set(0,30,-L/2-10);scene.add(neonLight);
+const lamps=[];[-80,0,80].forEach(z=>{const l=new THREE.PointLight(0xffb15c,.6,170);l.position.set(0,70,z);scene.add(l);lamps.push(l)});
+
+function canvasTex(w,h,fn){const c=document.createElement('canvas');c.width=w;c.height=h;fn(c.getContext('2d'),w,h);const t=new THREE.CanvasTexture(c);t.encoding=THREE.sRGBEncoding;return t}
+const woodTex=canvasTex(256,1024,(g,w,h)=>{for(let i=0;i<5;i++){g.fillStyle=i%2?'#7A4421':'#6C3A1C';g.fillRect(i*w/5,0,w/5,h)}
+  g.strokeStyle='rgba(30,12,4,.45)';g.lineWidth=2;for(let i=1;i<5;i++){g.beginPath();g.moveTo(i*w/5,0);g.lineTo(i*w/5,h);g.stroke()}
+  for(let k=0;k<160;k++){g.strokeStyle='rgba('+(k%2?'255,220,180,.06':'40,16,4,.12')+')';g.lineWidth=1;const x=Math.random()*w,y=Math.random()*h;g.beginPath();g.moveTo(x,y);g.bezierCurveTo(x+3,y+20,x-3,y+40,x+1,y+70);g.stroke()}});
+// 吧台
+const top=new THREE.Mesh(new THREE.BoxGeometry(W,6,L),new THREE.MeshStandardMaterial({map:woodTex,roughness:.45,metalness:.05}));
+top.position.set(0,-3,0);top.receiveShadow=true;scene.add(top);
+const body=new THREE.Mesh(new THREE.BoxGeometry(W-6,70,L-4),new THREE.MeshStandardMaterial({color:0x3A1F10,roughness:.8}));body.position.set(0,-41,2);scene.add(body);
+const rail=new THREE.MeshStandardMaterial({color:0xC9A25A,metalness:.8,roughness:.3});
+[-W/2-1.5,W/2+1.5].forEach(x=>{const r=new THREE.Mesh(new THREE.CylinderGeometry(1.4,1.4,L,10),rail);r.rotation.x=Math.PI/2;r.position.set(x,-1.5,0);scene.add(r)});
+const neon=new THREE.Mesh(new THREE.BoxGeometry(W,1.2,1.2),new THREE.MeshBasicMaterial({color:0xff5e7e}));neon.position.set(0,.6,-L/2);scene.add(neon);
+const floor=new THREE.Mesh(new THREE.PlaneGeometry(900,900),new THREE.MeshStandardMaterial({color:0x1C110C,roughness:1}));floor.rotation.x=-Math.PI/2;floor.position.y=-76;floor.receiveShadow=true;scene.add(floor);
+// 後方酒櫃
+const shelf=new THREE.Group();shelf.position.set(0,-20,-L/2-70);scene.add(shelf);
+const shelfMat=new THREE.MeshStandardMaterial({color:0x2A160C,roughness:.9});
+const back=new THREE.Mesh(new THREE.BoxGeometry(260,160,6),shelfMat);back.position.y=40;shelf.add(back);
+const bottleCols=[0x2E7D4F,0x8B2B2B,0xC98A2E,0x3E5FA8,0xD9D2C0,0x5A3A1E];
+[10,50,90].forEach((yy,row)=>{const b=new THREE.Mesh(new THREE.BoxGeometry(250,3,22),shelfMat);b.position.set(0,yy-30,10);shelf.add(b);
+  for(let i=0;i<14;i++){const h=18+((i*7+row*3)%9)*2,m=new THREE.MeshStandardMaterial({color:bottleCols[(i+row)%6],roughness:.15,metalness:.1,emissive:bottleCols[(i+row)%6],emissiveIntensity:.18});
+    const bt=new THREE.Mesh(new THREE.CylinderGeometry(4,4.5,h,10),m);bt.position.set(-115+i*17.5,yy-28+h/2,10);shelf.add(bt);
+    const nk=new THREE.Mesh(new THREE.CylinderGeometry(1.4,1.4,7,8),m);nk.position.set(bt.position.x,yy-28+h+3.5,10);shelf.add(nk)}});
+
+// 材質
+const M={
+  glass:new THREE.MeshStandardMaterial({color:0xdcebf0,transparent:true,opacity:.32,roughness:.05,metalness:.1}),
+  beer:new THREE.MeshStandardMaterial({color:0xE8961C,roughness:.3,emissive:0x4a2400,emissiveIntensity:.35}),
+  foam:new THREE.MeshStandardMaterial({color:0xFFF6E0,roughness:.9}),
+  shot:new THREE.MeshStandardMaterial({color:0xFFC845,roughness:.25,emissive:0x5a3a00,emissiveIntensity:.3}),
+  keg:new THREE.MeshStandardMaterial({color:0x8A5A2E,roughness:.7}),
+  band:new THREE.MeshStandardMaterial({color:0x3A3A3A,metalness:.7,roughness:.4}),
+  salt:new THREE.MeshStandardMaterial({color:0xEDEFF2,roughness:.4}),
+  cap:new THREE.MeshStandardMaterial({color:0xA8B0BA,metalness:.8,roughness:.3}),
+  lemon:new THREE.MeshStandardMaterial({color:0xF5E04A,roughness:.6}),
+  lemonIn:new THREE.MeshStandardMaterial({color:0xFFF4A8,roughness:.7}),
+  coaster:new THREE.MeshStandardMaterial({color:0xB98A55,roughness:.9}),
+  coasterOk:new THREE.MeshStandardMaterial({color:0x5FAE6E,roughness:.8}),
+};
+function glassMesh(t){const g=new THREE.Group(),T=TYPES[t];
+  if(t==='beer'){const sh=new THREE.Mesh(new THREE.CylinderGeometry(T.R,T.R*.88,T.h,20,1,true),M.glass);sh.position.y=T.h/2;g.add(sh);
+    const bt=new THREE.Mesh(new THREE.CylinderGeometry(T.R*.88,T.R*.88,1.4,20),M.glass);bt.position.y=.7;g.add(bt);
+    const lq=new THREE.Mesh(new THREE.CylinderGeometry(T.R*.9,T.R*.84,T.h*.72,20),M.beer);lq.position.y=T.h*.38;g.add(lq);
+    const fm=new THREE.Mesh(new THREE.CylinderGeometry(T.R*.98,T.R*.92,T.h*.2,20),M.foam);fm.position.y=T.h*.82;g.add(fm);
+    const hd=new THREE.Mesh(new THREE.TorusGeometry(T.h*.25,.9,8,16,Math.PI),M.glass);hd.rotation.z=-Math.PI/2;hd.position.set(T.R+.5,T.h*.5,0);g.add(hd)}
+  else if(t==='shot'){const sh=new THREE.Mesh(new THREE.CylinderGeometry(T.R,T.R*.75,T.h,16,1,true),M.glass);sh.position.y=T.h/2;g.add(sh);
+    const bt=new THREE.Mesh(new THREE.CylinderGeometry(T.R*.75,T.R*.75,2,16),M.glass);bt.position.y=1;g.add(bt);
+    const lq=new THREE.Mesh(new THREE.CylinderGeometry(T.R*.9,T.R*.76,T.h*.55,16),M.shot);lq.position.y=2+T.h*.27;g.add(lq)}
+  else{const bd=new THREE.Mesh(new THREE.CylinderGeometry(T.R*.9,T.R*.9,T.h,20),M.keg);bd.position.y=T.h/2;g.add(bd);
+    const mid=new THREE.Mesh(new THREE.CylinderGeometry(T.R,T.R,T.h*.5,20),M.keg);mid.position.y=T.h/2;g.add(mid);
+    [.15,.5,.85].forEach(f=>{const b=new THREE.Mesh(new THREE.TorusGeometry(T.R*(f===.5?1.01:.93),.7,6,24),M.band);b.rotation.x=Math.PI/2;b.position.y=T.h*f;g.add(b)});
+    const tap=new THREE.Mesh(new THREE.CylinderGeometry(1.2,1.2,3,8),M.band);tap.position.y=T.h+1;g.add(tap)}
+  g.traverse(o=>{if(o.isMesh){o.castShadow=true}});return g}
+function obsMesh(t){const g=new THREE.Group();
+  if(t==='salt'){const b=new THREE.Mesh(new THREE.CylinderGeometry(4.2,4.6,9,16),M.salt);b.position.y=4.5;g.add(b);
+    const c=new THREE.Mesh(new THREE.SphereGeometry(4.2,16,8,0,Math.PI*2,0,Math.PI/2),M.cap);c.position.y=9;g.add(c)}
+  else{const b=new THREE.Mesh(new THREE.CylinderGeometry(5,5,1.4,20),M.lemon);b.position.y=.7;g.add(b);
+    const i=new THREE.Mesh(new THREE.CylinderGeometry(4.2,4.2,1.5,20),M.lemonIn);i.position.y=.75;g.add(i)}
+  g.traverse(o=>{if(o.isMesh)o.castShadow=true});return g}
+function bubbleTex(want,ok){return canvasTex(128,128,(g)=>{g.fillStyle=ok?'#7BD88F':'#FBEBD8';g.beginPath();g.roundRect?g.roundRect(14,10,100,88,26):g.rect(14,10,100,88);g.fill();
+  g.beginPath();g.moveTo(52,96);g.lineTo(76,96);g.lineTo(64,118);g.fill();
+  if(ok){g.strokeStyle='#1A3A20';g.lineWidth=12;g.lineCap='round';g.beginPath();g.moveTo(40,54);g.lineTo(58,72);g.lineTo(90,38);g.stroke();return}
+  if(want==='beer'){g.fillStyle='#F4A62A';g.fillRect(46,38,32,46);g.fillStyle='#FFF6E0';g.fillRect(43,28,38,14);g.strokeStyle='#F4A62A';g.lineWidth=7;g.beginPath();g.arc(82,60,10,-1.3,1.3);g.stroke()}
+  else{g.fillStyle='rgba(120,140,150,.5)';g.beginPath();g.moveTo(44,32);g.lineTo(84,32);g.lineTo(78,84);g.lineTo(50,84);g.closePath();g.fill();
+    g.fillStyle='#FFC845';g.beginPath();g.moveTo(47,52);g.lineTo(81,52);g.lineTo(78,84);g.lineTo(50,84);g.closePath();g.fill()}})}
+function personMesh(c,k){const [skin,hair,shirt]=PEOPLE[k%PEOPLE.length],g=new THREE.Group();
+  const sm=new THREE.MeshStandardMaterial({color:skin,roughness:.7}),hm=new THREE.MeshStandardMaterial({color:hair,roughness:.8}),tm=new THREE.MeshStandardMaterial({color:shirt,roughness:.8});
+  const stool=new THREE.Mesh(new THREE.CylinderGeometry(7,7,2.5,16),new THREE.MeshStandardMaterial({color:0x8B1E2E,roughness:.6}));stool.position.y=-22;g.add(stool);
+  const leg=new THREE.Mesh(new THREE.CylinderGeometry(1,1,50,8),rail);leg.position.y=-48;g.add(leg);
+  const torso=new THREE.Mesh(new THREE.CylinderGeometry(6,8,24,14),tm);torso.position.y=-8;g.add(torso);
+  const head=new THREE.Mesh(new THREE.SphereGeometry(7,18,14),sm);head.position.y=11;g.add(head);
+  const hr=new THREE.Mesh(new THREE.SphereGeometry(7.4,18,10,0,Math.PI*2,0,Math.PI*.55),hm);hr.position.y=11.6;hr.rotation.z=c.side==='L'?-.25:.25;g.add(hr);
+  const em=new THREE.MeshBasicMaterial({color:0x2A1408});const dir=c.side==='L'?1:-1;
+  [-2.4,2.4].forEach(z=>{const e=new THREE.Mesh(new THREE.SphereGeometry(.9,8,6),em);e.position.set(dir*6.4,12,z);g.add(e)});
+  const arm=new THREE.Mesh(new THREE.CylinderGeometry(2,2,16,8),tm);arm.rotation.z=dir*Math.PI/2.3;arm.position.set(dir*9,-3,3);g.add(arm);
+  g.traverse(o=>{if(o.isMesh){o.castShadow=true}});
+  const bub=new THREE.Sprite(new THREE.SpriteMaterial({map:bubbleTex(c.want,false),depthTest:false}));bub.scale.set(16,16,1);bub.position.y=30;bub.renderOrder=5;g.add(bub);
+  g.userData={head,bub,arm};return g}
+
+/* ===== 狀態 ===== */
+let lv=null,lvIdx=0,bodies=[],custs=[],cur=null,qi=0,state='menu',drag=null,lastT=0,shake=0,total=0,lvScore=0,unlocked=0,bestTotal=0;
+const levelGroup=new THREE.Group();scene.add(levelGroup);
+try{unlocked=Math.min(LEVELS.length-1,Number(localStorage.getItem('pushglass_lv'))||0);bestTotal=Number(localStorage.getItem('pushglass_best2'))||0}catch(e){}
+
+function toast(t,good){const e=$('toast');e.textContent=t;e.classList.toggle('good',!!good);e.classList.add('show');clearTimeout(e._t);e._t=setTimeout(()=>e.classList.remove('show'),950)}
+function hint(t){const h=$('hint');if(t){h.textContent=t;h.style.opacity=1}else h.style.opacity=0}
+const pops=[];
+function pop(x,y,txt){const d=document.createElement('div');d.className='pop';d.textContent=txt;stage.appendChild(d);pops.push({el:d,x,y,t:0})}
+
+function resize(){const r=stage.getBoundingClientRect();const w=Math.max(1,r.width),h=Math.max(1,r.height);renderer.setSize(w,h,false);
+  const a=w/h;camera.aspect=a;
+  // 讓吧台寬度在直式手機也放得下
+  const hfov=2*Math.atan(78/215),vfov=Math.max(48,Math.min(80,2*Math.atan(Math.tan(hfov/2)/a)*180/Math.PI));camera.fov=vfov;
+  camera.position.set(0,a<1?150:130,L/2+(a<1?78:95));camera.lookAt(0,0,-L*.12);camera.updateProjectionMatrix()}
+new ResizeObserver(resize).observe(stage);resize();
+
+/* ===== 關卡 ===== */
+function clearLevel(){while(levelGroup.children.length)levelGroup.remove(levelGroup.children[0]);pops.forEach(p=>p.el.remove());pops.length=0}
+function addBody(b,mesh){b.mesh=mesh;mesh.position.copy(P(b.x,b.y));levelGroup.add(mesh);bodies.push(b);return b}
+function loadLevel(i){clearLevel();lvIdx=i;lv=LEVELS[i];bodies=[];qi=0;lvScore=0;cur=null;
+  for(const a of (lv.areas||[])){const isP=a.t==='puddle';
+    const tex=isP?null:canvasTex(128,128,(g)=>{for(let x=0;x<8;x++)for(let y=0;y<8;y++){g.fillStyle=(x+y)%2?'#4A70AA':'#E6ECF5';g.fillRect(x*16,y*16,16,16)}});
+    if(tex){tex.wrapS=tex.wrapT=THREE.RepeatWrapping;tex.repeat.set(a.w/20,a.h/20)}
+    const m=new THREE.Mesh(isP?new THREE.CircleGeometry(.5,32):new THREE.PlaneGeometry(1,1),
+      isP?new THREE.MeshStandardMaterial({color:0xE09A2A,transparent:true,opacity:.5,roughness:.02,metalness:.3}):new THREE.MeshStandardMaterial({map:tex,roughness:1}));
+    m.rotation.x=-Math.PI/2;m.scale.set(a.w,a.h,1);m.position.copy(P(a.x+a.w/2,a.y+a.h/2));m.position.y=isP?.08:.25;m.receiveShadow=true;levelGroup.add(m)}
+  custs=lv.cust.map((c,k)=>{const cx=c.side==='L'?20:80;
+    const co=new THREE.Mesh(new THREE.CylinderGeometry(CR,CR,.5,28),M.coaster.clone());co.position.copy(P(cx,c.y));co.position.y=.3;co.receiveShadow=true;levelGroup.add(co);
+    const ring=new THREE.Mesh(new THREE.RingGeometry(CR*.62,CR*.7,28),new THREE.MeshBasicMaterial({color:0xFBEBD8,transparent:true,opacity:.55}));ring.rotation.x=-Math.PI/2;ring.position.copy(co.position);ring.position.y=.6;levelGroup.add(ring);
+    const pm=personMesh(c,k+i);pm.position.copy(P(c.side==='L'?-16:W+16,c.y));pm.position.y=8;pm.rotation.y=0;levelGroup.add(pm);
+    return {...c,x:cx,served:false,t:0,co,pm}});
+  (lv.obs||[]).forEach(o=>{const D=OBS[o.t];addBody({kind:'obs',t:o.t,x:o.x,y:o.y,vx:0,vy:0,R:D.R,m:D.m,fric:D.fric||0,fall:0,moving:false},obsMesh(o.t))});
+  $('lvl').textContent=i+1;renderQueue()}
+function renderQueue(){const el=$('queue');el.innerHTML='';if(!lv)return;lv.q.forEach((t,k)=>{if(k<qi)return;const d=document.createElement('i');d.className=t+(k===qi&&state==='aim'?' next':'');d.title=TYPES[t].name;el.appendChild(d)})}
+function nextGlass(){if(qi>=lv.q.length){endLevel(false);return}
+  const t=lv.q[qi],T=TYPES[t];state='aim';
+  cur=addBody({kind:'glass',t,x:W/2,y:START_Y,vx:0,vy:0,R:T.R,m:T.m,fric:T.fric,fall:0,moving:false,served:false,spin:0},glassMesh(t));
+  renderQueue();hint(t==='shot'?'烈酒很滑，輕輕推':t==='keg'?'大酒桶很重，用力推去撞開障礙':'按住酒杯往前一推，放手就滑出去')}
+function playLevel(i){loadLevel(i);$('overlay').hidden=true;$('score').textContent=total;nextGlass()}
+function endLevel(win){state='end';hint('');const left=lv.q.length-qi;
+  if(win){const bonus=left*30;lvScore+=bonus;total+=lvScore;$('score').textContent=total;
+    const stars=left>=2?3:left===1?2:1,last=lvIdx===LEVELS.length-1;
+    if(lvIdx+1>unlocked&&!last){unlocked=lvIdx+1;try{localStorage.setItem('pushglass_lv',unlocked)}catch(e){}}
+    if(last&&total>bestTotal){bestTotal=total;try{localStorage.setItem('pushglass_best2',bestTotal)}catch(e){}}
+    const done=lvScore;
+    setTimeout(()=>showCard(`<div class="lv">LEVEL ${lvIdx+1} CLEAR</div><h2>${last?'全部客人都滿意了！':'過關！'}</h2>
+      <div class="stars">${[0,1,2].map(k=>k<stars?'★':'<span class="off">★</span>').join('')}</div>
+      <p>這關 <b style="color:var(--amber)">${done}</b> 分${left?`（剩 ${left} 杯，加 ${bonus} 分）`:''}<br>總分 ${total}${last?`・最高 ${bestTotal}`:''}</p>`,
+      last?[['再玩一次',()=>{total=0;intro(0)}],['回主選單',menu,1]]:[['下一關',()=>intro(lvIdx+1)],['重玩這關',()=>{total-=done;intro(lvIdx)},1]]),800);
+  }else{const n=custs.filter(c=>!c.served).length;
+    setTimeout(()=>showCard(`<div class="lv">LEVEL ${lvIdx+1}</div><h2>酒送完了…</h2><p>還有 ${n} 位客人沒拿到酒。<br>換個角度和力道再試一次！</p>`,
+      [['重玩這關',()=>intro(lvIdx)],['回主選單',menu,1]]),700)}}
+function intro(i){loadLevel(i);state='intro';const L2=LEVELS[i],want={};L2.cust.forEach(c=>want[c.want]=(want[c.want]||0)+1);
+  showCard(`<div class="lv">LEVEL ${i+1} / ${LEVELS.length}</div><h2>${L2.name}</h2><p>${L2.tip}</p>
+    <p style="color:var(--ink)">客人點了：${Object.entries(want).map(([t,n])=>TYPES[t].name+' ×'+n).join('、')}<br><span style="color:var(--muted)">手上有 ${L2.q.length} 杯可以推</span></p>`,
+    [['開始',()=>playLevel(i)]])}
+function menu(){state='menu';total=0;loadLevel(Math.min(unlocked,LEVELS.length-1));
+  const btns=[];if(unlocked>0)btns.push(['繼續第 '+(unlocked+1)+' 關',()=>intro(unlocked)]);
+  btns.push([unlocked>0?'從第 1 關開始':'開始營業',()=>intro(0),unlocked>0]);
+  showCard(`<div class="sign">推酒杯</div><p>你是吧台酒保。把客人點的酒推到他面前的杯墊上，推太大力會從吧台盡頭摔下去！</p>
+    <div class="legend"><b>啤酒</b><span>一般杯子，好控制</span><b>烈酒</b><span>小杯、很滑，輕推就好</span><b>大酒桶</b><span>很重，拿來撞開障礙</span></div>
+    ${bestTotal?`<p>最高總分 ${bestTotal}</p>`:''}`,btns)}
+function showCard(html,btns){$('card').innerHTML=html+'<div class="btns"></div><a class="home" href="../">← 回 Sonny 首頁</a>';
+  const b=$('card').querySelector('.btns');btns.forEach(([t,fn,alt])=>{const x=document.createElement('button');x.className='go'+(alt?' alt':'');x.textContent=t;x.onclick=fn;b.appendChild(x)});
+  $('overlay').hidden=false}
+
+/* ===== 推杯操作（手指位置投射到吧台桌面） ===== */
+const ray=new THREE.Raycaster(),plane=new THREE.Plane(new THREE.Vector3(0,1,0),0),ndc=new THREE.Vector2(),hit=new THREE.Vector3();
+function toWorld(e){const r=renderer.domElement.getBoundingClientRect();ndc.set((e.clientX-r.left)/r.width*2-1,-((e.clientY-r.top)/r.height)*2+1);
+  ray.setFromCamera(ndc,camera);if(!ray.ray.intersectPlane(plane,hit))return null;return{x:hit.x+W/2,y:hit.z+L/2,t:e.timeStamp}}
+const cvs=renderer.domElement;
+cvs.addEventListener('pointerdown',e=>{if(state!=='aim')return;const p=toWorld(e);if(!p)return;
+  if(p.y<START_LINE-60&&Math.hypot(p.x-cur.x,p.y-cur.y)>30)return;e.preventDefault();try{cvs.setPointerCapture(e.pointerId)}catch(_){}
+  drag={id:e.pointerId,pts:[p],dx:p.x-cur.x,dy:p.y-cur.y};hint('')});
+cvs.addEventListener('pointermove',e=>{if(!drag||e.pointerId!==drag.id)return;const p=toWorld(e);if(!p)return;drag.pts.push(p);if(drag.pts.length>12)drag.pts.shift();
+  cur.x=Math.max(cur.R,Math.min(W-cur.R,p.x-drag.dx));cur.y=Math.max(START_LINE,Math.min(L-cur.R,p.y-drag.dy))});
+function release(e){if(!drag||e.pointerId!==drag.id)return;const pts=drag.pts,last=pts[pts.length-1];drag=null;
+  let first=pts.length>1?pts[pts.length-2]:pts[0];for(let k=pts.length-2;k>=0;k--){first=pts[k];if(last.t-pts[k].t>=60)break}
+  const dt=Math.max(16,last.t-first.t)/1000;let vx=(last.x-first.x)/dt*FLICK,vy=(last.y-first.y)/dt*FLICK;const sp=Math.hypot(vx,vy);
+  if(vy>-12||sp<18){cur.x=W/2;cur.y=START_Y;toast('再推大力一點');hint('按住酒杯往前一推，放手就滑出去');return}
+  if(sp>MAXV){vx*=MAXV/sp;vy*=MAXV/sp}
+  cur.vx=vx;cur.vy=vy;cur.moving=true;qi++;state='slide';renderQueue()}
+cvs.addEventListener('pointerup',release);cvs.addEventListener('pointercancel',release);
+
+/* ===== 物理 ===== */
+function areaMul(b){let m=1;for(const a of (lv.areas||[]))if(b.x>a.x&&b.x<a.x+a.w&&b.y>a.y&&b.y<a.y+a.h)m*=a.t==='puddle'?.45:2.2;return m}
+function step(dt){
+  for(const b of bodies){
+    if(b.fall){b.fall+=dt;b.x+=b.vx*dt*.6;b.y+=b.vy*dt*.6;continue}
+    if(b.m===Infinity||b.served)continue;
+    const v=Math.hypot(b.vx,b.vy);
+    if(v>0){const nv=Math.max(0,v-b.fric*areaMul(b)*dt);b.vx*=nv/v;b.vy*=nv/v;b.x+=b.vx*dt;b.y+=b.vy*dt;b.spin=(b.spin||0)+v*dt*.03}
+    b.moving=v>.8;if(!b.moving){b.vx=b.vy=0}
+    if(b.y<-1||b.x<-1||b.x>W+1){b.fall=.001;b.moving=false;
+      if(b.kind==='glass'){shake=.3;toast('摔下去了！');try{navigator.vibrate&&navigator.vibrate(40)}catch(_){}}}
+  }
+  const live=bodies.filter(b=>!b.fall&&!b.served);
+  for(let i=0;i<live.length;i++)for(let j=i+1;j<live.length;j++){const a=live[i],b=live[j];
+    const dx=b.x-a.x,dy=b.y-a.y,d=Math.hypot(dx,dy),rr=a.R+b.R;if(d>=rr||d===0)continue;
+    if(a.m===Infinity&&b.m===Infinity)continue;
+    const nx=dx/d,ny=dy/d,ov=rr-d,ia=a.m===Infinity?0:1/a.m,ib=b.m===Infinity?0:1/b.m,sum=ia+ib;
+    a.x-=nx*ov*ia/sum;a.y-=ny*ov*ia/sum;b.x+=nx*ov*ib/sum;b.y+=ny*ov*ib/sum;
+    const rel=(a.vx-b.vx)*nx+(a.vy-b.vy)*ny;if(rel<=0)continue;
+    const e=(a.m===Infinity||b.m===Infinity)?.75:.9,jm=(1+e)*rel/sum;
+    a.vx-=jm*ia*nx;a.vy-=jm*ia*ny;b.vx+=jm*ib*nx;b.vy+=jm*ib*ny;a.moving=b.moving=true;
+    if(rel>45){toast(a.t==='keg'||b.t==='keg'?'咚！':'鏘！');shake=Math.max(shake,.12)}}
+  for(const c of custs)if(c.served)c.t+=dt;
+  if(state==='slide'&&!bodies.some(b=>b.moving)&&!bodies.some(b=>b.fall&&b.fall<.7))settle();
+}
+function settle(){
+  // 全部停下後才判定，所以撞過去停在杯墊上的也算
+  let n=0;
+  for(const c of custs){if(c.served)continue;let best=null,bd=1e9;
+    for(const b of bodies){if(b.kind!=='glass'||b.fall||b.served||b.t!==c.want)continue;const d=Math.hypot(b.x-c.x,b.y-c.y);if(d<CR&&d<bd){bd=d;best=b}}
+    if(best){best.served=true;best.servedT=0;best.target=c;c.served=true;n++;const pts=100+Math.round(50*(1-bd/CR));lvScore+=pts;pop(c.x,c.y,'+'+pts);
+      c.pm.userData.bub.material.map=bubbleTex(c.want,true);c.pm.userData.bub.material.needsUpdate=true;c.co.material=M.coasterOk}}
+  if(n)toast(n>1?'一次送 '+n+' 杯！':'送到了！',true);
+  else if(!cur.fall){const near=custs.find(c=>!c.served&&Math.hypot(cur.x-c.x,cur.y-c.y)<CR);
+    if(near&&near.want!==cur.t)toast('他點的是'+TYPES[near.want].name);else if(cur.t!=='keg')toast('沒送到')}
+  $('score').textContent=total+lvScore;state='wait';
+  setTimeout(()=>{if(state!=='wait')return;if(custs.every(c=>c.served))endLevel(true);else nextGlass()},900)}
+
+/* ===== 每一格畫面 ===== */
+const tmp=new THREE.Vector3();
+function sync(dt){
+  for(const b of bodies){const m=b.mesh;if(!m)continue;
+    m.position.x=b.x-W/2;m.position.z=b.y-L/2;
+    if(b.fall){const f=b.fall;m.position.y=-160*f*f;m.rotation.x=-f*4*Math.sign(b.vy||-1);m.rotation.z=f*3*Math.sign(b.vx||1);m.visible=f<1.3}
+    else if(b.served){b.servedT+=dt;const c=b.target,k=Math.min(1,b.servedT/.5);
+      m.position.x+=((c.side==='L'?-6:W+6)-b.x)*k;m.position.y=k*14;m.scale.setScalar(1-k*.85);if(k>=1)m.visible=false}
+    else{m.position.y=0;m.rotation.y=b.spin||0;if(b.t==='beer'||b.t==='shot'){const v=Math.hypot(b.vx,b.vy);m.rotation.x=Math.min(.12,v*.0006)*Math.sign(-b.vy);}}
+    if(b===cur&&state==='aim'){m.position.y=Math.abs(Math.sin(performance.now()/300))*1.2}}
+  for(const c of custs){const u=c.pm.userData;u.bub.position.y=30+Math.sin(performance.now()/400+c.y)*1.2;
+    if(c.served){const k=Math.max(0,1-c.t*1.2);u.head.position.y=11+Math.abs(Math.sin(c.t*10))*2*k;u.arm.rotation.x=-Math.min(1.2,c.t*3)}}
+  const r=renderer.domElement.getBoundingClientRect();
+  for(const p of pops){p.t+=dt;tmp.copy(P(p.x,p.y));tmp.y=22+p.t*14;tmp.project(camera);
+    p.el.style.left=((tmp.x+1)/2*r.width)+'px';p.el.style.top=((1-tmp.y)/2*r.height)+'px';p.el.style.opacity=Math.max(0,1-p.t/1.3)}
+  for(let i=pops.length-1;i>=0;i--)if(pops[i].t>1.3){pops[i].el.remove();pops.splice(i,1)}
+  neonLight.intensity=1.2+Math.sin(performance.now()/180)*.15;
+}
+function loop(t){const dt=Math.min(.033,(t-lastT)/1000||0);lastT=t;
+  if(state==='slide'||state==='wait'||state==='end'){for(let i=0;i<3;i++)step(dt/3)}
+  sync(dt);
+  if(shake>0){camera.position.x=(Math.random()-.5)*shake*6;shake=Math.max(0,shake-dt)}
+  renderer.render(scene,camera);camera.position.x=0;
+  requestAnimationFrame(loop)}
+menu();requestAnimationFrame(loop);
+})();
+</script>
+
+</body>
+</html>
