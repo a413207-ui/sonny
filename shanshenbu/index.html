@@ -1,0 +1,288 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover" />
+<title>閃身步</title>
+<style>
+  :root{color-scheme:dark;--bg:#071016;--panel:rgba(8,18,26,.72);--line:rgba(255,255,255,.12);--text:#f5fbff;--muted:#9db0bd;--cyan:#7fe9ff;--gold:#ffd27a;--danger:#ff6b78}
+  *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+  html,body{margin:0;width:100%;height:100%;overflow:hidden;background:radial-gradient(circle at 50% 20%,#112532 0,#071016 48%,#03070b 100%);font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","Noto Sans TC",sans-serif;color:var(--text);touch-action:none}
+  #wrap{position:fixed;inset:0;display:grid;place-items:center;background:linear-gradient(180deg,rgba(69,156,186,.08),transparent 35%)}
+  #gameBox{position:relative;width:min(100vw,520px);height:100dvh;max-height:960px;overflow:hidden;background:#081218;box-shadow:0 0 70px rgba(0,0,0,.5)}
+  canvas{display:block;width:100%;height:100%}
+  #hud{position:absolute;left:0;right:0;top:0;display:flex;justify-content:space-between;gap:12px;padding:max(18px,env(safe-area-inset-top)) 18px 0;pointer-events:none}
+  .hudCard{min-width:112px;padding:10px 12px;border:1px solid var(--line);background:var(--panel);backdrop-filter:blur(10px);border-radius:14px;box-shadow:0 8px 30px rgba(0,0,0,.22)}
+  .label{font-size:11px;letter-spacing:.16em;color:var(--muted)}
+  .value{font-size:22px;font-weight:800;margin-top:2px}
+  #dashMeter{position:absolute;left:18px;right:18px;bottom:calc(104px + env(safe-area-inset-bottom));height:9px;border-radius:99px;border:1px solid var(--line);background:rgba(0,0,0,.3);overflow:hidden;pointer-events:none}
+  #dashFill{height:100%;width:100%;background:linear-gradient(90deg,#5dd7ff,#c9f6ff);box-shadow:0 0 18px rgba(110,226,255,.85);transform-origin:left center}
+  #controls{position:absolute;left:0;right:0;bottom:0;display:flex;gap:14px;padding:14px 18px calc(14px + env(safe-area-inset-bottom));pointer-events:auto}
+  .btn{flex:1;height:70px;border-radius:20px;border:1px solid rgba(255,255,255,.16);background:linear-gradient(180deg,rgba(27,50,61,.92),rgba(9,20,28,.92));color:#effcff;font-weight:850;font-size:17px;letter-spacing:.08em;box-shadow:inset 0 1px 0 rgba(255,255,255,.1),0 12px 28px rgba(0,0,0,.28);user-select:none}
+  .btn:active{transform:scale(.98);filter:brightness(1.25)}
+  .arrow{font-size:24px;margin-right:8px;vertical-align:-2px;color:var(--cyan)}
+  #overlay{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;padding:28px;background:linear-gradient(180deg,rgba(3,8,12,.3),rgba(3,8,12,.8));backdrop-filter:blur(5px)}
+  #panel{width:min(100%,390px);border:1px solid rgba(255,255,255,.15);border-radius:28px;padding:28px 24px 24px;background:linear-gradient(180deg,rgba(15,31,41,.92),rgba(5,13,19,.94));box-shadow:0 25px 70px rgba(0,0,0,.48);text-align:center}
+  #title{font-size:44px;font-weight:950;letter-spacing:.12em;margin:2px 0 6px;text-shadow:0 0 24px rgba(127,233,255,.3)}
+  #subtitle{font-size:14px;color:var(--muted);line-height:1.7;margin:0 0 20px}
+  #startBtn{width:100%;height:58px;border:0;border-radius:17px;background:linear-gradient(90deg,#75e7ff,#a8f7ff);color:#041015;font-size:18px;font-weight:950;letter-spacing:.08em;box-shadow:0 0 28px rgba(102,225,255,.28)}
+  #tip{margin-top:14px;font-size:12px;color:#7f949f;line-height:1.65}
+  #status{min-height:24px;margin:8px 0 14px;color:var(--gold);font-weight:750}
+  .hidden{display:none!important}
+</style>
+</head>
+<body>
+<div id="wrap">
+  <div id="gameBox">
+    <canvas id="game"></canvas>
+    <div id="hud">
+      <div class="hudCard"><div class="label">距離</div><div class="value"><span id="score">0</span> m</div></div>
+      <div class="hudCard" style="text-align:right"><div class="label">最高</div><div class="value"><span id="best">0</span> m</div></div>
+    </div>
+    <div id="dashMeter"><div id="dashFill"></div></div>
+    <div id="controls">
+      <button class="btn" id="leftBtn"><span class="arrow">←</span>左閃</button>
+      <button class="btn" id="rightBtn">右閃<span class="arrow" style="margin:0 0 0 8px">→</span></button>
+    </div>
+    <div id="overlay">
+      <div id="panel">
+        <div id="title">閃身步</div>
+        <p id="subtitle">角色會自動向前疾奔。<br>看準障礙物出現的位置，用瞬間側閃穿過縫隙。</p>
+        <div id="status">撐得越久，速度越快。</div>
+        <button id="startBtn">開始奔跑</button>
+        <div id="tip">手機：點左右按鈕，或在畫面左右滑動<br>電腦：A / D 或 ← / →<br>閃身步有短暫冷卻，亂按會來不及躲下一個障礙。</div>
+        <a href="../" style="display:inline-block;margin-top:14px;font-size:13px;color:#9db0bd;text-decoration:none">← 回 Sonny 首頁</a>
+      </div>
+    </div>
+  </div>
+</div>
+<script>
+(() => {
+  const canvas = document.getElementById('game');
+  const ctx = canvas.getContext('2d');
+  const box = document.getElementById('gameBox');
+  const scoreEl = document.getElementById('score');
+  const bestEl = document.getElementById('best');
+  const dashFill = document.getElementById('dashFill');
+  const overlay = document.getElementById('overlay');
+  const startBtn = document.getElementById('startBtn');
+  const statusEl = document.getElementById('status');
+  const leftBtn = document.getElementById('leftBtn');
+  const rightBtn = document.getElementById('rightBtn');
+
+  let W=0,H=0,DPR=1;
+  let running=false,last=0,time=0,distance=0,best=0;
+  try{best=Number(localStorage.getItem('dashstepBest')||0)||0}catch(e){}
+  let speed=330,spawnTimer=0,nextSpawn=.85,shake=0;
+  let pointerStart=null;
+  let obstacles=[],particles=[],afterimages=[],roadMarks=[];
+
+  const player={x:0,y:0,w:34,h:52,lane:1,targetLane:1,dashCd:0,dashMax:.42,dashFx:0,invuln:0};
+  const lanes=3;
+
+  bestEl.textContent=Math.floor(best);
+
+  function resize(){
+    const r=box.getBoundingClientRect();
+    DPR=Math.min(window.devicePixelRatio||1,2);
+    W=r.width;H=r.height;
+    canvas.width=Math.floor(W*DPR);canvas.height=Math.floor(H*DPR);
+    ctx.setTransform(DPR,0,0,DPR,0,0);
+    player.y=H*.73;
+    if(!running){player.lane=1;player.targetLane=1;player.x=laneX(1)}
+  }
+  window.addEventListener('resize',resize);resize();
+
+  function laneX(i){
+    const roadW=Math.min(W*.78,390);
+    const left=(W-roadW)/2;
+    return left+roadW*((i+.5)/lanes);
+  }
+
+  function reset(){
+    obstacles=[];particles=[];afterimages=[];roadMarks=[];
+    time=0;distance=0;speed=330;spawnTimer=0;nextSpawn=.85;shake=0;
+    player.lane=1;player.targetLane=1;player.x=laneX(1);player.y=H*.73;player.dashCd=0;player.dashFx=0;player.invuln=0;
+    for(let i=0;i<16;i++) roadMarks.push({y:(i/16)*H});
+    scoreEl.textContent='0';dashFill.style.transform='scaleX(1)';
+  }
+
+  function start(){
+    reset();running=true;last=performance.now();overlay.classList.add('hidden');requestAnimationFrame(loop);
+  }
+  startBtn.addEventListener('click',start);
+
+  function dash(dir){
+    if(!running || player.dashCd>0) return;
+    const to=Math.max(0,Math.min(lanes-1,player.targetLane+dir));
+    if(to===player.targetLane) return;
+    afterimages.push({x:player.x,y:player.y,a:.55,life:.22});
+    player.targetLane=to;player.lane=to;player.dashCd=player.dashMax;player.invuln=.12;player.dashFx=.16;
+    for(let i=0;i<12;i++) particles.push({x:player.x,y:player.y+8,vx:-dir*(70+Math.random()*160),vy:(Math.random()-.5)*80,life:.28+Math.random()*.14,size:2+Math.random()*3});
+    if(navigator.vibrate) navigator.vibrate(16);
+  }
+
+  leftBtn.addEventListener('pointerdown',e=>{e.preventDefault();dash(-1)});
+  rightBtn.addEventListener('pointerdown',e=>{e.preventDefault();dash(1)});
+  window.addEventListener('keydown',e=>{
+    if(['ArrowLeft','a','A'].includes(e.key)){e.preventDefault();dash(-1)}
+    if(['ArrowRight','d','D'].includes(e.key)){e.preventDefault();dash(1)}
+    if((e.key===' '||e.key==='Enter')&&!running){e.preventDefault();start()}
+  });
+  canvas.addEventListener('pointerdown',e=>{pointerStart={x:e.clientX,y:e.clientY}});
+  canvas.addEventListener('pointerup',e=>{
+    if(!pointerStart)return;
+    const dx=e.clientX-pointerStart.x,dy=e.clientY-pointerStart.y;
+    if(Math.abs(dx)>28&&Math.abs(dx)>Math.abs(dy)) dash(dx>0?1:-1);
+    pointerStart=null;
+  });
+
+  function spawnObstacle(){
+    const difficulty=Math.min(1,time/38);
+    const double=Math.random()<(0.18+difficulty*.42);
+    let blocked=[];
+    if(double){
+      const open=Math.floor(Math.random()*3);
+      blocked=[0,1,2].filter(v=>v!==open);
+    }else blocked=[Math.floor(Math.random()*3)];
+    const type=Math.random()<.18?'beam':'block';
+    blocked.forEach((lane,idx)=>{
+      obstacles.push({lane,x:laneX(lane),y:-70-idx*5,w:type==='beam'?76:62,h:type==='beam'?24:46,type,passed:false,glow:Math.random()*Math.PI*2});
+    });
+  }
+
+  function update(dt){
+    time+=dt;
+    speed=330+Math.min(350,time*8.2);
+    distance+=speed*dt*.032;
+    scoreEl.textContent=Math.floor(distance);
+
+    player.dashCd=Math.max(0,player.dashCd-dt);
+    player.invuln=Math.max(0,player.invuln-dt);
+    player.dashFx=Math.max(0,player.dashFx-dt);
+    dashFill.style.transform=`scaleX(${1-player.dashCd/player.dashMax})`;
+
+    const tx=laneX(player.targetLane);
+    const ease=1-Math.pow(.0008,dt);
+    player.x+=(tx-player.x)*ease;
+
+    spawnTimer-=dt;
+    if(spawnTimer<=0){
+      spawnObstacle();
+      const difficulty=Math.min(1,time/45);
+      nextSpawn=.84-difficulty*.28+Math.random()*.23;
+      spawnTimer=nextSpawn;
+    }
+
+    roadMarks.forEach(m=>{m.y+=speed*dt;if(m.y>H+20)m.y-=H+80});
+
+    for(const o of obstacles){
+      o.y+=speed*dt;
+      o.glow+=dt*5;
+      if(!o.passed&&o.y>player.y+player.h*.55){o.passed=true}
+      if(player.invuln<=0 && hit(player,o)) gameOver();
+    }
+    obstacles=obstacles.filter(o=>o.y<H+100);
+
+    afterimages.forEach(a=>{a.life-=dt;a.a=Math.max(0,a.life/.22)*.48});
+    afterimages=afterimages.filter(a=>a.life>0);
+    particles.forEach(p=>{p.life-=dt;p.x+=p.vx*dt;p.y+=p.vy*dt;p.vx*=.93;p.vy*=.96});
+    particles=particles.filter(p=>p.life>0);
+    shake=Math.max(0,shake-dt*3);
+  }
+
+  function hit(p,o){
+    const px=p.x-p.w*.38,py=p.y-p.h*.42,pw=p.w*.76,ph=p.h*.84;
+    const ox=o.x-o.w*.5,oy=o.y-o.h*.5;
+    return px<ox+o.w&&px+pw>ox&&py<oy+o.h&&py+ph>oy;
+  }
+
+  function gameOver(){
+    if(!running)return;
+    running=false;shake=.32;
+    if(navigator.vibrate) navigator.vibrate([40,30,80]);
+    best=Math.max(best,distance);try{localStorage.setItem('dashstepBest',best)}catch(e){}bestEl.textContent=Math.floor(best);
+    statusEl.innerHTML=`這次跑了 <b>${Math.floor(distance)} m</b>`;
+    startBtn.textContent='再跑一次';
+    overlay.classList.remove('hidden');
+    draw();
+  }
+
+  function drawRoad(){
+    const roadW=Math.min(W*.78,390),left=(W-roadW)/2,right=left+roadW;
+    const grad=ctx.createLinearGradient(left,0,right,0);
+    grad.addColorStop(0,'rgba(6,17,24,.94)');grad.addColorStop(.5,'rgba(14,31,40,.97)');grad.addColorStop(1,'rgba(6,17,24,.94)');
+    ctx.fillStyle=grad;ctx.fillRect(left,0,roadW,H);
+    ctx.strokeStyle='rgba(132,228,255,.14)';ctx.lineWidth=1;
+    ctx.beginPath();ctx.moveTo(left,0);ctx.lineTo(left,H);ctx.moveTo(right,0);ctx.lineTo(right,H);ctx.stroke();
+    for(let i=1;i<3;i++){
+      const x=left+roadW*i/3;ctx.setLineDash([15,22]);ctx.strokeStyle='rgba(184,235,246,.12)';ctx.beginPath();ctx.moveTo(x,0);ctx.lineTo(x,H);ctx.stroke();
+    }
+    ctx.setLineDash([]);
+    roadMarks.forEach(m=>{
+      const alpha=.08+Math.min(.18,m.y/H*.18);ctx.strokeStyle=`rgba(135,224,242,${alpha})`;ctx.lineWidth=1;
+      ctx.beginPath();ctx.moveTo(left+9,m.y);ctx.lineTo(right-9,m.y);ctx.stroke();
+    });
+    ctx.strokeStyle='rgba(133,233,255,.10)';
+    for(let i=0;i<12;i++){
+      const x=left+12+(i*53%Math.max(30,roadW-24));const y=(i*97+time*speed*.65)%(H+160)-80;
+      ctx.beginPath();ctx.moveTo(x,y);ctx.lineTo(x,y+32+speed*.04);ctx.stroke();
+    }
+  }
+
+  function drawObstacle(o){
+    ctx.save();ctx.translate(o.x,o.y);
+    const pulse=.55+.2*Math.sin(o.glow);
+    ctx.shadowBlur=18;ctx.shadowColor=`rgba(255,93,112,${pulse})`;
+    if(o.type==='beam'){
+      ctx.fillStyle='#bd4250';ctx.fillRect(-o.w/2,-o.h/2,o.w,o.h);
+      ctx.fillStyle='rgba(255,238,209,.75)';for(let i=-28;i<=28;i+=14)ctx.fillRect(i,-o.h/2,6,o.h);
+    }else{
+      ctx.fillStyle='#642d38';ctx.fillRect(-o.w/2,-o.h/2,o.w,o.h);
+      ctx.strokeStyle='#ff8a96';ctx.lineWidth=2;ctx.strokeRect(-o.w/2+4,-o.h/2+4,o.w-8,o.h-8);
+      ctx.fillStyle='rgba(255,180,190,.22)';ctx.fillRect(-o.w/2+8,-o.h/2+8,o.w-16,7);
+    }
+    ctx.restore();
+  }
+
+  function drawRunner(x,y,alpha=1){
+    ctx.save();ctx.globalAlpha=alpha;ctx.translate(x,y);
+    const dashStretch=player.dashFx>0?1.22:1;
+    ctx.scale(dashStretch,1);
+    ctx.shadowBlur=18;ctx.shadowColor='rgba(112,229,255,.75)';
+    ctx.fillStyle='#d8faff';
+    ctx.beginPath();ctx.arc(0,-18,8,0,Math.PI*2);ctx.fill();
+    ctx.strokeStyle='#c4f6ff';ctx.lineWidth=6;ctx.lineCap='round';
+    ctx.beginPath();ctx.moveTo(0,-10);ctx.lineTo(0,12);ctx.stroke();
+    ctx.lineWidth=5;
+    ctx.beginPath();ctx.moveTo(0,-4);ctx.lineTo(-12,5);ctx.moveTo(0,-3);ctx.lineTo(12,4);ctx.moveTo(0,12);ctx.lineTo(-10,28);ctx.moveTo(0,12);ctx.lineTo(11,27);ctx.stroke();
+    ctx.strokeStyle='#72e8ff';ctx.lineWidth=2;ctx.beginPath();ctx.moveTo(-8,5);ctx.lineTo(8,5);ctx.stroke();
+    ctx.restore();
+  }
+
+  function draw(){
+    ctx.save();
+    if(shake>0){ctx.translate((Math.random()-.5)*9*shake,(Math.random()-.5)*9*shake)}
+    ctx.clearRect(-20,-20,W+40,H+40);
+    const bg=ctx.createLinearGradient(0,0,0,H);bg.addColorStop(0,'#0d202a');bg.addColorStop(.48,'#071117');bg.addColorStop(1,'#03080c');ctx.fillStyle=bg;ctx.fillRect(0,0,W,H);
+    drawRoad();
+    obstacles.forEach(drawObstacle);
+    afterimages.forEach(a=>drawRunner(a.x,a.y,a.a));
+    particles.forEach(p=>{ctx.globalAlpha=Math.max(0,p.life/.42);ctx.fillStyle='#93ecff';ctx.fillRect(p.x,p.y,p.size,p.size)});ctx.globalAlpha=1;
+    drawRunner(player.x,player.y,1);
+    const fog=ctx.createLinearGradient(0,0,0,H*.32);fog.addColorStop(0,'rgba(126,220,244,.12)');fog.addColorStop(1,'rgba(126,220,244,0)');ctx.fillStyle=fog;ctx.fillRect(0,0,W,H*.35);
+    ctx.restore();
+  }
+
+  function loop(now){
+    if(!running)return;
+    const dt=Math.min(.033,(now-last)/1000||0);last=now;
+    update(dt);draw();
+    if(running)requestAnimationFrame(loop);
+  }
+
+  reset();draw();
+})();
+</script>
+</body>
+</html>
