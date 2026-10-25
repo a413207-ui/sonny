@@ -231,6 +231,8 @@ details.hp{border-bottom:1px solid #d8c8a2;padding:6px 0}details.hp summary{font
 details.hp div{font-size:14px;line-height:1.7}details.hp p{margin:6px 0}
 .hpt{overflow-x:auto}.hpt table{border-collapse:collapse;font-size:12px;width:100%}.hpt td,.hpt th{border-bottom:1px solid #e0d2ad;padding:3px 4px;text-align:left;vertical-align:top}.hpt th{color:var(--ink-soft);font-weight:400}
 .title .hpwrap{background:var(--paper);color:var(--ink);text-align:left;border-radius:4px;padding:8px 14px;margin-top:8px}
+.tpick{display:grid;gap:8px}.tp{display:grid;grid-template-columns:5em 1fr 5.5em;grid-template-rows:auto auto;gap:2px 8px;align-items:center;border-bottom:1px solid #e0d2ad;padding:4px 0}
+.tp b{grid-row:1;font-family:var(--f-disp)}.tp small{grid-row:2;grid-column:1;font-size:10px;color:var(--ink-soft)}.tp input[type=range]{grid-row:1/3;grid-column:2;width:100%}.tp input[type=number]{grid-row:1/3;grid-column:3;width:100%;font-size:14px;background:#f7eedb;color:var(--ink);border:1px solid #b8a67e;border-radius:3px;padding:4px 6px}
 .lords{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
 .lords button{display:flex;gap:8px;align-items:center;text-align:left;border:1px solid #b8a67e;background:#f7eedb;color:var(--ink);padding:8px;border-radius:3px;cursor:pointer;font-size:12px}
 .lords button i{width:16px;height:16px;flex:none}
@@ -2902,7 +2904,7 @@ function 出征(k){
       const A=power(a,info[extraPick.s].train),D=power(dl,d.train,1+d.wall/(d.capWall||1000)*.6)*1.3;const win=Math.round(100*A/Math.max(1,A+D));
       const adv=p.length?advice(win,["出征",extraPick.t,extraPick.s,p.map(g=>g.n).join()].join("|")):"";
       return{ok:p.length&&tot>0&&food<=BANK[f].food,msg:p.length?`帶兵 ${tot.toLocaleString()}／${extraPick.s} 城內 ${info[extraPick.s].troops.toLocaleString()}・軍糧 ${food}${food>BANK[f].food?"（糧不夠）":""}${adv?"<br>"+adv:""}`:""}},
-    onOk:ps=>{const ef=info[extraPick.t].f;const t=ef?treaty(f,ef):null;const S=extraPick.s,T=extraPick.t,army=alloc(ps);
+    onOk:ps=>{const S0=extraPick.s;troopPicker(ps,S0,army=>{const ef=info[extraPick.t].f;const t=ef?treaty(f,ef):null;const S=S0,T=extraPick.t;
       const launch=pre=>{const d=info[T];const hasDef=d.troops>0||Object.values(GEN).some(g=>g.city===T&&g.f===d.f&&d.f&&!g.away);
         if(!hasDef){goBattle(S,T,army,pre);return}const ally=jointArmies(f,T);
         pickReinf({f,t:T,exclude:[S],title:"派援軍",note:`主力 ${army.length} 人從 ${S} 出兵 ${T}。要不要從其他城加派援軍？`,ally,onDone:list=>goBattle(S,T,army,pre,{reinf:[...list,...ally]})})};
@@ -2910,8 +2912,32 @@ function 出征(k){
         <div class="mfoot"><span class="sum"></span><button class="mbtn ghost" id="mno">取消</button><button class="mbtn" id="myes" style="background:#a3362a;border-color:#a3362a">毀約出兵</button></div>`;
         mbox.querySelector("#mno").onclick=()=>{modal.classList.remove("mid");closeModal()};
         mbox.querySelector("#myes").onclick=()=>{modal.classList.remove("mid");const msg=breakTreaty(f,ef);launch([`<div class="ng">${msg}</div>`])}}
-      else launch([])}});
+      else launch([])})}});
 }
+/* 出兵分配：每位武將自己決定帶多少兵（上限看官職與規則），可一鍵帶滿 */
+function troopPicker(ps,src,done){const c=info[src];const cap=g=>maxTroops(g);const STEP=100;
+  const v={};let left=c.troops;ps.forEach(g=>{const n=Math.min(cap(g),left);v[g.n]=n;left-=n});
+  const draw=()=>{const tot=ps.reduce((a,g)=>a+v[g.n],0),food=Math.round(tot/2);const over=tot>c.troops;modal.classList.remove("mid");
+    mbox.innerHTML=`<h3>出兵分配</h3><p class="note">${src} 城內有 ${c.troops.toLocaleString()} 兵。拉動或輸入每位武將要帶的兵，上限看官職（君主、智力 90 政治 80 以上可帶 20000）。</p>
+      <div class="tpick">${ps.map(g=>`<div class="tp"><b>${g.n}</b><small>上限 ${cap(g).toLocaleString()}</small>
+        <input type="range" min="0" max="${cap(g)}" step="${STEP}" value="${v[g.n]}" data-r="${g.n}"><input type="number" min="0" max="${cap(g)}" step="${STEP}" value="${v[g.n]}" data-n="${g.n}" class="cin"></div>`).join("")}</div>
+      <div class="opts" style="margin:8px 0"><button id="tmax">一鍵上限</button><button id="tavg">平均分配</button><button id="tzero">全部清空</button></div>
+      <div class="mfoot"><span class="sum" style="${over||food>BANK[G.me].food?"color:#a3362a":""}">共 ${tot.toLocaleString()} 兵${over?`（超過城內 ${(tot-c.troops).toLocaleString()}）`:""}・軍糧 ${food.toLocaleString()}${food>BANK[G.me].food?"（糧不夠）":""}</span>
+      <button class="mbtn ghost" id="mcancel">取消</button><button class="mbtn" id="mok" ${over||!tot||food>BANK[G.me].food?"disabled":""}>出征</button></div>`;
+    modal.hidden=false;
+    const set=(n,val)=>{const g=ps.find(x=>x.n===n);v[n]=Math.max(0,Math.min(cap(g),Math.round((+val||0)/STEP)*STEP))};
+    mbox.querySelectorAll("[data-r]").forEach(e=>e.oninput=()=>{set(e.dataset.r,e.value);const o=mbox.querySelector(`[data-n="${e.dataset.r}"]`);if(o)o.value=v[e.dataset.r];sumOnly()});
+    mbox.querySelectorAll("[data-r]").forEach(e=>e.onchange=draw);
+    mbox.querySelectorAll("[data-n]").forEach(e=>e.onchange=()=>{set(e.dataset.n,e.value);draw()});
+    mbox.querySelector("#tmax").onclick=()=>{let l=c.troops;ps.forEach(g=>{const n=Math.min(cap(g),l);v[g.n]=n;l-=n});draw()};
+    mbox.querySelector("#tavg").onclick=()=>{const each=Math.floor(c.troops/ps.length/STEP)*STEP;ps.forEach(g=>v[g.n]=Math.min(cap(g),each));draw()};
+    mbox.querySelector("#tzero").onclick=()=>{ps.forEach(g=>v[g.n]=0);draw()};
+    mbox.querySelector("#mcancel").onclick=closeModal;
+    mbox.querySelector("#mok").onclick=()=>{const army=ps.map(g=>({g,t:v[g.n]})).filter(u=>u.t>0);done(army)}};
+  const sumOnly=()=>{const tot=ps.reduce((a,g)=>a+v[g.n],0),food=Math.round(tot/2),over=tot>c.troops;const s=mbox.querySelector(".sum");const ok=mbox.querySelector("#mok");
+    if(s){s.textContent=`共 ${tot.toLocaleString()} 兵${over?`（超過城內 ${(tot-c.troops).toLocaleString()}）`:""}・軍糧 ${food.toLocaleString()}${food>BANK[G.me].food?"（糧不夠）":""}`;s.style.color=over||food>BANK[G.me].food?"#a3362a":""}
+    if(ok)ok.disabled=over||!tot||food>BANK[G.me].food};
+  draw()}
 /* 有守軍就進戰場；空城直接佔領 */
 async function goBattle(k,t,army,pre,opts={}){closeModal();await playMarchAnim(k,t,army.map(u=>u.g.n));const d=info[t];const hasDef=d.troops>0||Object.values(GEN).some(g=>g.city===t&&g.f===d.f&&d.f&&!g.away);
   if(hasDef)startBattle(k,t,army.filter(u=>u.t>0),pre,opts);else battle(k,t,army,pre)}
