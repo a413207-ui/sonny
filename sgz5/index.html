@@ -967,7 +967,7 @@ function helpHTML(){const sec=(t,b,open)=>`<details class="hp"${open?" open":""}
   +sec("天下武鬥大會",`<p>每年一月舉辦，各勢力派一人比武，淘汰制，人數是單數時排名最前的一位輪空。冠軍威名 +1000、勢力得金 2000；亞軍 +500、金 1000；季軍 +250、金 500。</p>`)
   +sec("天子・名聲",`<p>天子不屬於任何勢力，固定在首都（地圖上有「帝」字的城）。佔據那座城的勢力名聲 +200。名聲決定君主官職和每月指令數。</p>`)
   +sec("壽命",`<p>武將有出生年和壽命，超過壽命會先生病再病逝。未滿 16 歲不會登場。君主過世時由你選繼承人，勢力改用新君主的名字。選項可以改成長壽或不會病逝。</p>`)
-  +sec("建立武將",`<p>主選單的「建立武將」可以自創武將：選類型、擲骰子決定能力、挑陣型和特技、設定出生年和相性。開新遊戲時可以讓他當君主、加入某個勢力或當在野武將。</p>`)
+  +sec("建立武將",`<p>主選單的「建立武將」可以自創武將：選類型、擲骰子決定能力（武力、統率、智力、政治、魅力五項合計不超過類型上限），挑陣型和特技、設定出生年和相性。也可以按「自動建立一位」直接隨機產生。開新遊戲時可以讓他當君主、加入某個勢力或當在野武將。</p>`)
   +sec("選項",`<p>難度（影響季收入）、指令動畫、壽命、自動存檔、音樂、音效。遊戲中右側的「選項」也能改。</p>`)}
 function openHelpInGame(){modal.classList.remove("mid");mbox.innerHTML=`<h3>遊戲說明</h3>${helpHTML()}<div class="mfoot"><span class="sum"></span><button class="mbtn" id="mcancel">關閉</button></div>`;
   modal.hidden=false;mbox.classList.add("solid");mbox.scrollTop=0;mbox.querySelector("#mcancel").onclick=closeModal}
@@ -2033,23 +2033,24 @@ function playPatrolAnim(g,city,ev,o={}){const me=g.n;
     camAt(C,t){const zk=C.zk();const z=C.me.g.position.z;return[new C.T3.Vector3(5*zk,4.6*zk,z+7.5*zk),new C.T3.Vector3(0,1.3,z-2.5)]}})}
 /* ================= 建立武將 ================= */
 const CTYPES={
-  綜合型:{sum:350,cap:{war:94,int:94,pol:94,cha:100},lead:94,d:"唯一能洗出魅力 90 以上。武力、智力、政治上限 94"},
-  智力型:{sum:335,cap:{war:85,int:100,pol:99,cha:89},lead:90,d:"唯一能洗出智力 100。政治上限 99、魅力 89、武力 85"},
-  武力型:{sum:325,cap:{war:100,int:94,pol:89,cha:89},lead:95,d:"唯一能洗出武力 100。智力上限 94、政治與魅力 89"},
+  綜合型:{sum:350,cap:{war:94,int:94,pol:94,cha:100},lead:94,bias:{cha:.4},d:"唯一能洗出魅力 90 以上。武力、智力、政治上限 94"},
+  智力型:{sum:335,cap:{war:85,int:100,pol:99,cha:89},lead:90,bias:{int:1.6,pol:.6},d:"唯一能洗出智力 100。政治上限 99、魅力 89、武力 85"},
+  武力型:{sum:325,cap:{war:100,int:94,pol:89,cha:89},lead:95,bias:{war:1.6,lead:.6},d:"唯一能洗出武力 100。智力上限 94、政治與魅力 89"},
 };
 const STAT_N={war:"武力",lead:"統率",int:"智力",pol:"政治",cha:"魅力"};
 const CUSTOM_KEY="sgz5_custom";
 const loadCustom=()=>{try{return JSON.parse(localStorage.getItem(CUSTOM_KEY)||"[]")}catch(e){return[]}};
 const saveCustom=L=>{try{localStorage.setItem(CUSTOM_KEY,JSON.stringify(L));return true}catch(e){return false}};
-/* 骰點數：四維總和在「上限−30～上限」之間，每項至少 30、不超過類型上限；統率另外骰 */
-function rollStats(type){const T=CTYPES[type];const keys=["war","int","pol","cha"];const S=rint(T.sum-30,T.sum);
-  const v={war:30,int:30,pol:30,cha:30};let left=S-120;const w={};keys.forEach(k=>w[k]=.15+Math.random());
-  for(let guard=0;left>0&&guard<200;guard++){const open=keys.filter(k=>v[k]<T.cap[k]);if(!open.length)break;const tw=open.reduce((a,k)=>a+w[k],0);
-    let used=0;open.forEach(k=>{const add=Math.min(T.cap[k]-v[k],Math.max(1,Math.floor(left*w[k]/tw)));v[k]+=add;used+=add});left-=used;
+/* 骰點數：武力、統率、智力、政治、魅力五項一起算總和，總和在「上限−30～上限」之間，每項至少 30、不超過類型上限 */
+const SKEYS=["war","lead","int","pol","cha"];
+const capOfT=(T,k)=>k==="lead"?T.lead:T.cap[k];
+function rollStats(type){const T=CTYPES[type];const keys=SKEYS;const S=rint(T.sum-30,T.sum);
+  const v={war:30,lead:30,int:30,pol:30,cha:30};let left=S-150;const w={};keys.forEach(k=>w[k]=.15+Math.random()+((T.bias||{})[k]||0));
+  for(let guard=0;left>0&&guard<200;guard++){const open=keys.filter(k=>v[k]<capOfT(T,k));if(!open.length)break;const tw=open.reduce((a,k)=>a+w[k],0);
+    let used=0;open.forEach(k=>{if(used>=left)return;const add=Math.min(capOfT(T,k)-v[k],left-used,Math.max(1,Math.floor(left*w[k]/tw)));v[k]+=add;used+=add});left-=used;
     if(used===0)break}
-  while(left<0){const k=keys.find(k=>v[k]>30);v[k]--;left++}
-  v.lead=rint(40,T.lead);return v}
-const sumStats=v=>v.war+v.int+v.pol+v.cha;
+  return v}
+const sumStats=v=>v.war+v.lead+v.int+v.pol+v.cha;
 const allNames=()=>new Set([...Object.keys(GEN),...Object.keys(FREE)]);
 const refList=()=>[...Object.values(GEN).filter(g=>!g.custom),...Object.values(FREE).filter(g=>!g.custom)].sort((a,b)=>a.aff-b.aff);
 
@@ -2057,8 +2058,22 @@ function makeView(P,back){const L=loadCustom();
   P.innerHTML=`<h3>建立武將</h3><p class="note">自己創造的武將存在這台裝置的瀏覽器裡。開新遊戲時可以選擇讓他們登場。</p>
     <div class="clist">${L.map((c,i)=>`<button class="scn" data-i="${i}"><b>${esc(c.n)}<small style="display:inline;margin-left:8px">${c.type}・${c.birth}年生</small></b>
       <small>武${c.war} 統${c.lead} 智${c.int} 政${c.pol} 魅${c.cha}　【${c.skill}】　${c.forms.join(" ")}</small></button>`).join("")||`<p class="note">還沒有自創武將。</p>`}</div>
-    <div class="tm" style="margin-top:12px"><button id="cnew">新增武將</button></div><button class="back" id="tback">返回</button>`;
-  P.querySelector("#cnew").onclick=()=>editCustom(P,null,back);P.querySelectorAll("[data-i]").forEach(b=>b.onclick=()=>editCustom(P,+b.dataset.i,back));P.querySelector("#tback").onclick=back}
+    <div class="tm" style="margin-top:12px"><button id="cnew">新增武將</button><button id="cauto">自動建立一位</button></div><p class="note" id="cmsg2"></p><button class="back" id="tback">返回</button>`;
+  P.querySelector("#cnew").onclick=()=>editCustom(P,null,back);
+  P.querySelector("#cauto").onclick=()=>{const c=autoCustom();const L2=loadCustom();L2.push(c);if(!saveCustom(L2)){P.querySelector("#cmsg2").textContent="儲存失敗：這個瀏覽器不允許儲存";return}
+    makeView(P,back);const m=P.querySelector("#cmsg2");if(m)m.textContent=`已建立「${c.n}」（${c.type}），點他可以修改。`};P.querySelectorAll("[data-i]").forEach(b=>b.onclick=()=>editCustom(P,+b.dataset.i,back));P.querySelector("#tback").onclick=back}
+/* 自動建立：隨機名字、類型、能力、陣型、特技、出生年、相性 */
+const SURN_POOL="王李張劉陳楊趙黃周吳徐孫胡朱高林何郭馬羅梁宋鄭謝韓唐馮董蕭程袁鄧許傅沈彭呂蘇盧蔣蔡賈丁魏薛葉閻潘杜戴夏鍾田任姜范方石姚廖鄒熊金陸郝孔白崔康毛秦江史顧侯邵孟龍段雷錢尹常武喬賀文";
+const GIVEN_POOL="雲霸德威昭瑾翼勇烈謙績紹琮泰彥恪義忠信仁允超昂休奉範凌儀宏琰煥朗傑勳衡鈞瑜澤遠毅峻岳巍駿嵩宣肅穆睿弘融疇廣靖平安寧遼鎮";
+function randName(){const used=new Set([...allNames(),...loadCustom().map(c=>c.n)]);
+  for(let i=0;i<200;i++){const sn=Math.random()<.08?["諸葛","司馬","夏侯","公孫","上官","歐陽"][rint(0,5)]:SURN_POOL[rint(0,SURN_POOL.length-1)];
+    const gn=GIVEN_POOL[rint(0,GIVEN_POOL.length-1)]+(sn.length===1&&Math.random()<.35?GIVEN_POOL[rint(0,GIVEN_POOL.length-1)]:"");const n=sn+gn;if(!used.has(n)&&n.length<=4)return n}
+  return"無名"+rint(10,99)}
+function autoCustom(){const type=Object.keys(CTYPES)[rint(0,2)];const v=rollStats(type);const g={...v,n:""};
+  let forms=learnForms(g).filter(x=>x!=="水陣"||Math.random()<.3);const all=Object.keys(FORM);while(forms.length<3){const x=all[rint(0,all.length-1)];if(!forms.includes(x))forms.push(x)}forms=forms.slice(0,6);
+  const pool=learnPool(g).filter(x=>x!=="無雙");const skill=pool[rint(0,pool.length-1)];
+  const refs=refList();const ref=refs[rint(0,refs.length-1)];const aff=ref?((ref.aff+rint(-5,5))+150)%150:rint(0,149);
+  return{n:randName(),type,...v,forms,skill,birth:rint(158,200),ref:ref?ref.n:"",aff}}
 const esc=s=>String(s).replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
 
 function editCustom(P,idx,back){const L=loadCustom();const old=idx==null?null:L[idx];
@@ -2067,9 +2082,9 @@ function editCustom(P,idx,back){const L=loadCustom();const old=idx==null?null:L[
   const draw=(msg="")=>{const T=CTYPES[c.type];const ref=refList();
     P.innerHTML=`<h3>${old?"修改武將":"新增武將"}</h3>
     <div class="orow"><span>名字</span><input id="cname" maxlength="4" value="${esc(c.n)}" placeholder="最多 4 個字" class="cin"></div>
-    <div class="orow"><span>類型</span><div><div class="opts">${Object.keys(CTYPES).map(t=>`<button data-t="${t}" aria-pressed="${c.type===t}">${t}</button>`).join("")}</div><p class="note" style="margin:4px 0 0">${T.d}。四維總和最高 ${T.sum}</p></div></div>
+    <div class="orow"><span>類型</span><div><div class="opts">${Object.keys(CTYPES).map(t=>`<button data-t="${t}" aria-pressed="${c.type===t}">${t}</button>`).join("")}</div><p class="note" style="margin:4px 0 0">${T.d}。五項總和最高 ${T.sum}</p></div></div>
     <div class="orow"><span>能力</span><div><div class="cstats">${["war","lead","int","pol","cha"].map(k=>`<div><small>${STAT_N[k]}</small><b>${c[k]}</b><i style="width:${c[k]}%"></i><small class="cap">上限 ${k==="lead"?T.lead:T.cap[k]}</small></div>`).join("")}</div>
-      <p class="note" style="margin:4px 0 0">四維總和 ${sumStats(c)} / ${T.sum}（統率另計）</p><button class="dice" id="cdice">🎲 擲骰子</button></div></div>
+      <p class="note" style="margin:4px 0 0">五項總和 ${sumStats(c)} / ${T.sum}</p><button class="dice" id="cdice">🎲 擲骰子</button></div></div>
     <div class="orow"><span>陣型<br><small>${c.forms.length}/6</small></span><div class="opts">${Object.keys(FORM).map(x=>`<button data-fm="${x}" aria-pressed="${c.forms.includes(x)}" title="${FORM[x].sp}">${x}</button>`).join("")}</div></div>
     <div class="orow"><span>特技</span><div><div class="opts">${Object.keys(SKD).filter(x=>x!=="無雙").map(x=>`<button data-sk="${x}" aria-pressed="${c.skill===x}">${x}</button>`).join("")}</div>
       <p class="note" style="margin:4px 0 0">${c.skill?`【${c.skill}】${SKD[c.skill]}。`:"選一個開局就有的特技。"}之後靠威名學其他特技。</p></div></div>
