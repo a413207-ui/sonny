@@ -145,7 +145,35 @@ FISH = [
     ("flamefish", "火焰魚", "R", "volcano", "dusk", (0.3, 1.5), (20, 40), "round", "#ff5a2a", "#ffd040", "游動時鱗片像火苗一樣閃動。"),
     ("obsidian_grouper", "黑曜石斑", "E", "volcano", "night,dawn", (20.0, 120.0), (80, 200), "round", "#1e1a24", "#9a6aff", "鱗片像黑曜石一樣又黑又亮。"),
     ("lava_phoenix", "熔岩鳳凰魚", "L", "volcano", "dawn", (30.0, 100.0), (150, 260), "myth", "#ff6a2a", "#fff070", "傳說從海底熔岩裡誕生的火鳥之魚。"),
+    # ── 隱藏地點（要在迷霧裡找到才釣得到）──
+    # 沉船 wreck（西南深海）
+    ("wreck_goby", "船艙蝦虎", "C", "wreck", "any", (0.02, 0.08), (6, 12), "slim", "#6a5a4a", "#c8a070", "把破掉的船艙當成自己的家。"),
+    ("rust_crab", "鏽甲蟹", "C", "wreck", "any", (0.2, 1.0), (10, 25), "crab", "#a0582a", "#5a3a20", "殼上長滿像鐵鏽一樣的斑。"),
+    ("anchor_grouper", "錨紋石斑", "U", "wreck", "dusk,night,dawn", (3.0, 20.0), (40, 100), "round", "#5a5a4a", "#d0c080", "身上的花紋像一支船錨。"),
+    ("coin_snapper", "金幣笛鯛", "R", "wreck", "day,dusk", (1.0, 6.0), (30, 60), "flat", "#e0b040", "#fff0a0", "老是在沉船的寶箱旁邊打轉。"),
+    ("ghost_lanternfish", "幽靈燈籠魚", "E", "wreck", "night", (0.5, 3.0), (20, 40), "round", "#a0c8d8", "#e0fff8", "半透明的身體會發出淡淡的綠光。"),
+    ("wreck_captain", "沉船船長", "L", "wreck", "night", (200.0, 600.0), (250, 400), "myth", "#3a3a4a", "#e0c060", "據說是那艘沉船的船長化身成的巨魚。"),
+    # 海蝕洞 cave（西北岩礁，只有清晨退潮才進得去）
+    ("cave_blindfish", "盲眼洞魚", "C", "cave", "dawn", (0.02, 0.1), (6, 14), "slim", "#e8d8d0", "#ffb0b0", "一輩子住在黑暗裡，眼睛退化了。"),
+    ("echo_shrimp", "回音槍蝦", "U", "cave", "dawn", (0.01, 0.05), (4, 9), "crab", "#e06a4a", "#ffd0b0", "大螯一夾會「啪」一聲在洞裡迴盪。"),
+    ("crystal_eel", "水晶鰻", "R", "cave", "dawn", (0.3, 2.0), (40, 90), "eel", "#a0e0f0", "#ffffff", "身體像水晶一樣閃閃發亮。"),
+    ("cave_dragonet", "洞穴龍鰧", "E", "cave", "dawn", (0.5, 3.0), (20, 45), "flat", "#6a4a9a", "#f0a0ff", "只有退潮時的海蝕洞裡才見得到。"),
+    # 無人島潟湖 lagoon（東南外海）
+    ("lagoon_damsel", "潟湖雀鯛", "C", "lagoon", "any", (0.03, 0.12), (5, 10), "flat", "#4ac0e0", "#ffe060", "清澈潟湖裡成群游動的小魚。"),
+    ("bonefish", "北梭魚", "C", "lagoon", "dawn,day,dusk", (0.5, 4.0), (30, 70), "slim", "#c8d0d8", "#8a98a8", "在淺灘上跑得飛快，又叫「灰色幽靈」。"),
+    ("coconut_crab", "椰子蟹", "U", "lagoon", "night,dawn", (1.0, 4.0), (25, 40), "crab", "#6a3a8a", "#e08a4a", "力氣大到能夾開椰子。"),
+    ("palm_trevally", "椰影浪人鰺", "R", "lagoon", "day,dusk", (5.0, 40.0), (60, 130), "slim", "#7a8a9a", "#ffd070", "潟湖的霸主，咬餌又快又狠。"),
+    ("rainbow_wrasse", "彩虹隆頭魚", "E", "lagoon", "day", (2.0, 8.0), (40, 80), "round", "#3ad08a", "#ff5ad0", "全身七種顏色，像潟湖裡的彩虹。"),
+    ("castaway_king", "漂流魚王", "L", "lagoon", "dusk", (80.0, 300.0), (200, 360), "myth", "#3a8ad0", "#fff0b0", "傳說它載著迷路的船員漂到這座島。"),
+    # 冰封秘境 frozen（北方冰層深處，要破冰船頭才到得了）
+    ("frost_smelt", "霜晶胡瓜魚", "C", "frozen", "any", (0.02, 0.1), (10, 20), "slim", "#c8e8f8", "#ffffff", "身上結著一層細細的霜。"),
+    ("ice_ghost", "冰窟幽靈魚", "U", "frozen", "any", (0.2, 1.5), (20, 45), "slim", "#e8f4ff", "#8ac8ff", "在冰縫下面像鬼魂一樣飄過。"),
+    ("glacier_halibut", "冰川比目魚", "R", "frozen", "day,night", (5.0, 60.0), (60, 150), "flat", "#7a90a8", "#e0f0ff", "趴在冰下的海床，一動也不動。"),
+    ("frost_leviathan", "冰封巨鯨魚", "L", "frozen", "any", (800.0, 3000.0), (800, 1600), "myth", "#3a6aa0", "#c0f0ff", "被封在冰下千年的巨獸，終於醒來了。"),
 ]
+
+# 只在某些時段才進得去的地點（不用每個時段都有普通魚）
+REGION_ONLY_TIMES = {"cave": ["dawn"]}
 
 # 天氣限定魚：只有在指定天氣才會上鉤（最後一欄＝天氣，逗號分隔）
 # 天氣：sunny 晴天、cloudy 多雲、rain 下雨、storm 暴雨、waves 大浪、typhoon 颱風
@@ -161,7 +189,7 @@ WEATHER_FISH = [
 ]
 WEATHERS = ["sunny", "cloudy", "rain", "storm", "waves", "typhoon"]
 
-REGIONS = ["harbor", "lake", "river", "reef", "deep", "cold", "mangrove", "volcano"]
+REGIONS = ["harbor", "lake", "river", "reef", "deep", "cold", "mangrove", "volcano", "wreck", "cave", "lagoon", "frozen"]
 TIMES = ["dawn", "day", "dusk", "night"]
 
 
@@ -211,7 +239,7 @@ def check(data):
         assert all(r in REGIONS for r in f["regions"]) and all(t in TIMES for t in f["times"]), f["id"]
         assert all(w in WEATHERS for w in f.get("weather", [])), f["id"]
     for r in REGIONS:
-        for t in TIMES:
+        for t in REGION_ONLY_TIMES.get(r, TIMES):
             assert any(r in f["regions"] and t in f["times"] and f["rarity"] == "common" and "weather" not in f for f in data), \
                 f"{r}/{t} 沒有普通魚可釣"
     prices = [BASE_PRICE[k] for k in "CUREL"]

@@ -38,6 +38,7 @@ window.ART = (() => {
       beanie_pink: { name: '毛線帽（粉）', price: 90, shop: 'tailorA', style: 'beanie', h: '#e07a9a', H: '#ffb0c8' },
       straw: { name: '草帽', price: 120, shop: 'tailorA', style: 'straw', h: '#d8b060', H: '#f0d488' },
       captain: { name: '船長帽', price: 400, shop: 'tailorA', style: 'captain', h: '#f4f0e8', H: '#ffffff' },
+      pirate: { name: '海盜帽', price: 9999, shop: 'treasure', style: 'pirate', h: '#2a2a30', H: '#44444e' },   // 寶藏限定：挖寶才拿得到
     },
     hair: {
       short_brown: { name: '短髮（棕）', price: 0, style: 'short', d: '#5a3a1e', D: '#3e2612' },
@@ -53,12 +54,14 @@ window.ART = (() => {
       round: { name: '圓框眼鏡', price: 80, shop: 'tailorA', style: 'round', G: '#3a2a20' },
       sun: { name: '墨鏡', price: 150, shop: 'tailorA', style: 'sun' },
       party: { name: '粉紅派對眼鏡', price: 200, shop: 'tailorA', style: 'round', G: '#ff5aa8' },
+      patch: { name: '海盜眼罩', price: 9999, shop: 'treasure', style: 'patch' },
     },
     beard: {
       none: { name: '沒有鬍子', price: 0, style: 'none' },
       mustache: { name: '八字鬍', price: 80, shop: 'tailorA', style: 'mustache' },
       full: { name: '落腮鬍', price: 150, shop: 'tailorA', style: 'full' },
       white: { name: '白鬍子', price: 300, shop: 'tailorA', style: 'full', M: '#f0f0f0' },
+      blackbeard: { name: '黑鬍子船長', price: 9999, shop: 'treasure', style: 'full', M: '#1e1a1a' },
     },
     top: {
       raincoat_yellow: { name: '黃色雨衣', price: 0, y: '#e8a040', Y: '#c07a28', L: '#f6c468', w: '#fff2c8' },
@@ -67,6 +70,7 @@ window.ART = (() => {
       sailor: { name: '水手條紋衫', price: 200, shop: 'tailorB', y: '#f4f0e8', Y: '#c8c4bc', L: '#ffffff', w: '#2a5aa0', z: '#2a5aa0', pattern: 'stripe' },
       black_jacket: { name: '黑色夾克', price: 220, shop: 'tailorB', y: '#3a3a44', Y: '#24242c', L: '#5a5a66', w: '#d8b060' },
       hawaii: { name: '夏威夷花襯衫', price: 260, shop: 'tailorB', y: '#3ab0c0', Y: '#2a8090', L: '#6ad0e0', w: '#fff2c8', z: '#ff8aa0', pattern: 'dots' },
+      pirate_coat: { name: '海盜船長外套', price: 9999, shop: 'treasure', y: '#a8302a', Y: '#7a1e1a', L: '#d05a4a', w: '#ffd040' },
     },
     pants: {
       jeans: { name: '牛仔褲', price: 0, b: '#3a4a7a', B: '#24305a' },
@@ -89,6 +93,7 @@ window.ART = (() => {
     captain: ['....kkkk....', '..kkhhhhkk..', '.khhhHHhhhk.', '.kkkkkkkkkk.', '.kqqqqqqqqk.'],
     hair: ['............', '............', '...kkkkkk...', '..kddddddk..', '.kddddddddk.'],
     bald: ['............', '............', '...kkkkkk...', '..kssssssk..', '.kssssssssk.'],
+    pirate: ['............', '.kk......kk.', 'khhkkkkkkhhk', 'khhhhxxhhhhk', '.kkkkkkkkkk.'],
   };
   const HAT16 = {
     fisher: ['....kkkkkkkk....', '...kHHHHHHHHk...', '..khhHHHHHHhhk..', '.khhhhhhhhhhhhk.', 'kkkkkkkkkkkkkkkk'],
@@ -98,6 +103,7 @@ window.ART = (() => {
     captain: ['.....kkkkkk.....', '...kkhhhhhhkk...', '..khhhhHHhhhhk..', '..kkkkkkkkkkkk..', '..kqqqqqqqqqqk..'],
     hair: ['................', '................', '....kkkkkkkk....', '...kddddddddk...', '..kddddddddddk..'],
     bald: ['................', '................', '....kkkkkkkk....', '...kssssssssk...', '..kssssssssssk..'],
+    pirate: ['................', '.kk..........kk.', 'khhkkkkkkkkkkhhk', 'khhhhhhxxhhhhhhk', '.kkkkkkkkkkkkkk.'],
   };
   const hatKey = P => P.hat.style !== 'none' ? P.hat.style : P.hair.style === 'bald' ? 'bald' : 'hair';
   const unBald = (rows, P) => P.hair.style === 'bald' ? rows.map(r => r.replace(/d/g, 's').replace(/D/g, 'S')) : rows;
@@ -106,6 +112,7 @@ window.ART = (() => {
     if (P.hair.style === 'bangs') r[0] = '.kdddddddsk.';
     if (P.glasses.style === 'round') r[1] = set(r[1], { 2: 'G', 4: 'G', 5: 'G', 6: 'G', 8: 'G' });
     if (P.glasses.style === 'sun') r[1] = '.kqqqkqqqSk.';
+    if (P.glasses.style === 'patch') { r[1] = set(r[1], { 6: 'q', 7: 'q', 8: 'q' }); r[0] = set(r[0], { 4: 'q' }); }
     if (P.beard.style === 'mustache') r[2] = set(r[2], range(4, 6, 'M'));
     if (P.beard.style === 'full') { r[2] = '.kMMMMMMMMk.'; r[3] = '..kMMMMMMk..'; }
     if (P.hair.style === 'long') r = r.map((x, i) => i < 3 ? 'kd' + x.slice(2, 10) + 'dk' : '.kd' + x.slice(3, 9) + 'dk.');
@@ -118,6 +125,7 @@ window.ART = (() => {
     if (P.hair.style === 'bangs') r[0] = '...kdddddddsk...';
     if (P.glasses.style === 'round') r[1] = '...kGeGGGGeGk...';
     if (P.glasses.style === 'sun') r[1] = '...kqqqkkqqqk...';
+    if (P.glasses.style === 'patch') { r[1] = set(r[1], { 9: 'q', 10: 'q', 11: 'q' }); r[0] = set(r[0], { 6: 'q' }); }
     if (P.beard.style === 'mustache') r[2] = set(r[2], range(6, 9, 'M'));
     if (P.beard.style === 'full') { r[2] = f('MMMMMMMM'); r[3] = '....kMMMMMMk....'; }
     if (P.hair.style === 'long') r = r.map((x, i) => i < 3 ? set(x, { 2: 'k', 3: 'd', 12: 'd', 13: 'k' }) : set(x, { 3: 'k', 4: 'd', 11: 'd', 12: 'k' }));
@@ -160,7 +168,7 @@ window.ART = (() => {
   function lookParts(look) { const P = {}; for (const k in WARDROBE) P[k] = WARDROBE[k][(look || {})[k]] || WARDROBE[k][DEFAULT_LOOK[k]]; return P; }
   function palFor(P) {
     return { ...PAL, h: P.hat.h || PAL.h, H: P.hat.H || PAL.H, d: P.hair.d, D: P.hair.D, y: P.top.y, Y: P.top.Y, L: P.top.L, w: P.top.w,
-      z: P.top.z || P.top.y, b: P.pants.b, B: P.pants.B, G: P.glasses.G || '#3a2a20', q: '#1e2230', M: P.beard.M || P.hair.d };
+      z: P.top.z || P.top.y, b: P.pants.b, B: P.pants.B, G: P.glasses.G || '#3a2a20', q: '#1e2230', M: P.beard.M || P.hair.d, x: '#f4f0e8' };
   }
   // 手臂：[x,y,w,h,色] 疊在第三人稱背影上（單位座標），hand＝握竿的手相對 sprite 左上的位置
   const ARMS = {
