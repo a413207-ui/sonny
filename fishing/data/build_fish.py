@@ -120,6 +120,31 @@ FISH = [
     ("manta", "鬼蝠魟", "E", "deep", "day", (300.0, 1500.0), (300, 700), "ray", "#2a2e3a", "#f0f0f0", "優雅地在海中飛翔。"),
     ("coelacanth", "腔棘魚", "L", "deep", "night", (30.0, 90.0), (120, 200), "myth", "#3a5a8a", "#e0e8f0", "從恐龍時代活到現在的活化石。"),
     ("abyss_king", "深淵海王", "L", "deep", "night", (500.0, 2000.0), (800, 2000), "myth", "#2a1e4a", "#c070ff", "傳說中沉睡在最深處的海之王。"),
+    # ── 冰川海域 cold（地圖最北邊，冰晶島一帶）──
+    ("polar_cod", "北極鱈", "C", "cold", "any", (0.1, 0.6), (15, 35), "slim", "#8a96a0", "#e0e8ee", "在冰層下面成群游動。"),
+    ("capelin", "毛鱗魚", "C", "cold", "dawn,day", (0.02, 0.06), (10, 20), "slim", "#6a8aa0", "#d8e8f0", "肚子裡常常滿滿都是魚卵。"),
+    ("icefish", "冰魚", "U", "cold", "day,dusk", (0.1, 0.5), (20, 40), "slim", "#d8eef8", "#9ad0f0", "血液是透明的，全身幾乎看得穿。"),
+    ("king_crab", "帝王蟹", "U", "cold", "night,dawn", (1.0, 8.0), (30, 80), "crab", "#c0503a", "#f0c0a0", "腳張開比一個小孩還寬。"),
+    ("arctic_char", "北極紅點鮭", "R", "cold", "dawn,day", (1.0, 6.0), (40, 80), "slim", "#4a6a7a", "#ff8a6a", "冰冷海水裡的紅色寶石。"),
+    ("greenland_shark", "格陵蘭睡鯊", "E", "cold", "night", (200.0, 900.0), (300, 600), "shark", "#5a5a64", "#b0b8c0", "慢吞吞地游，據說可以活四百年。"),
+    ("aurora_king", "極光魚王", "L", "cold", "night", (50.0, 200.0), (180, 320), "myth", "#3ad0b0", "#c08aff", "只在極光出現的夜裡浮上冰縫。"),
+    # ── 紅樹林河口 mangrove（地圖最西邊，紅樹林島一帶）──
+    ("mudskipper", "彈塗魚", "C", "mangrove", "any", (0.01, 0.05), (8, 15), "slim", "#7a6a4a", "#5ab0e0", "會用胸鰭在泥灘上跳來跳去。"),
+    ("milkfish", "虱目魚", "C", "mangrove", "day,dusk", (0.3, 1.5), (30, 60), "slim", "#9aa8b0", "#e8eef0", "南部人早餐最愛的魚。"),
+    ("fiddler_crab", "招潮蟹", "C", "mangrove", "dawn,night", (0.01, 0.05), (2, 5), "crab", "#e0b040", "#c04a2a", "一隻大螯揮呀揮，像在招潮水。"),
+    ("scat", "金錢魚", "U", "mangrove", "dawn,day", (0.2, 1.0), (15, 30), "flat", "#a8a060", "#3a3a2a", "圓圓的身上滿是像錢幣的斑點。"),
+    ("barramundi", "尖吻鱸", "U", "mangrove", "dusk,night", (2.0, 15.0), (50, 120), "slim", "#9aa090", "#4a5040", "在紅樹林根間埋伏的大鱸魚。"),
+    ("archerfish", "射水魚", "R", "mangrove", "day", (0.1, 0.4), (15, 30), "flat", "#e0e0b0", "#2a2a2a", "會噴水把樹葉上的蟲打下來吃。"),
+    ("sawfish", "鋸鰩", "E", "mangrove", "dusk", (100.0, 500.0), (300, 600), "long", "#8a7a5a", "#d8c8a0", "長長的吻上兩排鋸齒。"),
+    ("mangrove_lord", "紅樹林之主", "L", "mangrove", "night", (80.0, 300.0), (250, 450), "myth", "#3a6a3a", "#e0c060", "樹根間游過的巨大身影，河口的守護神。"),
+    # ── 火山海域 volcano（地圖最東邊，火山島一帶）──
+    ("ember_goby", "餘燼蝦虎", "C", "volcano", "any", (0.02, 0.08), (6, 12), "slim", "#5a4a4a", "#ff8a4a", "身上的橘點像快熄滅的火星。"),
+    ("rosy_seabass", "紅喉", "C", "volcano", "night,dawn", (0.2, 1.0), (20, 40), "slim", "#e06a6a", "#3a2020", "喉嚨內側是黑色的，油脂豐富。"),
+    ("red_snapper", "赤鰭笛鯛", "U", "volcano", "day,dusk", (1.0, 6.0), (35, 70), "flat", "#d04a3a", "#ffb08a", "火紅的鰭在暗色海水裡特別顯眼。"),
+    ("sulfur_eel", "硫磺鰻", "U", "volcano", "night", (0.5, 4.0), (60, 140), "eel", "#c8b040", "#4a4020", "住在溫泉噴口旁，身上有硫磺味。"),
+    ("flamefish", "火焰魚", "R", "volcano", "dusk", (0.3, 1.5), (20, 40), "round", "#ff5a2a", "#ffd040", "游動時鱗片像火苗一樣閃動。"),
+    ("obsidian_grouper", "黑曜石斑", "E", "volcano", "night,dawn", (20.0, 120.0), (80, 200), "round", "#1e1a24", "#9a6aff", "鱗片像黑曜石一樣又黑又亮。"),
+    ("lava_phoenix", "熔岩鳳凰魚", "L", "volcano", "dawn", (30.0, 100.0), (150, 260), "myth", "#ff6a2a", "#fff070", "傳說從海底熔岩裡誕生的火鳥之魚。"),
 ]
 
 # 天氣限定魚：只有在指定天氣才會上鉤（最後一欄＝天氣，逗號分隔）
@@ -136,7 +161,7 @@ WEATHER_FISH = [
 ]
 WEATHERS = ["sunny", "cloudy", "rain", "storm", "waves", "typhoon"]
 
-REGIONS = ["harbor", "lake", "river", "reef", "deep"]
+REGIONS = ["harbor", "lake", "river", "reef", "deep", "cold", "mangrove", "volcano"]
 TIMES = ["dawn", "day", "dusk", "night"]
 
 
