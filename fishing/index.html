@@ -21,7 +21,7 @@
   .btn.off { opacity: .35; }
   #btnA { right: calc(20px + env(safe-area-inset-right)); bottom: calc(26px + env(safe-area-inset-bottom)); width: 92px; height: 92px; }
   #btnB { right: calc(122px + env(safe-area-inset-right)); bottom: calc(20px + env(safe-area-inset-bottom)); width: 66px; height: 66px; font-size: 13px; background: #bfe6ff; }
-  #toast { position: fixed; left: 50%; top: calc(150px + env(safe-area-inset-top)); transform: translateX(-50%); background: rgba(40,28,14,.85); color: #fff6dd; padding: 6px 14px; border-radius: 16px; font-size: 14px; font-weight: 700; z-index: 7; opacity: 0; transition: opacity .3s; pointer-events: none; max-width: 86vw; width: max-content; text-align: center; }
+  #toast { position: fixed; left: 50%; top: calc(190px + env(safe-area-inset-top)); transform: translateX(-50%); background: rgba(40,28,14,.85); color: #fff6dd; padding: 6px 14px; border-radius: 16px; font-size: 14px; font-weight: 700; z-index: 7; opacity: 0; transition: opacity .3s; pointer-events: none; max-width: 86vw; width: max-content; text-align: center; }
   #toast.show { opacity: 1; }
   .overlay { position: fixed; inset: 0; display: none; align-items: center; justify-content: center; z-index: 20; background: rgba(10,16,30,.55); }
   .overlay.show { display: flex; }
@@ -49,13 +49,22 @@
   #bigCv { width: 100%; aspect-ratio: 480 / 250; image-rendering: pixelated; border: 3px solid #6b4a2a; border-radius: 8px; background: #26508f; }
   .legend { display: flex; flex-wrap: wrap; justify-content: center; gap: 4px 10px; font-size: 12px; margin: 6px 0 10px; }
   .legend i { display: inline-block; width: 12px; height: 12px; border: 1px solid #0004; vertical-align: -2px; margin-right: 3px; }
-  #bars { position: fixed; left: 50%; top: calc(200px + env(safe-area-inset-top)); transform: translateX(-50%); width: min(78vw, 360px); z-index: 7; display: none; }
+  #bars { position: fixed; left: 50%; top: calc(232px + env(safe-area-inset-top)); transform: translateX(-50%); width: min(78vw, 360px); z-index: 7; display: none; }
   #bars.show { display: block; }
   .bar { height: 14px; background: rgba(255,248,230,.85); border: 2px solid #6b4a2a; border-radius: 8px; margin-bottom: 6px; overflow: hidden; position: relative; }
   .bar > div { height: 100%; width: 0; }
   .bar span { position: absolute; left: 6px; top: -2px; font-size: 11px; font-weight: 800; color: #3a2a18; }
   #tension > div { background: linear-gradient(90deg, #6ccf6c, #ffd040 60%, #e8503a); }
   #dist > div { background: #5aa8e8; }
+  /* 音效開關、咬鉤閃光、拉竿按鈕跳動、狀態標籤 */
+  #snd { position: fixed; right: 10px; top: calc(154px + env(safe-area-inset-top)); z-index: 5; font-size: 12px; padding: 3px 8px; cursor: pointer; }
+  #flash { position: fixed; inset: 0; z-index: 4; pointer-events: none; opacity: 0; box-shadow: inset 0 0 0 10px #ffd040, inset 0 0 90px 36px rgba(255,208,64,.6); }
+  #flash.on { animation: flash 1s ease-out; }
+  @keyframes flash { 0% { opacity: 1; } 15% { opacity: .25; } 30% { opacity: 1; } 45% { opacity: .3; } 60% { opacity: .9; } 100% { opacity: 0; } }
+  .btn.alert { animation: pulse .28s ease-in-out infinite alternate; background: #ff7a3a; color: #fff; }
+  @keyframes pulse { from { transform: scale(1); } to { transform: scale(1.16); } }
+  #statusChip { cursor: pointer; }
+  #statusChip.sick { background: #d8f0b0; border-color: #4a7a2a; box-shadow: 0 2px 0 #4a7a2a; color: #2a4a14; }
 </style>
 </head>
 <body>
@@ -64,10 +73,13 @@
   <div class="chip" id="timeChip">🌞 白天</div>
   <div class="chip" id="areaChip">📍 漁港鎮</div>
   <div class="chip row"><span id="coinChip">🪙 0</span><span id="bagChip">🐟 0</span><span id="baitChip">🪱 0</span></div>
+  <div class="chip" id="statusChip" hidden></div>
 </div>
 <canvas id="mini" width="128" height="96"></canvas>
 <div id="miniHint">點地圖放大</div>
 <div class="chip" id="vib">📳 震動：開</div>
+<div class="chip" id="snd">🔊 音效：開</div>
+<div id="flash"></div>
 <div id="joy"><div id="knob"></div></div>
 <div class="btn" id="btnB">上船</div>
 <div class="btn" id="btnA">拋竿</div>
@@ -326,6 +338,68 @@ document.getElementById('closeMap').addEventListener('click', toggleMap);
 const vibBtn = document.getElementById('vib');
 vibBtn.addEventListener('click', () => { state.vib = !state.vib; vibBtn.textContent = '📳 震動：' + (state.vib ? '開' : '關'); if (state.vib) buzz(60); });
 function buzz(p) { if (state.vib && navigator.vibrate) try { navigator.vibrate(p); } catch (e) {} }
+// iPhone 的網頁不能震動：把震動開關藏起來，音效開關往上移
+const sndBtn = document.getElementById('snd');
+if (!navigator.vibrate) { vibBtn.style.display = 'none'; sndBtn.style.top = 'calc(128px + env(safe-area-inset-top))'; }
+
+// ════════════════ 音效（程式合成，不用音檔）════════════════
+const SND_KEY = 'bay-fishing-sound';
+try { state.snd = localStorage.getItem(SND_KEY) !== 'off'; } catch (e) { state.snd = true; }
+sndBtn.textContent = '🔊 音效：' + (state.snd ? '開' : '關');
+let actx = null;
+function audio() {
+  if (!actx) { const AC = window.AudioContext || window.webkitAudioContext; if (!AC) return null; try { actx = new AC(); } catch (e) { return null; } }
+  if (actx.state === 'suspended') actx.resume();
+  return actx;
+}
+// iPhone 規定要在玩家點畫面時才能打開聲音，所以第一次點擊時就先準備好
+addEventListener('pointerdown', () => { if (state.snd) audio(); }, { capture: true });
+sndBtn.addEventListener('click', () => { state.snd = !state.snd; sndBtn.textContent = '🔊 音效：' + (state.snd ? '開' : '關'); try { localStorage.setItem(SND_KEY, state.snd ? 'on' : 'off'); } catch (e) {} if (state.snd) SFX.hook(); });
+function tone(f0, f1, dur, vol = .3, type = 'sine', delay = 0) {
+  if (!state.snd) return; const a = audio(); if (!a) return;
+  const t0 = a.currentTime + delay, o = a.createOscillator(), g = a.createGain();
+  o.type = type; o.frequency.setValueAtTime(f0, t0); o.frequency.exponentialRampToValueAtTime(f1, t0 + dur);
+  g.gain.setValueAtTime(.0001, t0); g.gain.exponentialRampToValueAtTime(vol, t0 + .01); g.gain.exponentialRampToValueAtTime(.0001, t0 + dur);
+  o.connect(g); g.connect(a.destination); o.start(t0); o.stop(t0 + dur + .05);
+}
+const SFX = {
+  nibble: () => tone(900, 600, .08, .12),                                                       // 浮標小抖：噗
+  bite: () => { tone(330, 140, .35, .55); tone(660, 280, .25, .25, 'triangle'); tone(330, 140, .35, .55, 'sine', .22); },   // 咬鉤：咚咚！
+  hook: () => tone(500, 950, .12, .2, 'square'),
+  caught: () => [523, 659, 784, 1047].forEach((f, i) => tone(f, f * 1.01, .18, .2, 'triangle', i * .09)),
+  fail: () => tone(300, 110, .4, .2, 'sawtooth'),
+  sick: () => { tone(220, 160, .5, .18, 'sine'); tone(230, 150, .5, .18, 'sine', .3); },
+};
+const flashEl = document.getElementById('flash');
+function flash() { flashEl.classList.remove('on'); void flashEl.offsetWidth; flashEl.classList.add('on'); }
+
+// ════════════════ 狀態：暈船（之後可在這裡加其他狀態）════════════════
+// sick 0～100：在船上會慢慢累積（深海、開快、夜晚更容易暈），上岸會恢復
+const SICK_ON = 60, SICK_OFF = 30, SICK_WARN = 35, PILL = { name: '暈船藥', price: 30, count: 3, secs: 180 };
+Object.assign(state, { sick: 0, sickOn: false, sickWarned: false, pillT: 0 });
+function updateSick(dt) {
+  let d;
+  if (state.onBoat) {
+    const reg = REGION_OF[at(Math.floor(state.boat.x), Math.floor(state.boat.y))];
+    const base = reg === 'deep' ? 1.1 : reg === 'reef' ? .45 : .55;
+    const sp = Math.hypot(state.boat.vx, state.boat.vy) / (state.boatSpeed || 6);
+    d = (base + sp * 1.2) * (phase === 'night' ? 1.2 : 1);
+  } else d = -8;
+  if (state.pillT > 0) { state.pillT = Math.max(0, state.pillT - dt); d = Math.min(d, -6); }
+  state.sick = clamp(state.sick + d * dt, 0, 100);
+  if (!state.sickOn && state.sick >= SICK_ON) { state.sickOn = true; SFX.sick(); buzz([200, 100, 200]); toast(prog.pills > 0 ? '🤢 你暈船了！點左上角「暈船」吃藥，或上岸休息' : '🤢 你暈船了！畫面會晃，上岸休息就會好', 3000); }
+  else if (state.sickOn && state.sick <= SICK_OFF) { state.sickOn = false; toast('😌 不暈了，舒服多了'); }
+  else if (!state.sickOn && !state.sickWarned && state.sick >= SICK_WARN) { state.sickWarned = true; toast('😵 有點頭暈…'); }
+  if (state.sick < 20) state.sickWarned = false;
+}
+const sickAmount = () => clamp((state.sick - SICK_WARN) / 55, 0, 1);   // 0＝不晃，1＝晃最大
+function takePill() {
+  if (state.pillT > 0) return toast(`💊 藥效還有 ${Math.ceil(state.pillT)} 秒`);
+  if (!(prog.pills > 0)) return toast('沒有暈船藥了，去釣具店買');
+  prog.pills--; state.pillT = PILL.secs; state.sick = 0; state.sickOn = false; state.sickWarned = false;
+  toast(`💊 吃了暈船藥，${PILL.secs / 60} 分鐘內不會暈`); save(); updateHud();
+}
+document.getElementById('statusChip').addEventListener('click', takePill);
 let toastT = 0;
 function toast(t, ms = 1800) { const el = document.getElementById('toast'); el.textContent = t; el.classList.add('show'); clearTimeout(toastT); toastT = setTimeout(() => el.classList.remove('show'), ms); }
 
@@ -400,13 +474,13 @@ function hook() {
   const rar = RAR[fish.catch.def.rarity];
   fish.power = rar.pow * (.8 + fish.catch.k * .5);
   fish.state = 'reel'; fish.t = 0; fish.d = 100; fish.tension = 20; fish.swap = rand(.4, 1.2);
-  buzz([60, 30, 60]);
+  buzz([60, 30, 60]); SFX.hook();
   toast(fish.catch.def.rarity === 'legendary' || fish.catch.def.rarity === 'epic' ? '‼️ 好重！是大傢伙！按住收線，張力太高就放手' : '上鉤了！按住「收線」，張力太高就放手');
 }
-function fail(msg) { buzz(200); fish.state = 'fail'; fish.t = 0; fish.msg = msg; toast(msg, 2200); }
+function fail(msg) { buzz(200); SFX.fail(); fish.state = 'fail'; fish.t = 0; fish.msg = msg; toast(msg, 2200); }
 function endFishing(msg) { fish.state = null; holding = false; if (msg) toast(msg); }
 function caught() {
-  fish.state = 'result'; buzz([40, 30, 40, 30, 160]);
+  fish.state = 'result'; buzz([40, 30, 40, 30, 160]); SFX.caught();
   const c = fish.catch; const isNew = !prog.dex[c.def.id]; state.bag.push({ id: c.def.id, w: +c.weight.toFixed(2), l: +c.length.toFixed(1), price: c.price, at: Date.now() });
   recordCatch(c);
   const rar = RAR[c.def.rarity];
@@ -427,11 +501,11 @@ function updateFishing(dt) {
   fish.t += dt;
   if (fish.state === 'cast' && fish.t > .7) fish.state = 'wait';
   if (fish.state === 'wait') {
-    for (let i = 0; i < fish.nibbles.length; i++) if (fish.t > fish.nibbles[i]) { fish.nibbles.splice(i, 1); fish.nib = .35; buzz(15); }
+    for (let i = 0; i < fish.nibbles.length; i++) if (fish.t > fish.nibbles[i]) { fish.nibbles.splice(i, 1); fish.nib = .35; buzz(15); SFX.nibble(); }
     if (fish.nib > 0) fish.nib -= dt;
-    if (fish.t > fish.biteAt) { fish.state = 'bite'; fish.biteT = 0; buzz([90, 40, 90]); }
+    if (fish.t > fish.biteAt) { fish.state = 'bite'; fish.biteT = 0; buzz([90, 40, 90]); SFX.bite(); flash(); updateHud(); }
   } else if (fish.state === 'bite') {
-    fish.biteT += dt; if (fish.biteT > .9 + state.rod.power * .1) fail('沒拉到…魚跑掉了');
+    fish.biteT += dt; if (fish.biteT > .9 + state.rod.power * .1 - (state.sickOn ? .2 : 0)) fail('沒拉到…魚跑掉了');
   } else if (fish.state === 'reel') {
     fish.swap -= dt;
     if (fish.swap <= 0) { fish.struggle = !fish.struggle; fish.swap = fish.struggle ? rand(.5, 1.3) * fish.power : rand(.6, 1.6) / fish.power; if (fish.struggle) buzz(35); }
@@ -487,7 +561,7 @@ const ACH = [
   ['boat', '🚤 加速前進', '升級你的船', s => s.boatLv > 0],
 ];
 const SAVE_KEY = 'bay-fishing-save-v1';
-const prog = { dex: {}, ach: {}, catches: 0, region: {}, time: {}, rar: {}, maxW: 0, earned: 0, rodIdx: 0, boatLv: 0, bait: 0 };
+const prog = { dex: {}, ach: {}, catches: 0, region: {}, time: {}, rar: {}, maxW: 0, earned: 0, rodIdx: 0, boatLv: 0, bait: 0, pills: 0 };
 function save() {
   try { localStorage.setItem(SAVE_KEY, JSON.stringify({ v: 1, coins: state.coins, bag: state.bag, prog, pos: { x: state.player.x, y: state.player.y, bx: state.boat.x, by: state.boat.y, onBoat: state.onBoat } })); } catch (e) {}
 }
@@ -547,11 +621,13 @@ function openShop() {
   showPanel(`<h2>🎣 釣具店</h2><p>你有 🪙${state.coins}</p>
     <div class="list"><h3>釣竿（依序升級）</h3>${rodRows}
     <h3>魚餌（剩 ${prog.bait} 個）</h3><div class="row"><span><b>${BAIT.name} ×${BAIT.count}</b><br><small>${BAIT.desc}</small></span><button id="buyBait">🪙${BAIT.price}</button></div>
+    <h3>${PILL.name}（剩 ${prog.pills} 顆）</h3><div class="row"><span><b>${PILL.name} ×${PILL.count}</b><br><small>吃一顆立刻不暈，${PILL.secs / 60} 分鐘內不會暈船。暈船時點左上角狀態就能吃。</small></span><button id="buyPill">🪙${PILL.price}</button></div>
     <h3>船</h3>${boatRows}</div>`);
   const pay = (cost, fn) => { if (state.coins < cost) { toast('錢不夠，先去魚市賣魚吧'); buzz(120); return; } state.coins -= cost; fn(); applyGear(); buzz(40); checkAch(); save(); updateHud(); openShop(); };
   document.querySelectorAll('[data-rod]').forEach(el => el.onclick = () => { const i = +el.dataset.rod; pay(RODS[i].price, () => { prog.rodIdx = i; toast('換上了 ' + RODS[i].name + '！'); }); });
   document.querySelectorAll('[data-boat]').forEach(el => el.onclick = () => { const lv = +el.dataset.boat; pay(BOATS[lv].price, () => { prog.boatLv = lv; toast('船升級成 ' + BOATS[lv].name + '！'); }); });
   document.getElementById('buyBait').onclick = () => pay(BAIT.price, () => { prog.bait += BAIT.count; toast('買了 10 個魚餌'); });
+  document.getElementById('buyPill').onclick = () => pay(PILL.price, () => { prog.pills += PILL.count; toast(`買了 ${PILL.count} 顆${PILL.name}`); });
 }
 function openHome() {
   const s = stats(), achN = Object.keys(prog.ach).length;
@@ -646,6 +722,7 @@ function update(dt) {
     if (sp > .3) { const s = iso(b.vx, b.vy); b.ang = Math.atan2(s.y - OY, s.x - OX); }
     if (state.onBoat) { p.x = b.x; p.y = b.y; }
   }
+  updateSick(dt);
   updateFishing(dt);
   const target = fish.state && fish.state !== 'cast' ? 1 : fish.state === 'cast' ? Math.min(1, fish.t / .5) : 0;
   viewMix += (target - viewMix) * Math.min(1, dt * 6);
@@ -661,7 +738,12 @@ function updateHud() {
   document.getElementById('bagChip').textContent = '🐟 ' + state.bag.length;
   document.getElementById('baitChip').textContent = '🪱 ' + prog.bait;
   const a = contextA(), b = contextB();
-  btnA.textContent = a || '拋竿'; btnA.classList.toggle('off', !a);
+  btnA.textContent = a || '拋竿'; btnA.classList.toggle('off', !a); btnA.classList.toggle('alert', fish.state === 'bite');
+  const sc = document.getElementById('statusChip'); let st = '';
+  if (state.pillT > 0) { const r = Math.ceil(state.pillT); st = `💊 防暈中 ${Math.floor(r / 60)}:${String(r % 60).padStart(2, '0')}`; }
+  else if (state.sickOn) st = '🤢 暈船' + (prog.pills > 0 ? `（點我吃藥 💊${prog.pills}）` : '');
+  else if (state.sick >= SICK_WARN) st = '😵 有點頭暈';
+  sc.hidden = !st; sc.textContent = st; sc.classList.toggle('sick', state.sickOn || state.sick >= SICK_WARN);
   btnB.textContent = b ? b.label : ''; btnB.style.visibility = b ? 'visible' : 'hidden';
   const bars = document.getElementById('bars'); bars.classList.toggle('show', fish.state === 'reel');
   if (fish.state === 'reel') { document.querySelector('#tension>div').style.width = fish.tension + '%'; document.querySelector('#dist>div').style.width = (100 - Math.min(100, fish.d)) + '%'; }
@@ -826,6 +908,14 @@ function drawThird(g, t) {
     if (sink < 5) { g.fillStyle = '#e8402e'; g.fillRect(fx - 2, fy - 7, 4, 4); g.fillStyle = '#ffd040'; g.fillRect(fx, fy - 10, 1, 3); }
     }
   } else if (fish.struggle) { g.fillStyle = shade(fish.catch.def.palette.body, -.2); g.fillRect(fx - 6, Math.round(fy0) - 4, 12, 3); }
+  // 咬鉤加強提醒：浮標上方跳動的大驚嘆號＋往外擴散的黃色水圈
+  if (fish.state === 'bite') {
+    const u = Math.max(2, Math.round(lh / 90)), wy = Math.round(fy0);
+    for (let i = 0; i < 2; i++) { const k = (t * 2.2 + i * .5) % 1; g.strokeStyle = `rgba(255,220,80,${(1 - k) * .9})`; g.lineWidth = 2; g.beginPath(); g.ellipse(fx, wy + 2, 6 + k * 30, (6 + k * 30) * .32, 0, 0, 7); g.stroke(); }
+    const ex = fx - u, ey = wy - 16 - u * 8 + Math.round(Math.sin(t * 22) * u);
+    g.fillStyle = '#3a2a18'; g.fillRect(ex - 1, ey - 1, u * 2 + 2, u * 5 + 2); g.fillRect(ex - 1, ey + u * 6 - 1, u * 2 + 2, u * 2 + 2);
+    g.fillStyle = '#ffd040'; g.fillRect(ex, ey, u * 2, u * 5); g.fillRect(ex, ey + u * 6, u * 2, u * 2);
+  }
   // 前景：船頭或岸邊
   if (state.onBoat) { g.fillStyle = '#6a3e1e'; g.beginPath(); g.moveTo(0, lh); g.lineTo(lw * .1, lh * .82); g.lineTo(lw * .55, lh * .8); g.lineTo(lw * .7, lh); g.fill(); g.fillStyle = '#b07a46'; g.beginPath(); g.moveTo(0, lh); g.lineTo(lw * .12, lh * .86); g.lineTo(lw * .52, lh * .84); g.lineTo(lw * .64, lh); g.fill(); }
   else { const col = fish.region === 'lake' || fish.region === 'river' ? '#5a9a3a' : '#c8a870'; g.fillStyle = col; g.fillRect(0, lh * .9 | 0, lw * .5 | 0, lh); g.fillStyle = shade(col, -.25); g.fillRect(0, lh * .9 | 0, lw * .5 | 0, 2); }
@@ -902,7 +992,16 @@ function frame(now) {
     if (viewMix < .99) lx.restore();
   }
   ctx.imageSmoothingEnabled = false; ctx.setTransform(1, 0, 0, 1, 0, 0);
+  // 暈船：整個畫面跟著搖晃（釣魚視角晃得更明顯），再蓋一層淡綠色
+  const sk = sickAmount();
+  if (sk > 0) {
+    const amp = sk * (.45 + .55 * viewMix), cw = cv.width, ch = cv.height;
+    const ang = Math.sin(t * 1.3) * .05 * amp, dx = Math.sin(t * .7) * cw * .015 * amp, dy = Math.sin(t * .9 + 1) * ch * .02 * amp, z = 1 + .18 * amp;
+    ctx.fillStyle = '#1b2a44'; ctx.fillRect(0, 0, cw, ch);
+    ctx.translate(cw / 2 + dx, ch / 2 + dy); ctx.rotate(ang); ctx.scale(z, z); ctx.translate(-cw / 2, -ch / 2);
+  }
   ctx.drawImage(low, 0, 0, low.width, low.height, 0, 0, low.width * PIX * DPR, low.height * PIX * DPR);
+  if (sk > 0) { ctx.setTransform(1, 0, 0, 1, 0, 0); ctx.fillStyle = `rgba(110,170,60,${.16 * sk})`; ctx.fillRect(0, 0, cv.width, cv.height); }
   // 建築名稱（高解析度文字）
   if (viewMix < .5 && !state.onBoat) {
     const pl = state.player, c = iso(pl.x, pl.y), vx = c.x - low.width / 2, vy = c.y - low.height / 2;
