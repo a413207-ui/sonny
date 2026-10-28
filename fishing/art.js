@@ -151,6 +151,52 @@ window.ART = (() => {
     return [left + p.hand[0] * s, top + p.hand[1] * s];
   }
 
+  // ════════ 釣到魚：正面雙手把魚捧高（24×34 單位）════════
+  const TROPHY = (() => {
+    const W = 16, face = (mid) => '...k' + mid + 'k...';
+    const base = THIRD_BASE.map((r, i) => {
+      if (i === 5) return face('ssssssss');
+      if (i === 6) return face('sesssses');
+      if (i === 7) return face('srssssrs');
+      if (i === 8) return '....ksssSSSk....';
+      if (i >= 12 && i <= 18 && r[7] === 'k') return r.slice(0, 7) + (i === 13 || i === 16 ? 'w' : 'y') + r.slice(8);
+      return r;
+    });
+    base.forEach(r => { if (r.length !== W) throw new Error('trophy row ' + r); });
+    const body = sprite(base), c = document.createElement('canvas'); c.width = 24; c.height = 34;
+    const g = c.getContext('2d'); g.drawImage(body, 4, 4);
+    // 兩隻手從肩膀舉到頭頂上方
+    for (const x of [1, 19]) {
+      g.fillStyle = PAL.k; g.fillRect(x, 3, 4, 13);
+      g.fillStyle = x === 1 ? PAL.L : PAL.Y; g.fillRect(x + 1, 4, 2, 11);
+      g.fillStyle = PAL.k; g.fillRect(x, 0, 4, 4);
+      g.fillStyle = PAL.s; g.fillRect(x + 1, 1, 2, 2);
+    }
+    // 開心的嘴巴
+    g.fillStyle = PAL.k; g.fillRect(10, 12, 4, 1); g.fillStyle = '#c84a3a'; g.fillRect(11, 13, 2, 1);
+    return c;
+  })();
+  // 畫捧魚：cx＝中心，by＝腳底（螢幕像素），s＝倍率，fishImg＝64×32 魚圖，lift 0..1 舉起的進度，glow＝稀有度顏色
+  function drawTrophy(g, cx, by, s, fishImg, t, lift, glow) {
+    const e = 1 - Math.pow(1 - Math.min(1, lift), 3);
+    const top = by - 34 * s + Math.round((1 - e) * 10 * s), left = Math.round(cx - 12 * s);
+    const fw = 26 * s, fh = 13 * s, fx = Math.round(cx - fw / 2), fy = Math.round(top + 3 * s - fh + Math.sin(t * 9) * s * .4);
+    if (glow) {   // 魚後面的光圈
+      const r = fw * (.75 + Math.sin(t * 3) * .05), gr = g.createRadialGradient(cx, fy + fh / 2, 0, cx, fy + fh / 2, r);
+      gr.addColorStop(0, glow + 'cc'); gr.addColorStop(1, glow + '00'); g.fillStyle = gr; g.fillRect(cx - r, fy + fh / 2 - r, r * 2, r * 2);
+    }
+    g.drawImage(TROPHY, left, top, 24 * s, 34 * s);
+    if (fishImg) g.drawImage(fishImg, fx, fy, fw, fh);
+    // 閃光
+    g.fillStyle = '#fff6b0';
+    for (let i = 0; i < 8; i++) {
+      const a = i * .785 + t * 1.5, rr = fw * (.55 + (i % 2) * .15), on = Math.sin(t * 7 + i * 1.7) > .2;
+      if (!on || e < .6) continue;
+      const sx = Math.round(cx + Math.cos(a) * rr), sy = Math.round(fy + fh / 2 + Math.sin(a) * rr * .6), u = Math.max(1, s >> 1);
+      g.fillRect(sx - u, sy, u * 3, u); g.fillRect(sx, sy - u, u, u * 3);
+    }
+  }
+
   // ════════ 浮標（7×12）════════
   const BOBBER = sprite([
     '...k...',
@@ -249,5 +295,5 @@ window.ART = (() => {
     }
   }
 
-  return { PAL, sprite, flipped, shade: shadeHex, drawPerson, drawThirdPerson, drawBobber, drawBoat, decorateBuilding };
+  return { PAL, sprite, flipped, shade: shadeHex, drawPerson, drawThirdPerson, drawTrophy, drawBobber, drawBoat, decorateBuilding };
 })();

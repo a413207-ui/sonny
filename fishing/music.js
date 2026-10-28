@@ -119,6 +119,12 @@
     if (!playing) return; playing = false; clearInterval(timer);
     if (ctx && out) { out.gain.cancelScheduledValues(ctx.currentTime); out.gain.setValueAtTime(Math.max(.0001, out.gain.value), ctx.currentTime); out.gain.exponentialRampToValueAtTime(.0001, ctx.currentTime + .6); }
   };
+  // 播音效時把音樂先壓小聲，secs 秒後慢慢回來
+  BGM.duck = function (secs) {
+    if (!playing || !ctx || !out) return; const n = ctx.currentTime;
+    out.gain.cancelScheduledValues(n); out.gain.setValueAtTime(Math.max(.0001, out.gain.value), n);
+    out.gain.exponentialRampToValueAtTime(.06, n + .08); out.gain.setValueAtTime(.06, n + secs); out.gain.exponentialRampToValueAtTime(BGM.volume, n + secs + 1.2);
+  };
   BGM.next = function () { ti = (ti + 1) % TRACKS.length; step = 0; loop = 0; if (ctx) nextT = ctx.currentTime + .2; };
   BGM.current = () => TRACKS[ti].name;
   BGM.isPlaying = () => playing;

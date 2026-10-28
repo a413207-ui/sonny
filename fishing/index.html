@@ -64,6 +64,38 @@
   .btn.alert { animation: pulse .28s ease-in-out infinite alternate; background: #ff7a3a; color: #fff; }
   @keyframes pulse { from { transform: scale(1); } to { transform: scale(1.16); } }
   #statusChip { cursor: pointer; }
+  /* 成就收集冊與徽章 */
+  .book { background: #f6ead0; border: 3px solid #8a6a3a; border-radius: 6px 12px 12px 6px; padding: 10px 10px 12px 22px; position: relative; box-shadow: inset 6px 0 0 #d8c49a; }
+  .book::before { content: ''; position: absolute; left: 6px; top: 10px; bottom: 10px; width: 6px; background: repeating-linear-gradient(#8a6a3a 0 6px, transparent 6px 16px); border-radius: 3px; }
+  .book .prog { font-size: 13px; font-weight: 800; margin: 0 0 4px; text-align: left; }
+  .book .meter { height: 10px; background: #e2d2ae; border: 2px solid #8a6a3a; border-radius: 6px; overflow: hidden; margin-bottom: 4px; }
+  .book .meter > div { height: 100%; background: linear-gradient(90deg, #e0902a, #ffd040); }
+  .book .tiers { font-size: 12px; color: #6b5034; text-align: left; margin-bottom: 8px; }
+  .badges { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px 6px; }
+  .bdg { display: flex; flex-direction: column; align-items: center; gap: 2px; cursor: pointer; font-size: 11px; line-height: 1.25; text-align: center; }
+  .bdg b { font-size: 11.5px; }
+  .medal { --c1: #e8b07a; --c2: #a8683a; --rb: #c84a3a; position: relative; width: 56px; height: 64px; }
+  .medal::before, .medal::after { content: ''; position: absolute; top: 0; width: 14px; height: 24px; background: var(--rb); clip-path: polygon(0 0, 100% 0, 100% 100%, 50% 78%, 0 100%); }
+  .medal::before { left: 12px; transform: rotate(14deg); } .medal::after { right: 12px; transform: rotate(-14deg); filter: brightness(.8); }
+  .medal i { position: absolute; left: 4px; top: 12px; width: 48px; height: 48px; border-radius: 50%; z-index: 1; display: flex; align-items: center; justify-content: center; font-style: normal; font-size: 24px;
+    background: radial-gradient(circle at 35% 30%, #fff8 0 18%, transparent 19%), radial-gradient(circle, var(--c1) 0 58%, var(--c2) 60% 100%); border: 2px solid #5a3a1e; box-shadow: 0 2px 0 #5a3a1e; }
+  .medal.bronze { --c1: #e8b07a; --c2: #a8683a; --rb: #c84a3a; }
+  .medal.silver { --c1: #f0f2f6; --c2: #a8b0bc; --rb: #3a78c0; }
+  .medal.gold { --c1: #ffe680; --c2: #d89a20; --rb: #4a9a5a; }
+  .medal.rainbow { --c1: #fff6d0; --c2: #c070e0; --rb: #e0902a; }
+  .medal.rainbow i { background: radial-gradient(circle at 35% 30%, #fff9 0 18%, transparent 19%), conic-gradient(#ff8a8a, #ffd040, #80e0a0, #70b8ff, #c070e0, #ff8a8a); }
+  .medal.lock { --c1: #d8ccb4; --c2: #b0a28a; --rb: #b0a28a; }
+  .medal.lock i { color: #8a7a62; font-size: 22px; font-weight: 900; }
+  .bdg.locked { color: #9a8a72; }
+  #badgePop { z-index: 30; }
+  #badgePop .card { overflow: hidden; }
+  #badgePop .medal { width: 112px; height: 128px; margin: 6px auto 4px; animation: medalIn .9s cubic-bezier(.2,1.4,.4,1) both; }
+  #badgePop .medal::before, #badgePop .medal::after { width: 28px; height: 48px; } #badgePop .medal::before { left: 24px; } #badgePop .medal::after { right: 24px; }
+  #badgePop .medal i { left: 8px; top: 24px; width: 96px; height: 96px; font-size: 48px; border-width: 3px; }
+  #badgePop .rays { position: absolute; inset: -40%; background: repeating-conic-gradient(#ffd04033 0 10deg, transparent 10deg 20deg); animation: spin 8s linear infinite; z-index: 0; pointer-events: none; }
+  #badgePop .card > *:not(.rays) { position: relative; z-index: 1; }
+  @keyframes medalIn { 0% { transform: scale(.1) rotateY(540deg); opacity: 0; } 60% { opacity: 1; } 100% { transform: scale(1) rotateY(0); } }
+  @keyframes spin { to { transform: rotate(360deg); } }
   #statusChip.sick { background: #d8f0b0; border-color: #4a7a2a; box-shadow: 0 2px 0 #4a7a2a; color: #2a4a14; }
 </style>
 </head>
@@ -100,6 +132,7 @@
   <button id="closeMap">關閉</button>
 </div></div>
 <div class="overlay" id="panel"><div class="card" id="panelCard"></div></div>
+<div class="overlay" id="badgePop"><div class="card" id="badgeCard"></div></div>
 
 <script src="data/fish.js"></script>
 <script src="art.js"></script>
@@ -394,7 +427,15 @@ const SFX = {
   nibble: () => tone(900, 600, .08, .12),                                                       // 浮標小抖：噗
   bite: () => { tone(330, 140, .35, .55); tone(660, 280, .25, .25, 'triangle'); tone(330, 140, .35, .55, 'sine', .22); },   // 咬鉤：咚咚！
   hook: () => tone(500, 950, .12, .2, 'square'),
-  caught: () => [523, 659, 784, 1047].forEach((f, i) => tone(f, f * 1.01, .18, .2, 'triangle', i * .09)),
+  // 釣到魚：「登登登　登～登～」勝利小號
+  caught: () => {
+    if (window.BGM) BGM.duck(1.6);
+    const horn = (f, at, dur, v = .22) => { tone(f, f, dur, v, 'square', at); tone(f, f, dur + .05, v * .9, 'triangle', at); tone(f / 2, f / 2, dur, v * .5, 'triangle', at); };
+    horn(392, 0, .1); horn(392, .13, .1); horn(392, .26, .1);   // 登登登
+    horn(523, .46, .26); horn(659, .78, .75, .26);                 // 登～登～
+    tone(262, 262, 1, .1, 'triangle', .78); tone(330, 330, 1, .08, 'triangle', .78);
+  },
+  badge: () => { if (window.BGM) BGM.duck(1.4); [784, 988, 1175, 1568].forEach((f, i) => tone(f, f, .3, .14, 'triangle', i * .08)); tone(1568, 1568, .9, .1, 'sine', .4); },
   fail: () => tone(300, 110, .4, .2, 'sawtooth'),
   sick: () => { tone(220, 160, .5, .18, 'sine'); tone(230, 150, .5, .18, 'sine', .3); },
 };
@@ -460,6 +501,7 @@ function contextA() {
   if (fish.state === 'wait') return '拉竿';
   if (fish.state === 'bite') return '拉竿！';
   if (fish.state === 'reel') return '收線\n（按住）';
+  if (fish.state === 'trophy') return '好耶！';
   if (fish.state) return '…';
   const o = state.onBoat ? state.boat : state.player;
   return waterAhead(o.x, o.y, state.player.fx, state.player.fy) ? '拋竿' : null;
@@ -471,6 +513,7 @@ function pressA(down) {
   if (!fish.state) return startCast();
   if (fish.state === 'wait') return fail('太早拉竿，魚被嚇跑了…');
   if (fish.state === 'bite') return hook();
+  if (fish.state === 'trophy' && fish.t > .5) return showCatchCard();
 }
 
 // ════════════════ 釣魚 ════════════════
@@ -507,10 +550,18 @@ function hook() {
 }
 function fail(msg) { buzz(200); SFX.fail(); fish.state = 'fail'; fish.t = 0; fish.msg = msg; toast(msg, 2200); }
 function endFishing(msg) { fish.state = null; holding = false; if (msg) toast(msg); }
+const trophyFish = document.createElement('canvas'); trophyFish.width = 64; trophyFish.height = 32;
 function caught() {
-  fish.state = 'result'; buzz([40, 30, 40, 30, 160]); SFX.caught();
-  const c = fish.catch; const isNew = !prog.dex[c.def.id]; state.bag.push({ id: c.def.id, w: +c.weight.toFixed(2), l: +c.length.toFixed(1), price: c.price, at: Date.now() });
+  fish.state = 'trophy'; fish.t = 0; buzz([40, 30, 40, 30, 160]); SFX.caught();
+  const c = fish.catch; fish.isNew = !prog.dex[c.def.id]; state.bag.push({ id: c.def.id, w: +c.weight.toFixed(2), l: +c.length.toFixed(1), price: c.price, at: Date.now() });
+  drawFishTo(trophyFish, c.def); toast(`🎉 釣到了 ${c.def.name}！`, 1800);
   recordCatch(c);
+}
+// 捧魚動畫播完（或玩家點一下）才跳出釣獲卡片
+function showCatchCard() {
+  if (fish.state !== 'trophy') return;
+  fish.state = 'result';
+  const c = fish.catch, isNew = fish.isNew;
   const rar = RAR[c.def.rarity];
   const card = document.getElementById('catchCard');
   card.innerHTML = `<h2>🎉 釣到了！${isNew ? ' <small style="color:#e05a2a">NEW 圖鑑登錄</small>' : ''}</h2><span class="rar" style="background:${rar.color}">${rar.name}</span>
@@ -521,7 +572,7 @@ function caught() {
     <button id="keepBtn">放進魚簍</button>`;
   drawFishTo(document.getElementById('fishPic'), c.def);
   document.getElementById('catch').classList.add('show');
-  document.getElementById('keepBtn').onclick = () => { document.getElementById('catch').classList.remove('show'); endFishing(); updateHud(); };
+  document.getElementById('keepBtn').onclick = () => { document.getElementById('catch').classList.remove('show'); endFishing(); updateHud(); setTimeout(showNextBadge, 250); };
 }
 const fmtW = w => w < 1 ? Math.round(w * 1000) + ' g' : w.toFixed(2) + ' kg';
 function updateFishing(dt) {
@@ -544,7 +595,8 @@ function updateFishing(dt) {
     if (fish.tension >= 100) fail('啪！線斷了…');
     else if (fish.d >= 110) fail('魚游走了…');
     else if (fish.d <= 0) caught();
-  } else if (fish.state === 'fail' && fish.t > 1.2) endFishing();
+  } else if (fish.state === 'trophy' && fish.t > 1.7) showCatchCard();
+  else if (fish.state === 'fail' && fish.t > 1.2) endFishing();
 }
 
 // ════════════════ 商店、魚市、圖鑑、成就、存檔 ════════════════
@@ -588,6 +640,30 @@ const ACH = [
   ['rod', '🛒 新裝備', '買一支新釣竿', s => s.rodIdx > 0],
   ['boat', '🚤 加速前進', '升級你的船', s => s.boatLv > 0],
 ];
+// 徽章等級：bronze 銅、silver 銀、gold 金、rainbow 彩虹（最難）
+const TIER = { first: 'bronze', c10: 'bronze', c50: 'silver', c200: 'gold', d10: 'bronze', d30: 'silver', d60: 'gold', dall: 'rainbow',
+  r_harbor: 'bronze', r_lake: 'bronze', r_river: 'bronze', r_reef: 'silver', r_deep: 'silver', t_dawn: 'bronze', t_dusk: 'bronze', t_night: 'silver',
+  rare: 'silver', epic: 'gold', legend: 'gold', legend_all: 'rainbow', w10: 'silver', w100: 'gold', m1000: 'bronze', m10000: 'gold', rod: 'bronze', boat: 'bronze' };
+const TIER_NAME = { bronze: '銅', silver: '銀', gold: '金', rainbow: '彩虹' };
+const achParts = a => { const i = a[1].indexOf(' '); return { id: a[0], icon: a[1].slice(0, i), title: a[1].slice(i + 1), desc: a[2], tier: TIER[a[0]] || 'bronze' }; };
+const medalHtml = (b, got) => `<div class="medal ${got ? b.tier : 'lock'}"><i>${got ? b.icon : '？'}</i></div>`;
+const fmtDate = ms => { const d = new Date(ms); return `${d.getFullYear()}/${d.getMonth() + 1}/${d.getDate()}`; };
+// 得到新徽章：排隊一個一個跳出來（釣魚動畫和卡片結束後才跳）
+const badgeQueue = [];
+function showNextBadge() {
+  const pop = document.getElementById('badgePop');
+  if (pop.classList.contains('show') || !badgeQueue.length) return;
+  if (fish.state === 'trophy' || fish.state === 'result') return;
+  const id = badgeQueue.shift(), def = ACH.find(a => a[0] === id); if (!def) return showNextBadge();
+  const b = achParts(def);
+  document.getElementById('badgeCard').innerHTML = `<div class="rays"></div><h2>🏅 獲得新徽章！</h2>${medalHtml(b, true)}
+    <h2 style="margin:4px 0 0">${b.title}</h2><p>${b.desc}<br><small>${TIER_NAME[b.tier]}徽章・已收進收集冊（${Object.keys(prog.ach).length}/${ACH.length}）</small></p>
+    <button id="badgeOk">太棒了</button> <button id="badgeBook" style="background:#bfe6ff">看收集冊</button>`;
+  pop.classList.add('show'); SFX.badge(); buzz([30, 40, 30, 40, 120]);
+  const close = () => { pop.classList.remove('show'); setTimeout(showNextBadge, 200); };
+  document.getElementById('badgeOk').onclick = close;
+  document.getElementById('badgeBook').onclick = () => { badgeQueue.length = 0; pop.classList.remove('show'); openDex('ach'); };
+}
 const SAVE_KEY = 'bay-fishing-save-v1';
 const prog = { dex: {}, ach: {}, catches: 0, region: {}, time: {}, rar: {}, maxW: 0, earned: 0, rodIdx: 0, boatLv: 0, bait: 0, pills: 0 };
 function save() {
@@ -611,7 +687,7 @@ function stats() { return { ...prog, dexN: Object.keys(prog.dex).length }; }
 function checkAch() {
   const s = stats(); const got = [];
   for (const [id, name] of ACH) if (!prog.ach[id] && ACH.find(a => a[0] === id)[3](s)) { prog.ach[id] = Date.now(); got.push(name); }
-  if (got.length) { buzz([30, 30, 30, 30, 120]); setTimeout(() => toast('🏅 達成成就：' + got.join('、'), 2800), 400); }
+  if (got.length) { for (const [id, name] of ACH) if (got.includes(name)) badgeQueue.push(id); setTimeout(showNextBadge, 400); }
 }
 function recordCatch(c) {
   prog.catches++; const id = c.def.id;
@@ -676,13 +752,18 @@ function openDex(tab = 'dex') {
     body = order.map(r => { const list = FISH.filter(f => f.rarity === r); const got = list.filter(f => prog.dex[f.id]).length;
       return `<h3 style="color:${RAR[r].color}">${RAR[r].name}（${got}/${list.length}）</h3><div class="dex">` + list.map(f => `<div class="cell ${prog.dex[f.id] ? '' : 'unk'}" data-fish="${f.id}"><canvas width="64" height="32" data-pic="${f.id}"></canvas><span>${prog.dex[f.id] ? f.name : '？？？'}</span></div>`).join('') + '</div>'; }).join('');
   } else {
-    body = ACH.map(([id, name, desc]) => `<div class="row ${prog.ach[id] ? '' : 'unk'}"><span><b>${name}</b><br><small>${desc}</small></span>${prog.ach[id] ? '✅' : '🔒'}</div>`).join('');
+    const all = ACH.map(achParts), n = all.filter(b => prog.ach[b.id]).length;
+    const cnt = t => all.filter(b => b.tier === t && prog.ach[b.id]).length + '/' + all.filter(b => b.tier === t).length;
+    body = `<div class="book"><p class="prog">🏅 徽章收集冊　${n} / ${all.length}</p><div class="meter"><div style="width:${n / all.length * 100}%"></div></div>
+      <div class="tiers">🥉 銅 ${cnt('bronze')}　🥈 銀 ${cnt('silver')}　🥇 金 ${cnt('gold')}　🌈 彩虹 ${cnt('rainbow')}</div>
+      <div class="badges">` + all.map(b => { const got = prog.ach[b.id]; return `<div class="bdg ${got ? '' : 'locked'}" data-badge="${b.id}">${medalHtml(b, got)}<b>${got ? b.title : '？？？'}</b>${got ? `<small>${fmtDate(got)}</small>` : ''}</div>`; }).join('') + '</div></div>';
   }
   showPanel(`<h2>📖 圖鑑館</h2>
-    <div class="tabs"><button id="tDex" class="${tab === 'dex' ? 'on' : ''}">魚類圖鑑 ${s.dexN}/${FISH.length}</button><button id="tAch" class="${tab === 'ach' ? 'on' : ''}">成就 ${Object.keys(prog.ach).length}/${ACH.length}</button></div>
+    <div class="tabs"><button id="tDex" class="${tab === 'dex' ? 'on' : ''}">魚類圖鑑 ${s.dexN}/${FISH.length}</button><button id="tAch" class="${tab === 'ach' ? 'on' : ''}">🏅 徽章收集冊 ${Object.keys(prog.ach).length}/${ACH.length}</button></div>
     <div class="list">${body}</div><p id="dexInfo" style="min-height:2.4em"></p>`);
   document.getElementById('tDex').onclick = () => openDex('dex'); document.getElementById('tAch').onclick = () => openDex('ach');
   document.querySelectorAll('[data-pic]').forEach(c => { const f = FISH_BY_ID[c.dataset.pic]; drawFishTo(c, f); if (!prog.dex[f.id]) { const g = c.getContext('2d'); g.globalCompositeOperation = 'source-in'; g.fillStyle = '#5a5048'; g.fillRect(0, 0, 64, 32); } });
+  document.querySelectorAll('[data-badge]').forEach(el => el.onclick = () => { const b = achParts(ACH.find(a => a[0] === el.dataset.badge)), got = prog.ach[b.id]; document.getElementById('dexInfo').innerHTML = got ? `${b.icon} <b>${b.title}</b>（${TIER_NAME[b.tier]}徽章）：${b.desc}<br><small>${fmtDate(got)} 獲得</small>` : `🔒 還沒拿到的${TIER_NAME[b.tier]}徽章。條件：${b.desc}`; });
   document.querySelectorAll('[data-fish]').forEach(el => el.onclick = () => { const f = FISH_BY_ID[el.dataset.fish], d = prog.dex[f.id]; document.getElementById('dexInfo').innerHTML = d ? `<b>${f.name}</b>：${f.desc}<br>釣到 ${d.n} 次・最重 ${fmtW(d.maxW)}・最長 ${d.maxL} cm・出沒：${f.regions.map(r => REGION_NAME[r]).join('、')}` : `還沒釣到。提示：出沒在${f.regions.map(r => REGION_NAME[r]).join('、')}，${f.times.length === 4 ? '任何時間' : f.times.map(t => PHASE[t].name.slice(3)).join('、')}。`; });
 }
 
@@ -940,7 +1021,9 @@ function drawThird(g, t) {
   g.strokeStyle = 'rgba(255,255,255,.6)'; g.lineWidth = 1;
   const rip = (t * 1.2) % 1; g.beginPath(); g.ellipse(fx, Math.round(fy0) + 2, 4 + rip * 12, (4 + rip * 12) * .3, 0, 0, 7); g.globalAlpha = 1 - rip; g.stroke(); g.globalAlpha = 1;
   if (fish.state === 'bite' || (fish.state === 'reel' && fish.struggle)) { g.fillStyle = 'rgba(255,255,255,.85)'; for (let i = 0; i < 6; i++) { const a = t * 8 + i; g.fillRect(fx + Math.cos(a) * 7 | 0, Math.round(fy0) - 2 - Math.abs(Math.sin(a * 1.7)) * 6 | 0, 2, 2); } }
-  if (fish.state !== 'reel') {
+  const showOff = fish.state === 'trophy' || fish.state === 'result';
+  if (showOff) { /* 捧魚時浮標已收起 */ }
+  else if (fish.state !== 'reel') {
     if (window.ART && fish.state !== 'cast') ART.drawBobber(g, fx, Math.round(fy0), fy - Math.round(fy0));
     else {
     g.fillStyle = '#f4f0e8'; g.fillRect(fx - 2, fy - 3, 4, 3);
@@ -958,6 +1041,13 @@ function drawThird(g, t) {
   // 前景：船頭或岸邊
   if (state.onBoat) { g.fillStyle = '#6a3e1e'; g.beginPath(); g.moveTo(0, lh); g.lineTo(lw * .1, lh * .82); g.lineTo(lw * .55, lh * .8); g.lineTo(lw * .7, lh); g.fill(); g.fillStyle = '#b07a46'; g.beginPath(); g.moveTo(0, lh); g.lineTo(lw * .12, lh * .86); g.lineTo(lw * .52, lh * .84); g.lineTo(lw * .64, lh); g.fill(); }
   else { const col = fish.region === 'lake' || fish.region === 'river' ? '#5a9a3a' : '#c8a870'; g.fillStyle = col; g.fillRect(0, lh * .9 | 0, lw * .5 | 0, lh); g.fillStyle = shade(col, -.25); g.fillRect(0, lh * .9 | 0, lw * .5 | 0, 2); }
+  // 釣到魚：正面把魚捧高
+  if (showOff && window.ART && ART.drawTrophy) {
+    const st = Math.max(3, Math.round(lh / 105));
+    ART.drawTrophy(g, Math.round(lw / 2), Math.round(lh * 1.02), st, trophyFish, t, fish.state === 'result' ? 1 : fish.t / .45, RAR[fish.catch.def.rarity].color);
+    if (phase === 'night') { g.fillStyle = 'rgba(10,16,50,.25)'; g.fillRect(0, 0, lw, lh); }
+    return;
+  }
   // 主角背影（第三人稱）
   const s = Math.max(2, Math.round(lh / 120)), bx = Math.round(lw * .28), by = Math.round(lh * .98);
   const R = (x, y, w, h, c) => { g.fillStyle = c; g.fillRect(bx + x * s, by + y * s, w * s, h * s); };
@@ -1053,7 +1143,7 @@ function frame(now) {
 load(); applyGear(); updateHud(); drawMini(); setInterval(save, 10000); addEventListener('pagehide', save);
 toast('歡迎來到漁港鎮！走到碼頭盡頭「上船」出海，或在水邊直接「拋竿」', 3200);
 if (params.get('demo') === 'boat') { state.onBoat = true; }
-window.__game = { state, fish, FISH, docks, BUILDINGS, prog, ACH, save, applyGear, openBuilding };   // 給測試用
+window.__game = { state, fish, FISH, docks, BUILDINGS, prog, ACH, save, applyGear, openBuilding, checkAch, openDex };   // 給測試用
 requestAnimationFrame(frame);
 </script>
 </body>
