@@ -27,58 +27,184 @@ window.ART = (() => {
     const g = f.getContext('2d'); g.translate(c.width, 0); g.scale(-1, 1); g.drawImage(c, 0, 0); return f;
   }
 
-  // ════════ 地圖視角的主角（12×19，腳底在最下面一列）════════
-  const HEAD_FRONT = [
-    '....kkkk....',
-    '..kkHHHHkk..',
-    '.khhHHhhhhk.',
-    'khhhhhhhhhhk',
-    '.kkkkkkkkkk.',
-    '.kssssssssk.',
-    '.ksesssesSk.',
-    '.ksrsssrsSk.',
-    '..kssssSSk..',
-  ];
-  const HEAD_BACK = [
-    '....kkkk....',
-    '..kkHHHHkk..',
-    '.khhHHhhhhk.',
-    'khhhhhhhhhhk',
-    '.kkkkkkkkkk.',
-    '.kddddddddk.',
-    '.kddddddddk.',
-    '.kdddddddDk.',
-    '..kddddDDk..',
-  ];
-  const BODY_FRONT = [
-    '.kyyykkyyyk.',
-    'kLyyyyyyyyYk',
-    'kLyyywyyyyYk',
-    'ksyyyyyyyYSk',
-    '.kyyywyyyYk.',
-    '.kYYYYYYYYk.',
-  ];
-  const BODY_BACK = [
-    '.kyyyyyyyyk.',
-    'kLyyyyyyyyYk',
-    'kLyyyykyyyYk',
-    'ksyyyykyyYSk',
-    '.kyyyykyyYk.',
-    '.kYYYYYYYYk.',
-  ];
-  const LEGS = [
+  // ════════ 外型與換裝（帽子、髮型、眼鏡、鬍子、衣服、褲子）════════
+  // shop：在哪間店買（tailorA＝翠湖森林島「森林服飾店」、tailorB＝溪谷山島「山谷造型屋」）；price 0＝一開始就有
+  const WARDROBE = {
+    hat: {
+      fisher_green: { name: '漁夫帽（綠）', price: 0, style: 'fisher', h: '#2a7a5a', H: '#3fa078' },
+      none: { name: '不戴帽子', price: 0, style: 'none' },
+      fisher_red: { name: '漁夫帽（紅）', price: 60, shop: 'tailorA', style: 'fisher', h: '#b8403a', H: '#e06a5a' },
+      cap_blue: { name: '棒球帽（藍）', price: 80, shop: 'tailorA', style: 'cap', h: '#2a5aa0', H: '#4a80d0' },
+      beanie_pink: { name: '毛線帽（粉）', price: 90, shop: 'tailorA', style: 'beanie', h: '#e07a9a', H: '#ffb0c8' },
+      straw: { name: '草帽', price: 120, shop: 'tailorA', style: 'straw', h: '#d8b060', H: '#f0d488' },
+      captain: { name: '船長帽', price: 400, shop: 'tailorA', style: 'captain', h: '#f4f0e8', H: '#ffffff' },
+    },
+    hair: {
+      short_brown: { name: '短髮（棕）', price: 0, style: 'short', d: '#5a3a1e', D: '#3e2612' },
+      short_black: { name: '短髮（黑）', price: 50, shop: 'tailorB', style: 'short', d: '#2a2a30', D: '#16161a' },
+      gray: { name: '灰白短髮', price: 100, shop: 'tailorB', style: 'short', d: '#c8c8cc', D: '#909098' },
+      bangs_blonde: { name: '瀏海（金）', price: 120, shop: 'tailorB', style: 'bangs', d: '#e8c060', D: '#b8902a' },
+      long_brown: { name: '長髮（棕）', price: 150, shop: 'tailorB', style: 'long', d: '#6a4224', D: '#4a2a14' },
+      long_red: { name: '長髮（紅）', price: 180, shop: 'tailorB', style: 'long', d: '#c04a2a', D: '#8a2a14' },
+      bald: { name: '光頭', price: 60, shop: 'tailorB', style: 'bald', d: '#5a3a1e', D: '#3e2612' },
+    },
+    glasses: {
+      none: { name: '不戴眼鏡', price: 0, style: 'none' },
+      round: { name: '圓框眼鏡', price: 80, shop: 'tailorA', style: 'round', G: '#3a2a20' },
+      sun: { name: '墨鏡', price: 150, shop: 'tailorA', style: 'sun' },
+      party: { name: '粉紅派對眼鏡', price: 200, shop: 'tailorA', style: 'round', G: '#ff5aa8' },
+    },
+    beard: {
+      none: { name: '沒有鬍子', price: 0, style: 'none' },
+      mustache: { name: '八字鬍', price: 80, shop: 'tailorA', style: 'mustache' },
+      full: { name: '落腮鬍', price: 150, shop: 'tailorA', style: 'full' },
+      white: { name: '白鬍子', price: 300, shop: 'tailorA', style: 'full', M: '#f0f0f0' },
+    },
+    top: {
+      raincoat_yellow: { name: '黃色雨衣', price: 0, y: '#e8a040', Y: '#c07a28', L: '#f6c468', w: '#fff2c8' },
+      raincoat_red: { name: '紅色雨衣', price: 120, shop: 'tailorB', y: '#d04a3a', Y: '#a02a20', L: '#f07a6a', w: '#fff2c8' },
+      hoodie_green: { name: '綠色帽T', price: 150, shop: 'tailorB', y: '#4a9a5a', Y: '#2a6a3a', L: '#7cc08a', w: '#f4f0e8' },
+      sailor: { name: '水手條紋衫', price: 200, shop: 'tailorB', y: '#f4f0e8', Y: '#c8c4bc', L: '#ffffff', w: '#2a5aa0', z: '#2a5aa0', pattern: 'stripe' },
+      black_jacket: { name: '黑色夾克', price: 220, shop: 'tailorB', y: '#3a3a44', Y: '#24242c', L: '#5a5a66', w: '#d8b060' },
+      hawaii: { name: '夏威夷花襯衫', price: 260, shop: 'tailorB', y: '#3ab0c0', Y: '#2a8090', L: '#6ad0e0', w: '#fff2c8', z: '#ff8aa0', pattern: 'dots' },
+    },
+    pants: {
+      jeans: { name: '牛仔褲', price: 0, b: '#3a4a7a', B: '#24305a' },
+      khaki: { name: '卡其褲', price: 80, shop: 'tailorB', b: '#b8a070', B: '#8a7448' },
+      black: { name: '黑色長褲', price: 80, shop: 'tailorB', b: '#2a2a30', B: '#16161a' },
+      shorts_red: { name: '紅色短褲', price: 100, shop: 'tailorB', b: '#c04a3a', B: '#8a2a20', style: 'shorts' },
+    },
+  };
+  const SLOT_NAME = { hat: '帽子', hair: '髮型', glasses: '眼鏡', beard: '鬍子', top: '衣服', pants: '褲子' };
+  const DEFAULT_LOOK = { hat: 'fisher_green', hair: 'short_brown', glasses: 'none', beard: 'none', top: 'raincoat_yellow', pants: 'jeans' };
+
+  const set = (str, map) => str.split('').map((c, i) => map[i] !== undefined ? map[i] : c).join('');
+  const range = (a, b, ch) => { const m = {}; for (let i = a; i <= b; i++) m[i] = ch; return m; };
+  // 帽子形狀（前後共用）：12 寬給地圖小人、16 寬給第三人稱與正面
+  const HAT12 = {
+    fisher: ['....kkkk....', '..kkHHHHkk..', '.khhHHhhhhk.', 'khhhhhhhhhhk', '.kkkkkkkkkk.'],
+    cap: ['............', '...kkkkkk...', '..kHHHHHHk..', '.khhhhhhhhk.', '.kkkkkkkkkkk'],
+    beanie: ['.....kk.....', '...kkHHkk...', '..khhhhhhk..', '.khhhhhhhhk.', '.kHHHHHHHHk.'],
+    straw: ['............', '....kkkk....', '...kHhhhk...', 'kkhhhhhhhhkk', 'kkkkkkkkkkkk'],
+    captain: ['....kkkk....', '..kkhhhhkk..', '.khhhHHhhhk.', '.kkkkkkkkkk.', '.kqqqqqqqqk.'],
+    hair: ['............', '............', '...kkkkkk...', '..kddddddk..', '.kddddddddk.'],
+    bald: ['............', '............', '...kkkkkk...', '..kssssssk..', '.kssssssssk.'],
+  };
+  const HAT16 = {
+    fisher: ['....kkkkkkkk....', '...kHHHHHHHHk...', '..khhHHHHHHhhk..', '.khhhhhhhhhhhhk.', 'kkkkkkkkkkkkkkkk'],
+    cap: ['................', '....kkkkkkkk....', '...kHHHHHHHHk...', '..khhhhhhhhhhk..', '..kkkkkkkkkkkkkk'],
+    beanie: ['.......kk.......', '.....kkHHkk.....', '...khhhhhhhhk...', '..khhhhhhhhhhk..', '..kHHHHHHHHHHk..'],
+    straw: ['................', '.....kkkkkk.....', '....kHhhhhhk....', 'kkkhhhhhhhhhhkkk', 'kkkkkkkkkkkkkkkk'],
+    captain: ['.....kkkkkk.....', '...kkhhhhhhkk...', '..khhhhHHhhhhk..', '..kkkkkkkkkkkk..', '..kqqqqqqqqqqk..'],
+    hair: ['................', '................', '....kkkkkkkk....', '...kddddddddk...', '..kddddddddddk..'],
+    bald: ['................', '................', '....kkkkkkkk....', '...kssssssssk...', '..kssssssssssk..'],
+  };
+  const hatKey = P => P.hat.style !== 'none' ? P.hat.style : P.hair.style === 'bald' ? 'bald' : 'hair';
+  const unBald = (rows, P) => P.hair.style === 'bald' ? rows.map(r => r.replace(/d/g, 's').replace(/D/g, 'S')) : rows;
+  function face12(P) {   // 正面臉 4 列
+    let r = ['.kssssssssk.', '.ksesssesSk.', '.ksrsssrsSk.', '..kssssSSk..'];
+    if (P.hair.style === 'bangs') r[0] = '.kdddddddsk.';
+    if (P.glasses.style === 'round') r[1] = set(r[1], { 2: 'G', 4: 'G', 5: 'G', 6: 'G', 8: 'G' });
+    if (P.glasses.style === 'sun') r[1] = '.kqqqkqqqSk.';
+    if (P.beard.style === 'mustache') r[2] = set(r[2], range(4, 6, 'M'));
+    if (P.beard.style === 'full') { r[2] = '.kMMMMMMMMk.'; r[3] = '..kMMMMMMk..'; }
+    if (P.hair.style === 'long') r = r.map((x, i) => i < 3 ? 'kd' + x.slice(2, 10) + 'dk' : '.kd' + x.slice(3, 9) + 'dk.');
+    return r;
+  }
+  const back12 = P => unBald(['.kddddddddk.', '.kddddddddk.', '.kdddddddDk.', '..kddddDDk..'], P);
+  function face16(P) {
+    const f = m => '...k' + m + 'k...';
+    let r = ['...kssssssssk...', f('sesssses'), f('srssssrs'), '....ksssSSSk....'];
+    if (P.hair.style === 'bangs') r[0] = '...kdddddddsk...';
+    if (P.glasses.style === 'round') r[1] = '...kGeGGGGeGk...';
+    if (P.glasses.style === 'sun') r[1] = '...kqqqkkqqqk...';
+    if (P.beard.style === 'mustache') r[2] = set(r[2], range(6, 9, 'M'));
+    if (P.beard.style === 'full') { r[2] = f('MMMMMMMM'); r[3] = '....kMMMMMMk....'; }
+    if (P.hair.style === 'long') r = r.map((x, i) => i < 3 ? set(x, { 2: 'k', 3: 'd', 12: 'd', 13: 'k' }) : set(x, { 3: 'k', 4: 'd', 11: 'd', 12: 'k' }));
+    return r;
+  }
+  const back16 = P => unBald(['...kddddddddk...', '...kddddddddk...', '...kdddddddDk...', '....kdddddDk....'], P);
+  function pattern(rows, P, y0) {   // 衣服花紋：條紋、圓點
+    if (P.top.pattern === 'stripe') return rows.map((r, i) => (i + y0) % 2 ? r.replace(/y/g, 'z') : r);
+    if (P.top.pattern === 'dots') return rows.map((r, i) => r.split('').map((c, x) => c === 'y' && (x + (i + y0) * 2) % 4 === 0 ? 'z' : c).join(''));
+    return rows;
+  }
+  const BODY12 = {
+    front: ['.kyyykkyyyk.', 'kLyyyyyyyyYk', 'kLyyywyyyyYk', 'ksyyyyyyyYSk', '.kyyywyyyYk.', '.kYYYYYYYYk.'],
+    back: ['.kyyyyyyyyk.', 'kLyyyyyyyyYk', 'kLyyyykyyyYk', 'ksyyyykyyYSk', '.kyyyykyyYk.', '.kYYYYYYYYk.'],
+  };
+  function body12(dir, P) {
+    let r = pattern(BODY12[dir], P, 0);
+    if (dir === 'back' && P.hair.style === 'long') r = r.map((x, i) => i < 3 ? x.slice(0, 2) + 'dddddddd' + x.slice(10) : x);
+    return r;
+  }
+  const LEGS12 = [
     ['..kbbkkbbk..', '..kbbk.kbbk.', '..kBBk.kBBk.', '..kkkk.kkkk.'],   // 站立
     ['..kbbkkbbk..', '.kbbk...kbbk', '.kBBk...kBBk', '.kkkk...kkkk'],   // 跨步
     ['..kbbkkbbk..', '...kbbbbk...', '...kBBBBk...', '...kkkkkk...'],   // 併腳
   ];
-  const person = {};
-  for (const dir of ['front', 'back']) {
-    const head = dir === 'front' ? HEAD_FRONT : HEAD_BACK, body = dir === 'front' ? BODY_FRONT : BODY_BACK;
-    person[dir] = LEGS.map(l => sprite([...head, ...body, ...l]));
-    person[dir + 'Flip'] = person[dir].map(flipped);
-    person[dir + 'Sit'] = sprite([...head, ...body]);
-    person[dir + 'SitFlip'] = flipped(person[dir + 'Sit']);
+  const legs12 = P => LEGS12.map(l => P.pants.style === 'shorts' ? l.map((r, i) => i === 1 ? r.replace(/b/g, 's') : r) : l);
+  const BODY16 = [
+    '..kkLyyyyyyYkk..', '.kLLyyyyyyyyYYk.', 'kLLyyyyyyyyyyYYk', 'kLyyyyykyyyyyyYk', 'kLyyyyykyyyyyyYk', 'kLyyyyykyyyyyyYk',
+    'kLyyyyykyyyyyyYk', 'kLyyyyykyyyyyYYk', 'kyyyyyykyyyyyYYk', 'kYyyyyykyyyyyYYk', 'kYYYYYYYYYYYYYYk',
+  ];
+  function body16(dir, P) {
+    let r = BODY16;
+    if (dir === 'front') r = r.map((x, i) => x[7] === 'k' && i >= 3 ? x.slice(0, 7) + (i === 4 || i === 7 ? 'w' : 'y') + x.slice(8) : x);
+    r = pattern(r, P, 1);
+    if (dir === 'back' && P.hair.style === 'long') r = r.map((x, i) => i < 4 ? x.slice(0, 4) + 'dddddddd' + x.slice(12) : x);
+    return r;
   }
+  const LEGS16 = ['.kbbbbbbbbbbbbk.', '.kbbbbbkkbbbbbk.', '.kbbbbk..kbbbbk.', '.kbbbbk..kbbbbk.', '.kBBBBk..kBBBBk.', '.kkkkkk..kkkkkk.'];
+  const legs16 = P => P.pants.style === 'shorts' ? LEGS16.map((r, i) => i === 2 || i === 3 ? r.replace(/b/g, 's') : r) : LEGS16;
+  function lookParts(look) { const P = {}; for (const k in WARDROBE) P[k] = WARDROBE[k][(look || {})[k]] || WARDROBE[k][DEFAULT_LOOK[k]]; return P; }
+  function palFor(P) {
+    return { ...PAL, h: P.hat.h || PAL.h, H: P.hat.H || PAL.H, d: P.hair.d, D: P.hair.D, y: P.top.y, Y: P.top.Y, L: P.top.L, w: P.top.w,
+      z: P.top.z || P.top.y, b: P.pants.b, B: P.pants.B, G: P.glasses.G || '#3a2a20', q: '#1e2230', M: P.beard.M || P.hair.d };
+  }
+  // 手臂：[x,y,w,h,色] 疊在第三人稱背影上（單位座標），hand＝握竿的手相對 sprite 左上的位置
+  const ARMS = {
+    idle: { parts: [[13, 10, 3, 8, 'Y'], [14, 11, 1, 6, 'y'], [13, 17, 3, 2, 's']], hand: [14.5, 18] },
+    cast: { parts: [[13, 2, 3, 9, 'Y'], [14, 3, 1, 7, 'y'], [13, 1, 3, 2, 's']], hand: [14.5, 1.5] },
+    pull: { parts: [[12, 7, 4, 4, 'Y'], [0, 7, 4, 4, 'L'], [13, 6, 3, 2, 's'], [0, 6, 3, 2, 's']], hand: [14.5, 6.5] },
+  };
+  // 依外型組出所有角度的圖：地圖小人（前後、走路三格、坐船）、第三人稱背影、正面站姿、正面捧魚
+  function buildLook(look) {
+    const P = lookParts(look), pal = palFor(P), hk = hatKey(P), out = { person: {}, third: {} };
+    for (const dir of ['front', 'back']) {
+      const head = [...HAT12[hk], ...(dir === 'front' ? face12(P) : back12(P))], body = body12(dir, P);
+      out.person[dir] = legs12(P).map(l => sprite([...head, ...body, ...l], pal));
+      out.person[dir + 'Flip'] = out.person[dir].map(flipped);
+      out.person[dir + 'Sit'] = sprite([...head, ...body], pal);
+      out.person[dir + 'SitFlip'] = flipped(out.person[dir + 'Sit']);
+    }
+    const backRows = [...HAT16[hk], ...back16(P), ...body16('back', P), ...legs16(P)];
+    for (const [pose, def] of Object.entries(ARMS)) {
+      const c = sprite(backRows, pal), g = c.getContext('2d');
+      for (const [x, y, w, h, col] of def.parts) {
+        g.fillStyle = pal.k; g.fillRect(x, y, w, h);
+        g.fillStyle = pal[col]; g.fillRect(x + (w > 2 ? 1 : 0), y + (h > 2 ? 1 : 0), Math.max(1, w - (w > 2 ? 2 : 0)), Math.max(1, h - (h > 2 ? 2 : 0)));
+      }
+      out.third[pose] = { img: c, hand: def.hand };
+    }
+    out.front = sprite([...HAT16[hk], ...face16(P), ...body16('front', P), ...legs16(P)], pal);
+    // 正面捧魚：兩隻手從肩膀舉到頭頂上方＋開心的嘴巴
+    const c = document.createElement('canvas'); c.width = 24; c.height = 34;
+    const g = c.getContext('2d'); g.drawImage(out.front, 4, 4);
+    for (const x of [1, 19]) {
+      g.fillStyle = pal.k; g.fillRect(x, 3, 4, 13);
+      g.fillStyle = x === 1 ? pal.L : pal.Y; g.fillRect(x + 1, 4, 2, 11);
+      g.fillStyle = pal.k; g.fillRect(x, 0, 4, 4);
+      g.fillStyle = pal.s; g.fillRect(x + 1, 1, 2, 2);
+    }
+    g.fillStyle = pal.k; g.fillRect(10, 12, 4, 1); g.fillStyle = '#c84a3a'; g.fillRect(11, 13, 2, 1);
+    out.trophy = c;
+    return out;
+  }
+  let LOOK = buildLook(DEFAULT_LOOK), person = LOOK.person, third = LOOK.third, TROPHY = LOOK.trophy;
+  function setLook(look) { LOOK = buildLook(look); person = LOOK.person; third = LOOK.third; TROPHY = LOOK.trophy; }
+  // 換裝畫面的預覽：回傳 16×26 的正面站姿（look 不給就用目前的）
+  const previewFront = look => look ? buildLook(look).front : LOOK.front;
 
   // 畫主角：x,y＝腳底中心；dir front/back；flip 面向左；frame 0..2；sitting 坐船
   function drawPerson(g, x, y, { back, flip, frame, sitting, rod }) {
@@ -98,51 +224,6 @@ window.ART = (() => {
     g.drawImage(img, x - 6, top);
     if (!back) drawRod();
   }
-
-  // ════════ 第三人稱背影（16×30 單位，依姿勢換手臂）════════
-  const THIRD_BASE = [
-    '....kkkkkkkk....',
-    '...kHHHHHHHHk...',
-    '..khhHHHHHHhhk..',
-    '.khhhhhhhhhhhhk.',
-    'kkkkkkkkkkkkkkkk',
-    '...kddddddddk...',
-    '...kddddddddk...',
-    '...kdddddddDk...',
-    '....kdddddDk....',
-    '..kkLyyyyyyYkk..',
-    '.kLLyyyyyyyyYYk.',
-    'kLLyyyyyyyyyyYYk',
-    'kLyyyyykyyyyyyYk',
-    'kLyyyyykyyyyyyYk',
-    'kLyyyyykyyyyyyYk',
-    'kLyyyyykyyyyyyYk',
-    'kLyyyyykyyyyyYYk',
-    'kyyyyyykyyyyyYYk',
-    'kYyyyyykyyyyyYYk',
-    'kYYYYYYYYYYYYYYk',
-    '.kbbbbbbbbbbbbk.',
-    '.kbbbbbkkbbbbbk.',
-    '.kbbbbk..kbbbbk.',
-    '.kbbbbk..kbbbbk.',
-    '.kBBBBk..kBBBBk.',
-    '.kkkkkk..kkkkkk.',
-  ];
-  // 手臂：[x,y,w,h,色] 疊在 base 上（單位座標），hand＝握竿的手相對 sprite 左上的位置
-  const ARMS = {
-    idle: { parts: [[13, 10, 3, 8, 'Y'], [14, 11, 1, 6, 'y'], [13, 17, 3, 2, 's']], hand: [14.5, 18] },
-    cast: { parts: [[13, 2, 3, 9, 'Y'], [14, 3, 1, 7, 'y'], [13, 1, 3, 2, 's']], hand: [14.5, 1.5] },
-    pull: { parts: [[12, 7, 4, 4, 'Y'], [0, 7, 4, 4, 'L'], [13, 6, 3, 2, 's'], [0, 6, 3, 2, 's']], hand: [14.5, 6.5] },
-  };
-  const third = {};
-  for (const [pose, def] of Object.entries(ARMS)) {
-    const c = sprite(THIRD_BASE), g = c.getContext('2d');
-    for (const [x, y, w, h, col] of def.parts) {
-      g.fillStyle = PAL.k; g.fillRect(x, y, w, h);
-      g.fillStyle = PAL[col]; g.fillRect(x + (w > 2 ? 1 : 0), y + (h > 2 ? 1 : 0), Math.max(1, w - (w > 2 ? 2 : 0)), Math.max(1, h - (h > 2 ? 2 : 0)));
-    }
-    third[pose] = { img: c, hand: def.hand };
-  }
   // 畫背影：bx,by＝腳底中心（螢幕像素），s＝放大倍率；回傳手的位置
   function drawThirdPerson(g, bx, by, s, pose) {
     const p = third[pose] || third.idle, w = 16 * s, h = 26 * s;
@@ -151,31 +232,6 @@ window.ART = (() => {
     return [left + p.hand[0] * s, top + p.hand[1] * s];
   }
 
-  // ════════ 釣到魚：正面雙手把魚捧高（24×34 單位）════════
-  const TROPHY = (() => {
-    const W = 16, face = (mid) => '...k' + mid + 'k...';
-    const base = THIRD_BASE.map((r, i) => {
-      if (i === 5) return face('ssssssss');
-      if (i === 6) return face('sesssses');
-      if (i === 7) return face('srssssrs');
-      if (i === 8) return '....ksssSSSk....';
-      if (i >= 12 && i <= 18 && r[7] === 'k') return r.slice(0, 7) + (i === 13 || i === 16 ? 'w' : 'y') + r.slice(8);
-      return r;
-    });
-    base.forEach(r => { if (r.length !== W) throw new Error('trophy row ' + r); });
-    const body = sprite(base), c = document.createElement('canvas'); c.width = 24; c.height = 34;
-    const g = c.getContext('2d'); g.drawImage(body, 4, 4);
-    // 兩隻手從肩膀舉到頭頂上方
-    for (const x of [1, 19]) {
-      g.fillStyle = PAL.k; g.fillRect(x, 3, 4, 13);
-      g.fillStyle = x === 1 ? PAL.L : PAL.Y; g.fillRect(x + 1, 4, 2, 11);
-      g.fillStyle = PAL.k; g.fillRect(x, 0, 4, 4);
-      g.fillStyle = PAL.s; g.fillRect(x + 1, 1, 2, 2);
-    }
-    // 開心的嘴巴
-    g.fillStyle = PAL.k; g.fillRect(10, 12, 4, 1); g.fillStyle = '#c84a3a'; g.fillRect(11, 13, 2, 1);
-    return c;
-  })();
   // 畫捧魚：cx＝中心，by＝腳底（螢幕像素），s＝倍率，fishImg＝64×32 魚圖，lift 0..1 舉起的進度，glow＝稀有度顏色
   function drawTrophy(g, cx, by, s, fishImg, t, lift, glow) {
     const e = 1 - Math.pow(1 - Math.min(1, lift), 3);
@@ -287,6 +343,14 @@ window.ART = (() => {
       const [fx, fy] = P(x0 + .5, yF, 0); px(fx - 3, fy - 7, 7, 2, '#6a4224'); for (let i = 0; i < 3; i++) px(fx - 2 + i * 2, fy - 8, 1, 1, ['#ff8aa0', '#fff3a0', '#ff8aa0'][i]);
       // 信箱
       const [mx, my] = P(xR + .25, yF + .35, 0); px(mx, my - 8, 1, 8, '#5a3a1e'); px(mx - 2, my - 11, 5, 3, '#3a78c0'); px(mx + 2, my - 12, 1, 2, '#d0403a');
+    } else if (b.id === 'tailorA') {   // 森林服飾店：綠白雨遮、帽子招牌、門口的帽架
+      awning('#3a8a4a', '#f4f6e8');
+      sign(x0 + .7, (sx, sy) => { px(sx - 3, sy - 2, 7, 1, '#6a4224'); px(sx - 2, sy - 4, 5, 2, '#b8403a'); px(sx - 1, sy - 5, 3, 1, '#b8403a'); });
+      const [hx, hy] = P(xR + .3, yF + .3, 0); px(hx, hy - 12, 1, 12, '#5a3a1e'); px(hx - 3, hy - 14, 7, 2, '#d8b060'); px(hx - 2, hy - 16, 5, 2, '#d8b060');
+    } else if (b.id === 'tailorB') {   // 山谷造型屋：粉白雨遮、衣架招牌、門口的假人
+      awning('#c85a8a', '#fff0f6');
+      sign(x0 + .7, (sx, sy) => { px(sx, sy - 5, 1, 2, '#3a3a40'); px(sx - 4, sy - 3, 9, 1, '#3a3a40'); px(sx - 4, sy - 2, 1, 1, '#3a3a40'); px(sx + 4, sy - 2, 1, 1, '#3a3a40'); });
+      const [mx, my] = P(xR + .3, yF + .3, 0); px(mx, my - 4, 1, 4, '#5a3a1e'); px(mx - 3, my - 12, 7, 8, '#3ab0c0'); px(mx - 1, my - 15, 3, 3, '#e8d8c0'); px(mx - 2, my - 9, 1, 1, '#ff8aa0'); px(mx + 1, my - 7, 1, 1, '#ff8aa0');
     } else if (b.id === 'board') {
       awning('#9a5ab0', '#f6eefa');
       sign(x0 + .7, (sx, sy) => { px(sx - 4, sy - 3, 4, 4, '#3a78c0'); px(sx, sy - 3, 4, 4, '#d0403a'); px(sx - 1, sy - 3, 1, 4, '#2a1e14'); });
@@ -295,5 +359,5 @@ window.ART = (() => {
     }
   }
 
-  return { PAL, sprite, flipped, shade: shadeHex, drawPerson, drawThirdPerson, drawTrophy, drawBobber, drawBoat, decorateBuilding };
+  return { PAL, sprite, flipped, shade: shadeHex, drawPerson, drawThirdPerson, drawTrophy, drawBobber, drawBoat, decorateBuilding, WARDROBE, SLOT_NAME, DEFAULT_LOOK, setLook, previewFront };
 })();

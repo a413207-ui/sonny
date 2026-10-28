@@ -96,6 +96,18 @@
   #badgePop .card > *:not(.rays) { position: relative; z-index: 1; }
   @keyframes medalIn { 0% { transform: scale(.1) rotateY(540deg); opacity: 0; } 60% { opacity: 1; } 100% { transform: scale(1) rotateY(0); } }
   @keyframes spin { to { transform: rotate(360deg); } }
+  /* 換裝 */
+  .dress { display: flex; gap: 10px; align-items: flex-start; text-align: left; }
+  .dress canvas.pv { width: 96px; height: 156px; image-rendering: pixelated; background: radial-gradient(circle at 50% 70%, #fff6dc, #e8d8b4); border: 3px solid #8a6a3a; border-radius: 10px; flex: none; }
+  .slots { display: flex; flex-wrap: wrap; gap: 4px; margin-bottom: 6px; }
+  .slots button { font-size: 12px; padding: 3px 8px; border: 2px solid #8a6a3a; border-radius: 8px; background: #fff8e6; box-shadow: none; font-weight: 700; }
+  .slots button.on { background: #ffb840; }
+  .items { display: grid; grid-template-columns: 1fr 1fr; gap: 5px; }
+  .items button { font-size: 12.5px; padding: 6px 4px; border: 2px solid #c8b08a; border-radius: 8px; background: #fffdf4; box-shadow: none; font-weight: 700; line-height: 1.25; color: #4a2e12; }
+  .items button.on { border-color: #e0902a; background: #ffe7b0; }
+  .items button small { display: block; font-weight: 600; color: #8a6a4a; font-size: 11px; }
+  .items button.lock { opacity: .55; }
+  .hint { font-size: 12px; color: #8a6a4a; margin: 6px 0 0; text-align: left; }
   #statusChip.sick { background: #d8f0b0; border-color: #4a7a2a; box-shadow: 0 2px 0 #4a7a2a; color: #2a4a14; }
 </style>
 </head>
@@ -228,6 +240,26 @@ const BUILDINGS = [
   { id: 'home', name: '我的小屋', x: 36, y: 46, w: 2, h: 2, hgt: 14, wall: '#f4e6c8', roof: '#4a9a5a', sign: '🏠' },
   { id: 'board', name: '圖鑑館', x: 43, y: 47, w: 2, h: 2, hgt: 15, wall: '#efe0d0', roof: '#9a5ab0', sign: '📖' },
 ];
+// 服飾店：放在其他島的碼頭附近（翠湖森林島、溪谷山島），並鋪一條石板路接到碼頭
+function placeShop(dock, w, h) {
+  let best = null, bd = 1e9;
+  for (let y = dock.y0 - 7; y <= dock.y0 + 7; y++) for (let x = dock.x0 - 7; x <= dock.x0 + 7; x++) {
+    let ok = true;
+    for (let yy = y - 1; yy < y + h + 2 && ok; yy++) for (let xx = x - 1; xx < x + w + 1 && ok; xx++) { const t = at(xx, yy); if (t !== T.GRASS && t !== T.SAND) ok = false; }
+    if (!ok) continue;
+    const d = Math.hypot(x + w / 2 - dock.x0 - .5, y + h + .5 - dock.y0 - .5);
+    if (d >= 2.5 && d < bd) { bd = d; best = { x, y }; }
+  }
+  return best;
+}
+const shopPaths = [];
+for (const [di, def] of [[1, { id: 'tailorA', name: '森林服飾店', wall: '#eef0dc', roof: '#3a8a4a', sign: '🎩' }], [2, { id: 'tailorB', name: '山谷造型屋', wall: '#f6e8ee', roof: '#c85a8a', sign: '👕' }]]) {
+  const d = docks[di], pos = d && placeShop(d, 2, 2); if (!pos) continue;
+  const b = { ...def, x: pos.x, y: pos.y, w: 2, h: 2, hgt: 14 }; BUILDINGS.push(b);
+  // 門口 → 碼頭起點的石板路（先橫後直）
+  let x = pos.x + 1, y = pos.y + 2; const tx = d.x0, ty = d.y0;
+  while (x !== tx || y !== ty) { const t = at(x, y); if (t === T.GRASS || t === T.SAND) { set(x, y, T.STONE); shopPaths.push([x, y]); } if (x !== tx) x += Math.sign(tx - x); else y += Math.sign(ty - y); }
+}
 for (const b of BUILDINGS) {
   for (let y = b.y; y < b.y + b.h; y++) for (let x = b.x; x < b.x + b.w; x++) { set(x, y, T.STONE); block[y * N + x] = 1; }
   b.door = [b.x + b.w / 2, b.y + b.h + .5];   // 門在建築的左前方（＋y 那一面）
@@ -242,7 +274,7 @@ for (let y = 1; y < N - 1; y++) for (let x = 1; x < N - 1; x++) {
   for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1], [1, 1], [-1, -1], [1, -1], [-1, 1]]) if (WATER.has(at(x + dx, y + dy)) || at(x + dx, y + dy) === T.DOCK) nearWater = true;
   const is = ISLANDS[landOf[i] - 1];
   if (tt === T.GRASS && !nearWater && is && hash(x, y, 11) < is.trees) {
-    const dockNear = docks.some(d => Math.abs(d.x0 - x) + Math.abs(d.y0 - y) < 3);
+    const dockNear = docks.some(d => Math.abs(d.x0 - x) + Math.abs(d.y0 - y) < 3) || BUILDINGS.some(b => Math.abs(b.door[0] - x - .5) + Math.abs(b.door[1] - y - .5) < 3);
     if (!dockNear) { block[i] = 1; trees.push({ x: x + .5, y: y + .5, k: hash(x, y, 12) }); }
   } else if (tt === T.GRASS && is && is.name === '溪谷山島' && !nearWater && hash(x, y, 13) < .07) { block[i] = 1; rocks.push({ x: x + .5, y: y + .5 }); }
 }
@@ -639,11 +671,13 @@ const ACH = [
   ['m10000', '💰 漁港大亨', '賣魚累計賺 10000', s => s.earned >= 10000],
   ['rod', '🛒 新裝備', '買一支新釣竿', s => s.rodIdx > 0],
   ['boat', '🚤 加速前進', '升級你的船', s => s.boatLv > 0],
+  ['style1', '👒 第一件新衣', '在服飾店買一件服飾', s => (s.closet || []).length >= 1],
+  ['style10', '🕶️ 時尚達人', '收集 10 件服飾', s => (s.closet || []).length >= 10],
 ];
 // 徽章等級：bronze 銅、silver 銀、gold 金、rainbow 彩虹（最難）
 const TIER = { first: 'bronze', c10: 'bronze', c50: 'silver', c200: 'gold', d10: 'bronze', d30: 'silver', d60: 'gold', dall: 'rainbow',
   r_harbor: 'bronze', r_lake: 'bronze', r_river: 'bronze', r_reef: 'silver', r_deep: 'silver', t_dawn: 'bronze', t_dusk: 'bronze', t_night: 'silver',
-  rare: 'silver', epic: 'gold', legend: 'gold', legend_all: 'rainbow', w10: 'silver', w100: 'gold', m1000: 'bronze', m10000: 'gold', rod: 'bronze', boat: 'bronze' };
+  rare: 'silver', epic: 'gold', legend: 'gold', legend_all: 'rainbow', w10: 'silver', w100: 'gold', m1000: 'bronze', m10000: 'gold', rod: 'bronze', boat: 'bronze', style1: 'bronze', style10: 'gold' };
 const TIER_NAME = { bronze: '銅', silver: '銀', gold: '金', rainbow: '彩虹' };
 const achParts = a => { const i = a[1].indexOf(' '); return { id: a[0], icon: a[1].slice(0, i), title: a[1].slice(i + 1), desc: a[2], tier: TIER[a[0]] || 'bronze' }; };
 const medalHtml = (b, got) => `<div class="medal ${got ? b.tier : 'lock'}"><i>${got ? b.icon : '？'}</i></div>`;
@@ -665,7 +699,7 @@ function showNextBadge() {
   document.getElementById('badgeBook').onclick = () => { badgeQueue.length = 0; pop.classList.remove('show'); openDex('ach'); };
 }
 const SAVE_KEY = 'bay-fishing-save-v1';
-const prog = { dex: {}, ach: {}, catches: 0, region: {}, time: {}, rar: {}, maxW: 0, earned: 0, rodIdx: 0, boatLv: 0, bait: 0, pills: 0 };
+const prog = { dex: {}, ach: {}, catches: 0, region: {}, time: {}, rar: {}, maxW: 0, earned: 0, rodIdx: 0, boatLv: 0, bait: 0, pills: 0, look: null, closet: [] };
 function save() {
   try { localStorage.setItem(SAVE_KEY, JSON.stringify({ v: 1, coins: state.coins, bag: state.bag, prog, pos: { x: state.player.x, y: state.player.y, bx: state.boat.x, by: state.boat.y, onBoat: state.onBoat } })); } catch (e) {}
 }
@@ -679,6 +713,13 @@ function load() {
     return true;
   } catch (e) { return false; }
 }
+// ── 外型：衣櫃（prog.closet＝買過的服飾 id，格式 slot:id）與目前穿搭（prog.look）──
+const WR = window.ART ? ART.WARDROBE : {};
+const SLOTS = ['hat', 'hair', 'glasses', 'beard', 'top', 'pants'];
+const owns = (slot, id) => (WR[slot][id] && WR[slot][id].price === 0) || prog.closet.includes(slot + ':' + id);
+function applyLook() { if (!prog.look) prog.look = { ...ART.DEFAULT_LOOK }; if (window.ART) ART.setLook(prog.look); }
+function drawPreview(cvs, look) { const g = cvs.getContext('2d'); g.imageSmoothingEnabled = false; g.clearRect(0, 0, cvs.width, cvs.height); g.drawImage(ART.previewFront(look), 0, 0, cvs.width, cvs.height); }
+const SHOP_OF = { tailorA: '翠湖森林島的🎩森林服飾店', tailorB: '溪谷山島的👕山谷造型屋' };
 function applyGear() {
   const r = RODS[prog.rodIdx] || RODS[0]; state.rod = { power: r.power, luck: r.luck + (prog.bait > 0 ? 1 : 0), name: r.name };
   state.boatSpeed = (BOATS[prog.boatLv] || BOATS[0]).speed;
@@ -708,7 +749,7 @@ function showPanel(html) {
   document.getElementById('closePanel').onclick = () => panelEl().classList.remove('show');
 }
 const FISH_BY_ID = Object.fromEntries(FISH.map(f => [f.id, f]));
-function openBuilding(b) { ({ shop: openShop, market: openMarket, home: openHome, board: openDex })[b.id](); }
+function openBuilding(b) { ({ shop: openShop, market: openMarket, home: openHome, board: openDex, tailorA: () => openTailor(b), tailorB: () => openTailor(b) })[b.id](); }
 function openMarket() {
   const total = state.bag.reduce((a, f) => a + f.price, 0);
   const rows = state.bag.map((f, i) => { const d = FISH_BY_ID[f.id]; return `<div class="row"><span><b style="color:${RAR[d.rarity].color}">${d.name}</b> ${fmtW(f.w)}・${f.l} cm</span><button data-sell="${i}">賣 🪙${f.price}</button></div>`; }).join('');
@@ -733,16 +774,61 @@ function openShop() {
   document.getElementById('buyBait').onclick = () => pay(BAIT.price, () => { prog.bait += BAIT.count; toast('買了 10 個魚餌'); });
   document.getElementById('buyPill').onclick = () => pay(PILL.price, () => { prog.pills += PILL.count; toast(`買了 ${PILL.count} 顆${PILL.name}`); });
 }
-function openHome() {
-  const s = stats(), achN = Object.keys(prog.ach).length;
-  showPanel(`<h2>🏠 我的小屋</h2><p>遊戲會自動存在這台裝置上。</p>
+let homeTab = 'dress', dressSlot = 'hat';
+function openHome(tab = homeTab) {
+  homeTab = tab;
+  const tabs = `<div class="tabs"><button id="hDress" class="${tab === 'dress' ? 'on' : ''}">🪞 換裝</button><button id="hStats" class="${tab === 'stats' ? 'on' : ''}">📊 我的紀錄</button></div>`;
+  if (tab === 'stats') {
+    const s = stats(), achN = Object.keys(prog.ach).length;
+    showPanel(`<h2>🏠 我的小屋</h2>${tabs}<p>遊戲會自動存在這台裝置上。</p>
     <div class="list" style="text-align:left">
     <div class="row"><span>累計釣到</span><b>${s.catches} 條</b></div>
     <div class="row"><span>圖鑑</span><b>${s.dexN} / ${FISH.length} 種</b></div>
-    <div class="row"><span>成就</span><b>${achN} / ${ACH.length}</b></div>
+    <div class="row"><span>徽章</span><b>${achN} / ${ACH.length}</b></div>
     <div class="row"><span>最重的魚</span><b>${fmtW(s.maxW || 0)}</b></div>
     <div class="row"><span>賣魚總收入</span><b>🪙${s.earned}</b></div>
+    <div class="row"><span>服飾收藏</span><b>${prog.closet.length} 件</b></div>
     <div class="row"><span>釣竿／船</span><b>${RODS[prog.rodIdx].name}／${BOATS[prog.boatLv].name}</b></div></div>`);
+  } else {
+    const items = Object.entries(WR[dressSlot]);
+    const mine = items.filter(([id]) => owns(dressSlot, id)), more = items.length - mine.length;
+    const shops = [...new Set(items.filter(([id]) => !owns(dressSlot, id)).map(([, it]) => SHOP_OF[it.shop]))];
+    showPanel(`<h2>🏠 我的小屋</h2>${tabs}
+      <div class="dress"><canvas class="pv" id="pv" width="16" height="26"></canvas><div style="flex:1">
+      <div class="slots">${SLOTS.map(k => `<button data-slot="${k}" class="${k === dressSlot ? 'on' : ''}">${ART.SLOT_NAME[k]}</button>`).join('')}</div>
+      <div class="items">${mine.map(([id, it]) => `<button data-wear="${id}" class="${prog.look[dressSlot] === id ? 'on' : ''}">${it.name}</button>`).join('')}</div>
+      ${more ? `<p class="hint">還有 ${more} 款${ART.SLOT_NAME[dressSlot]}可以到${shops.join('、')}購買。</p>` : `<p class="hint">這個部位的款式都收集齊了！</p>`}
+      </div></div>`);
+    drawPreview(document.getElementById('pv'));
+    document.querySelectorAll('[data-slot]').forEach(el => el.onclick = () => { dressSlot = el.dataset.slot; openHome('dress'); });
+    document.querySelectorAll('[data-wear]').forEach(el => el.onclick = () => { prog.look[dressSlot] = el.dataset.wear; applyLook(); save(); SFX.hook(); openHome('dress'); });
+  }
+  document.getElementById('hDress').onclick = () => openHome('dress'); document.getElementById('hStats').onclick = () => openHome('stats');
+}
+// ── 服飾店：可以先試穿再買 ──
+let tailorTry = null, tailorSlot = null;
+function openTailor(b, keep) {
+  const slots = SLOTS.filter(k => Object.values(WR[k]).some(it => it.shop === b.id));
+  if (!keep || !slots.includes(tailorSlot)) { tailorSlot = slots[0]; tailorTry = null; }
+  const items = Object.entries(WR[tailorSlot]).filter(([, it]) => it.shop === b.id);
+  const tryLook = tailorTry ? { ...prog.look, [tailorSlot]: tailorTry } : prog.look;
+  const sel = tailorTry && WR[tailorSlot][tailorTry], have = sel && owns(tailorSlot, tailorTry);
+  showPanel(`<h2>${b.sign} ${b.name}</h2><p>你有 🪙${state.coins}・點一件先試穿</p>
+    <div class="dress"><canvas class="pv" id="pv" width="16" height="26"></canvas><div style="flex:1">
+    <div class="slots">${slots.map(k => `<button data-tslot="${k}" class="${k === tailorSlot ? 'on' : ''}">${ART.SLOT_NAME[k]}</button>`).join('')}</div>
+    <div class="items">${items.map(([id, it]) => `<button data-try="${id}" class="${tailorTry === id ? 'on' : ''}">${it.name}<small>${owns(tailorSlot, id) ? '已擁有' : '🪙' + it.price}</small></button>`).join('')}</div>
+    </div></div>
+    <div style="margin-top:10px;min-height:44px">${sel ? (have ? `<button id="wearIt">穿上 ${sel.name}</button>` : `<button id="buyIt">買下 ${sel.name}（🪙${sel.price}）</button>`) : '<p class="hint" style="text-align:center">買到的服飾會放進小屋的衣櫃，回小屋可以隨時換。</p>'}</div>`);
+  drawPreview(document.getElementById('pv'), tryLook);
+  document.querySelectorAll('[data-tslot]').forEach(el => el.onclick = () => { tailorSlot = el.dataset.tslot; tailorTry = null; openTailor(b, true); });
+  document.querySelectorAll('[data-try]').forEach(el => el.onclick = () => { tailorTry = el.dataset.try; openTailor(b, true); });
+  const wear = () => { prog.look[tailorSlot] = tailorTry; applyLook(); save(); };
+  const w = document.getElementById('wearIt'); if (w) w.onclick = () => { wear(); toast('換上了 ' + sel.name + '！'); openTailor(b, true); };
+  const by = document.getElementById('buyIt'); if (by) by.onclick = () => {
+    if (state.coins < sel.price) { toast('錢不夠，先去魚市賣魚吧'); buzz(120); return; }
+    state.coins -= sel.price; prog.closet.push(tailorSlot + ':' + tailorTry); wear(); buzz(40); SFX.hook();
+    toast(`買了 ${sel.name}，已經穿上，也放進小屋衣櫃了！`, 2400); checkAch(); save(); updateHud(); openTailor(b, true);
+  };
 }
 function openDex(tab = 'dex') {
   const s = stats();
@@ -1140,10 +1226,10 @@ function frame(now) {
   if ((hudTick += dt) > .12) { hudTick = 0; updateHud(); }
   requestAnimationFrame(frame);
 }
-load(); applyGear(); updateHud(); drawMini(); setInterval(save, 10000); addEventListener('pagehide', save);
+load(); applyGear(); applyLook(); updateHud(); drawMini(); setInterval(save, 10000); addEventListener('pagehide', save);
 toast('歡迎來到漁港鎮！走到碼頭盡頭「上船」出海，或在水邊直接「拋竿」', 3200);
 if (params.get('demo') === 'boat') { state.onBoat = true; }
-window.__game = { state, fish, FISH, docks, BUILDINGS, prog, ACH, save, applyGear, openBuilding, checkAch, openDex };   // 給測試用
+window.__game = { state, fish, FISH, docks, BUILDINGS, prog, ACH, save, applyGear, openBuilding, checkAch, openDex }; window.__walk = walkable;   // 給測試用
 requestAnimationFrame(frame);
 </script>
 </body>
