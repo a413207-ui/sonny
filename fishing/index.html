@@ -88,6 +88,18 @@
   .medal.lock i { color: #8a7a62; font-size: 22px; font-weight: 900; }
   .bdg.locked { color: #9a8a72; }
   #badgePop { z-index: 30; }
+  /* 圖鑑：點魚放大介紹 */
+  #fishDetail { z-index: 25; }
+  #fishDetail .card { position: relative; padding-top: 10px; }
+  .fd-pic { position: relative; margin: 4px auto 2px; width: min(78vw, 300px); aspect-ratio: 2 / 1; border-radius: 12px; border: 3px solid #8a6a3a; background: radial-gradient(circle at 50% 55%, var(--glow, #fff6dc) 0, #f3e6c8 70%); display: flex; align-items: center; justify-content: center; overflow: hidden; }
+  .fd-pic canvas { width: 92%; height: 92%; image-rendering: pixelated; margin: 0; animation: fdSwim 2.4s ease-in-out infinite; }
+  @keyframes fdSwim { 0%, 100% { transform: translateY(0) rotate(-1deg); } 50% { transform: translateY(-4px) rotate(1deg); } }
+  .fd-pic .no { position: absolute; left: 8px; top: 6px; font-size: 12px; font-weight: 800; color: #8a6a4a; }
+  .fd-nav { position: absolute; top: 50%; transform: translateY(-50%); width: 34px; height: 34px; border-radius: 50%; border: 2px solid #8a6a3a; background: #fff8e6; font-size: 18px; font-weight: 900; display: flex; align-items: center; justify-content: center; cursor: pointer; z-index: 2; padding: 0; box-shadow: none; }
+  .fd-grid { display: grid; grid-template-columns: auto 1fr; gap: 3px 10px; text-align: left; font-size: 13px; margin: 8px 0 4px; }
+  .fd-grid b { color: #6b5034; white-space: nowrap; }
+  .fd-tags { display: flex; flex-wrap: wrap; gap: 4px; justify-content: center; margin: 4px 0; }
+  .fd-tags span { font-size: 12px; padding: 2px 8px; border-radius: 10px; background: #f3e6c8; border: 1px solid #c8b08a; }
   #badgePop .card { overflow: hidden; }
   #badgePop .medal { width: 112px; height: 128px; margin: 6px auto 4px; animation: medalIn .9s cubic-bezier(.2,1.4,.4,1) both; }
   #badgePop .medal::before, #badgePop .medal::after { width: 28px; height: 48px; } #badgePop .medal::before { left: 24px; } #badgePop .medal::after { right: 24px; }
@@ -157,6 +169,7 @@
 </div></div>
 <div class="overlay" id="panel"><div class="card" id="panelCard"></div></div>
 <div class="overlay" id="cut"><canvas id="cutCv"></canvas><div class="t" id="cutTitle" style="font-size:18px"></div><div class="t" id="cutName" style="font-size:22px"></div><div class="t" id="cutPlaque" style="font-size:13px"></div><div class="t" id="cutCap" style="font-size:16px"></div></div>
+<div class="overlay" id="fishDetail"><div class="card" id="fishDetailCard"></div></div>
 <div class="overlay" id="badgePop"><div class="card" id="badgeCard"></div></div>
 
 <script src="data/fish.js"></script>
@@ -1197,6 +1210,44 @@ function openTailor(b, keep) {
     toast(`買了 ${sel.name}，已經穿上，也放進小屋衣櫃了！`, 2400); checkAch(); save(); updateHud(); openTailor(b, true);
   };
 }
+// ── 圖鑑：點魚放大介紹（左右箭頭看上一條／下一條）──
+const DEX_ORDER = ['common', 'uncommon', 'rare', 'epic', 'legendary'].flatMap(r => FISH.filter(f => f.rarity === r));
+function openFishDetail(id) {
+  const i = DEX_ORDER.findIndex(f => f.id === id), f = DEX_ORDER[i], d = prog.dex[f.id], rar = RAR[f.rarity];
+  const where = f.regions.map(r => REGION_NAME[r]).join('、'), when = f.times.length === 4 ? '任何時間' : f.times.map(t => PHASE[t].name).join('、');
+  const range = `${fmtW(f.weightKg[0])}～${fmtW(f.weightKg[1])}・${f.lengthCm[0]}～${f.lengthCm[1]} cm`;
+  const wx2 = f.weather ? `<div class="fd-tags"><span style="background:#dbe6ff;border-color:#8aa0e0">⚡ 天氣限定：${f.weather.map(w => WEATHER[w].name).join('、')}</span></div>` : '';
+  const html = d ? `
+      <h2 style="margin:6px 0 2px">${f.name}</h2><span class="rar" style="background:${rar.color}">${rar.name}</span>
+      <p style="margin:8px 0 4px">${f.desc}</p>${wx2}
+      <div class="fd-grid">
+        <b>📍 出沒</b><span>${where}</span><b>🕒 時段</b><span>${when}</span>
+        <b>📏 體型</b><span>${range}</span><b>🪙 行情</b><span>約 ${f.price}（越大越值錢）</span>
+        <b>🎣 釣到</b><span>${d.n} 次</span><b>🏆 最大</b><span>${fmtW(d.maxW)}・${d.maxL} cm</span>
+        <b>📅 初次</b><span>${fmtDate(d.first)}</span>
+      </div>` : `
+      <h2 style="margin:6px 0 2px">？？？</h2><span class="rar" style="background:${rar.color}">${rar.name}</span>
+      <p style="margin:8px 0 4px">還沒釣到這條魚。</p>${wx2}
+      <div class="fd-grid"><b>📍 線索</b><span>出沒在${where}</span><b>🕒 時段</b><span>${when}</span><b>📏 體型</b><span>${range}</span></div>`;
+  document.getElementById('fishDetailCard').innerHTML = `
+    <div class="fd-pic" style="--glow:${d ? rar.color + '55' : '#d8ccb4'}"><span class="no">No.${String(i + 1).padStart(3, '0')}</span>
+      <button class="fd-nav" id="fdPrev" style="left:6px">‹</button><canvas id="fdCv" width="64" height="32"></canvas><button class="fd-nav" id="fdNext" style="right:6px">›</button></div>
+    ${html}
+    <div style="margin-top:8px"><button id="fdClose">回圖鑑</button></div>`;
+  const cvs = document.getElementById('fdCv');
+  if (d) drawFishTo(cvs, f);
+  else {   // 還沒釣到：黑色剪影。先畫在看不見的畫布，圖載入完成也不會露出原貌
+    const src = document.createElement('canvas'); src.width = 64; src.height = 32; drawFishTo(src, f);
+    const copy = () => { const g = cvs.getContext('2d'); g.clearRect(0, 0, 64, 32); g.drawImage(src, 0, 0); g.globalCompositeOperation = 'source-in'; g.fillStyle = '#4a4038'; g.fillRect(0, 0, 64, 32); g.globalCompositeOperation = 'source-over'; };
+    copy(); let n = 0; const tm = setInterval(() => { if (!document.body.contains(cvs) || ++n > 20) return clearInterval(tm); copy(); }, 150);
+  }
+  document.getElementById('fishDetail').classList.add('show');
+  const go = k => openFishDetail(DEX_ORDER[(i + k + DEX_ORDER.length) % DEX_ORDER.length].id);
+  document.getElementById('fdPrev').onclick = () => go(-1);
+  document.getElementById('fdNext').onclick = () => go(1);
+  document.getElementById('fdClose').onclick = () => document.getElementById('fishDetail').classList.remove('show');
+}
+document.getElementById('fishDetail').addEventListener('click', e => { if (e.target.id === 'fishDetail') e.target.classList.remove('show'); });   // 點外面也能關
 function openDex(tab = 'dex') {
   const s = stats();
   let body;
@@ -1217,7 +1268,7 @@ function openDex(tab = 'dex') {
   document.getElementById('tDex').onclick = () => openDex('dex'); document.getElementById('tAch').onclick = () => openDex('ach');
   document.querySelectorAll('[data-pic]').forEach(c => { const f = FISH_BY_ID[c.dataset.pic]; drawFishTo(c, f); if (!prog.dex[f.id]) { const g = c.getContext('2d'); g.globalCompositeOperation = 'source-in'; g.fillStyle = '#5a5048'; g.fillRect(0, 0, 64, 32); } });
   document.querySelectorAll('[data-badge]').forEach(el => el.onclick = () => { const b = achParts(ACH.find(a => a[0] === el.dataset.badge)), got = prog.ach[b.id]; document.getElementById('dexInfo').innerHTML = got ? `${b.icon} <b>${b.title}</b>（${TIER_NAME[b.tier]}徽章）：${b.desc}<br><small>${fmtDate(got)} 獲得</small>` : `🔒 還沒拿到的${TIER_NAME[b.tier]}徽章。條件：${b.desc}`; });
-  document.querySelectorAll('[data-fish]').forEach(el => el.onclick = () => { const f = FISH_BY_ID[el.dataset.fish], d = prog.dex[f.id]; document.getElementById('dexInfo').innerHTML = d ? `<b>${f.name}</b>：${f.desc}<br>釣到 ${d.n} 次・最重 ${fmtW(d.maxW)}・最長 ${d.maxL} cm・出沒：${f.regions.map(r => REGION_NAME[r]).join('、')}` : `還沒釣到。提示：出沒在${f.regions.map(r => REGION_NAME[r]).join('、')}，${f.times.length === 4 ? '任何時間' : f.times.map(t => PHASE[t].name.slice(3)).join('、')}${f.weather ? '，只在' + f.weather.map(w => WEATHER[w].name).join('、') + '出現' : ''}。`; });
+  document.querySelectorAll('[data-fish]').forEach(el => el.onclick = () => openFishDetail(el.dataset.fish));
 }
 
 // ════════════════ 地圖 ════════════════
@@ -1625,7 +1676,7 @@ function frame(now) {
 load(); applyGear(); applyLook(); updateHud(); drawMini(); setInterval(save, 10000); addEventListener('pagehide', save);
 toast('歡迎來到漁港鎮！走到碼頭盡頭「上船」出海，或在水邊直接「拋竿」', 3200);
 if (params.get('demo') === 'boat') { state.onBoat = true; }
-window.__game = { state, fish, FISH, docks, BUILDINGS, prog, ACH, save, applyGear, openBuilding, checkAch, openDex }; window.__walk = walkable; window.__pick = pickFish; window.__drifts = drifts; window.__regionAt = regionAt; window.__boatable = boatable; window.__islands = ISLANDS; window.__contest = { nextContestKey, contestAt, runContest, openGuild, contestTable, startCeremony, get cut() { return cut; } };   // 給測試用
+window.__game = { state, fish, FISH, docks, BUILDINGS, prog, ACH, save, applyGear, openBuilding, checkAch, openDex }; window.__walk = walkable; window.__pick = pickFish; window.__drifts = drifts; window.__regionAt = regionAt; window.__boatable = boatable; window.__islands = ISLANDS; window.__openFishDetail = openFishDetail; window.__contest = { nextContestKey, contestAt, runContest, openGuild, contestTable, startCeremony, get cut() { return cut; } };   // 給測試用
 requestAnimationFrame(frame);
 </script>
 </body>
