@@ -108,6 +108,17 @@
   .items button small { display: block; font-weight: 600; color: #8a6a4a; font-size: 11px; }
   .items button.lock { opacity: .55; }
   .hint { font-size: 12px; color: #8a6a4a; margin: 6px 0 0; text-align: left; }
+  .bagRow { display: flex; align-items: center; gap: 8px; padding: 5px 4px; border-bottom: 1px dashed #c8b08a; font-size: 13px; text-align: left; }
+  .bagRow canvas { width: 48px; height: 24px; image-rendering: pixelated; flex: none; }
+  .bagRow .r { margin-left: auto; text-align: right; white-space: nowrap; font-size: 12px; color: #6b5034; }
+  .bagRow.pick { cursor: pointer; } .bagRow.pick:hover, .bagRow.sel { background: #ffe7b0; }
+  .meterS { height: 8px; background: #e2d2ae; border-radius: 4px; overflow: hidden; margin-top: 2px; } .meterS > div { height: 100%; background: #7ac04a; }
+  .rank { width: 100%; border-collapse: collapse; font-size: 12px; } .rank td, .rank th { padding: 4px 3px; border-bottom: 1px dashed #c8b08a; text-align: left; white-space: nowrap; }
+  .rank tr.me { background: #ffe7b0; font-weight: 800; } .rank td.sc { text-align: right; font-weight: 800; }
+  /* 頒獎動畫 */
+  #cut.overlay.show { display: block; background: #000; z-index: 40; }
+  #cut canvas { position: absolute; inset: 0; width: 100%; height: 100%; image-rendering: pixelated; }
+  #cut .t { position: absolute; left: 0; right: 0; text-align: center; color: #fff6dd; font-weight: 900; text-shadow: 0 2px 0 #3a2a18, 0 0 8px #000; pointer-events: none; transition: opacity .4s; padding: 0 12px; }
   #statusChip.sick { background: #d8f0b0; border-color: #4a7a2a; box-shadow: 0 2px 0 #4a7a2a; color: #2a4a14; }
 </style>
 </head>
@@ -118,6 +129,7 @@
   <div class="chip" id="areaChip">📍 漁港鎮</div>
   <div class="chip row"><span id="coinChip">🪙 0</span><span id="bagChip">🐟 0</span><span id="baitChip">🪱 0</span></div>
   <div class="chip" id="statusChip" hidden></div>
+  <div class="chip" id="bagBtn" style="cursor:pointer">🎒 背包</div>
 </div>
 <canvas id="mini" width="128" height="96"></canvas>
 <div id="miniHint">點地圖放大</div>
@@ -144,6 +156,7 @@
   <button id="closeMap">關閉</button>
 </div></div>
 <div class="overlay" id="panel"><div class="card" id="panelCard"></div></div>
+<div class="overlay" id="cut"><canvas id="cutCv"></canvas><div class="t" id="cutTitle" style="font-size:18px"></div><div class="t" id="cutName" style="font-size:22px"></div><div class="t" id="cutPlaque" style="font-size:13px"></div><div class="t" id="cutCap" style="font-size:16px"></div></div>
 <div class="overlay" id="badgePop"><div class="card" id="badgeCard"></div></div>
 
 <script src="data/fish.js"></script>
@@ -188,6 +201,7 @@ const ISLANDS = [
   { name: '溪谷山島', cx: 63, cy: 16, rx: 10, ry: 9, trees: .14, dock: [62, 20, 0, 1, 3] },
   { name: '珊瑚小島', cx: 60, cy: 64, rx: 3.2, ry: 2.6, trees: .1, dock: [60, 64, -1, 0, 3] },
   { name: '西南孤島', cx: 15, cy: 62, rx: 4, ry: 3.2, trees: .15, dock: [15, 62, 1, 0, 3] },
+  { name: '金鱗島', cx: 40, cy: 16, rx: 6.5, ry: 5, trees: .08, dock: [40, 17, 0, 1, 3] },   // 釣魚協會所在（北方，從漁港鎮往上開船）
 ];
 const ell = (x, y, cx, cy, rx, ry) => ((x + .5 - cx) / rx) ** 2 + ((y + .5 - cy) / ry) ** 2;
 ISLANDS.forEach((is, i) => {
@@ -253,11 +267,11 @@ function placeShop(dock, w, h) {
   return best;
 }
 const shopPaths = [];
-for (const [di, def] of [[1, { id: 'tailorA', name: '森林服飾店', wall: '#eef0dc', roof: '#3a8a4a', sign: '🎩' }], [2, { id: 'tailorB', name: '山谷造型屋', wall: '#f6e8ee', roof: '#c85a8a', sign: '👕' }]]) {
-  const d = docks[di], pos = d && placeShop(d, 2, 2); if (!pos) continue;
-  const b = { ...def, x: pos.x, y: pos.y, w: 2, h: 2, hgt: 14 }; BUILDINGS.push(b);
+for (const [di, def] of [[1, { id: 'tailorA', name: '森林服飾店', wall: '#eef0dc', roof: '#3a8a4a', sign: '🎩' }], [2, { id: 'tailorB', name: '山谷造型屋', wall: '#f6e8ee', roof: '#c85a8a', sign: '👕' }], [5, { id: 'guild', name: '釣魚協會', wall: '#f4ecd8', roof: '#c8902a', sign: '🏆', w: 3, h: 2, hgt: 18 }]]) {
+  const w = def.w || 2, h = def.h || 2, d = docks[di], pos = d && placeShop(d, w, h); if (!pos) continue;
+  const b = { hgt: 14, ...def, x: pos.x, y: pos.y, w, h }; BUILDINGS.push(b);
   // 門口 → 碼頭起點的石板路（先橫後直）
-  let x = pos.x + 1, y = pos.y + 2; const tx = d.x0, ty = d.y0;
+  let x = pos.x + Math.floor(w / 2), y = pos.y + h; const tx = d.x0, ty = d.y0;
   while (x !== tx || y !== ty) { const t = at(x, y); if (t === T.GRASS || t === T.SAND) { set(x, y, T.STONE); shopPaths.push([x, y]); } if (x !== tx) x += Math.sign(tx - x); else y += Math.sign(ty - y); }
 }
 for (const b of BUILDINGS) {
@@ -798,11 +812,14 @@ const ACH = [
   ['wx_typhoon', '🌀 颱風勇者', '颱風天釣到魚', s => (s.wxc.typhoon || 0) > 0],
   ['wx_special', '⚡ 天氣限定', '釣到天氣限定的魚', s => FISH.some(f => f.weather && s.dex[f.id])],
   ['drift10', '🪵 海上撿寶', '開船撈到 10 個漂流物', s => (s.drift || 0) >= 10],
+  ['contest1', '🎫 初次參賽', '參加一次釣魚協會評比大賽', s => (s.contestN || 0) >= 1],
+  ['podium', '🎖️ 登上頒獎台', '評比大賽拿到前三名', s => s.contestBest > 0 && s.contestBest <= 3],
+  ['champion', '🏆 評比冠軍', '評比大賽拿到第一名', s => s.contestBest === 1],
 ];
 // 徽章等級：bronze 銅、silver 銀、gold 金、rainbow 彩虹（最難）
 const TIER = { first: 'bronze', c10: 'bronze', c50: 'silver', c200: 'gold', d10: 'bronze', d30: 'silver', d60: 'gold', dall: 'rainbow',
   r_harbor: 'bronze', r_lake: 'bronze', r_river: 'bronze', r_reef: 'silver', r_deep: 'silver', t_dawn: 'bronze', t_dusk: 'bronze', t_night: 'silver',
-  rare: 'silver', epic: 'gold', legend: 'gold', legend_all: 'rainbow', w10: 'silver', w100: 'gold', m1000: 'bronze', m10000: 'gold', rod: 'bronze', boat: 'bronze', style1: 'bronze', style10: 'gold', wx_rain: 'bronze', wx_typhoon: 'gold', wx_special: 'silver', drift10: 'silver' };
+  rare: 'silver', epic: 'gold', legend: 'gold', legend_all: 'rainbow', w10: 'silver', w100: 'gold', m1000: 'bronze', m10000: 'gold', rod: 'bronze', boat: 'bronze', style1: 'bronze', style10: 'gold', wx_rain: 'bronze', wx_typhoon: 'gold', wx_special: 'silver', drift10: 'silver', contest1: 'bronze', podium: 'silver', champion: 'gold' };
 const TIER_NAME = { bronze: '銅', silver: '銀', gold: '金', rainbow: '彩虹' };
 const achParts = a => { const i = a[1].indexOf(' '); return { id: a[0], icon: a[1].slice(0, i), title: a[1].slice(i + 1), desc: a[2], tier: TIER[a[0]] || 'bronze' }; };
 const medalHtml = (b, got) => `<div class="medal ${got ? b.tier : 'lock'}"><i>${got ? b.icon : '？'}</i></div>`;
@@ -824,7 +841,7 @@ function showNextBadge() {
   document.getElementById('badgeBook').onclick = () => { badgeQueue.length = 0; pop.classList.remove('show'); openDex('ach'); };
 }
 const SAVE_KEY = 'bay-fishing-save-v1';
-const prog = { dex: {}, ach: {}, catches: 0, region: {}, time: {}, rar: {}, maxW: 0, earned: 0, rodIdx: 0, boatLv: 0, bait: 0, pills: 0, look: null, closet: [], wxc: {}, drift: 0 };
+const prog = { dex: {}, ach: {}, catches: 0, region: {}, time: {}, rar: {}, maxW: 0, earned: 0, rodIdx: 0, boatLv: 0, bait: 0, pills: 0, look: null, closet: [], wxc: {}, drift: 0, contest: {}, contestN: 0, contestBest: 0, contestWins: 0 };
 function save() {
   try { localStorage.setItem(SAVE_KEY, JSON.stringify({ v: 1, coins: state.coins, bag: state.bag, prog, pos: { x: state.player.x, y: state.player.y, bx: state.boat.x, by: state.boat.y, onBoat: state.onBoat } })); } catch (e) {}
 }
@@ -875,7 +892,7 @@ function showPanel(html) {
   document.getElementById('closePanel').onclick = () => panelEl().classList.remove('show');
 }
 const FISH_BY_ID = Object.fromEntries(FISH.map(f => [f.id, f]));
-function openBuilding(b) { ({ shop: openShop, market: openMarket, home: openHome, board: openDex, tailorA: () => openTailor(b), tailorB: () => openTailor(b) })[b.id](); }
+function openBuilding(b) { ({ shop: openShop, market: openMarket, home: openHome, board: openDex, tailorA: () => openTailor(b), tailorB: () => openTailor(b), guild: () => openGuild() })[b.id](); }
 function openMarket() {
   const total = state.bag.reduce((a, f) => a + f.price, 0);
   const rows = state.bag.map((f, i) => { const d = FISH_BY_ID[f.id]; return `<div class="row"><span><b style="color:${RAR[d.rarity].color}">${d.name}</b> ${fmtW(f.w)}・${f.l} cm</span><button data-sell="${i}">賣 🪙${f.price}</button></div>`; }).join('');
@@ -930,6 +947,204 @@ function openHome(tab = homeTab) {
     document.querySelectorAll('[data-wear]').forEach(el => el.onclick = () => { prog.look[dressSlot] = el.dataset.wear; applyLook(); save(); SFX.hook(); openHome('dress'); });
   }
   document.getElementById('hDress').onclick = () => openHome('dress'); document.getElementById('hStats').onclick = () => openHome('stats');
+}
+// ════════════════ 🎒 背包：魚簍、道具、狀態 ════════════════
+const fishCanvas = (def, cls = '') => `<canvas width="64" height="32" data-fpic="${def.id}" class="${cls}"></canvas>`;
+const paintFishCanvases = () => document.querySelectorAll('[data-fpic]').forEach(c => drawFishTo(c, FISH_BY_ID[c.dataset.fpic]));
+const fishRow = (f, i, pick) => { const d = FISH_BY_ID[f.id]; return `<div class="bagRow ${pick ? 'pick' : ''}" ${pick ? `data-pick="${i}"` : ''}>${fishCanvas(d)}<span><b style="color:${RAR[d.rarity].color}">${d.name}</b><br><small>${RAR[d.rarity].name}${d.weather ? '・⚡天氣限定' : ''}</small></span><span class="r">⚖️ ${fmtW(f.w)}<br>📏 ${f.l} cm・🪙${f.price}</span></div>`; };
+function openBag() {
+  const total = state.bag.reduce((a, f) => a + f.price, 0), ck = nextContestKey(), entry = prog.contest[ck] && prog.contest[ck].entry;
+  const list = state.bag.map((f, i) => [f, i]).reverse().map(([f, i]) => fishRow(f, i)).join('');
+  const sickPct = Math.round(state.sick);
+  showPanel(`<h2>🎒 背包</h2>
+    <h3>🐟 魚簍（${state.bag.length} 條・總值 🪙${total}）</h3><div class="list" style="max-height:34vh">${list || '<p>魚簍是空的，去釣魚吧！</p>'}</div>
+    <h3>🧰 道具</h3><div style="text-align:left;font-size:13px;line-height:1.8">🪙 金幣 ${state.coins}　🪱 魚餌 ${prog.bait}　💊 暈船藥 ${prog.pills || 0}<br>🎣 ${RODS[prog.rodIdx].name}　⛵ ${BOATS[prog.boatLv].name}</div>
+    <h3>💫 狀態</h3><div style="text-align:left;font-size:13px;line-height:1.7">
+      ${state.pillT > 0 ? `💊 防暈中，還有 ${Math.ceil(state.pillT)} 秒` : `${state.sickOn ? '🤢 暈船中' : sickPct >= SICK_WARN ? '😵 有點頭暈' : '😊 精神很好'}（暈眩 ${sickPct}%）<div class="meterS"><div style="width:${sickPct}%;background:${state.sickOn ? '#8ab04a' : '#7ac04a'}"></div></div>`}
+      ${WEATHER[weather].name}・${PHASE[phase].name}<br>
+      🏆 ${contestDayName(ck)} 20:00 評比大賽：${entry ? `已報名（${FISH_BY_ID[entry.id].name}）` : '還沒報名（到金鱗島的釣魚協會）'}</div>`);
+  paintFishCanvases();
+}
+document.getElementById('bagBtn').addEventListener('click', openBag);
+
+// ════════════════ 🏆 釣魚協會：每天 20:00 魚的評比大賽 ════════════════
+// 一場 10 條魚：玩家交的魚＋電腦補滿。以後多人連線時，真人越多、電腦補得越少（改 npcEntries 的數量就好）。
+// 評分：重量 25%＋長度 25%＋稀有度 50%（重量、長度跟同場最重／最長的比，用對數讓大小差距不會太誇張）
+const CONTEST_SIZE = 10, CONTEST_PRIZE = [800, 500, 300], CONTEST_JOIN = 50;
+const RAR_SCORE = { common: .2, uncommon: .4, rare: .6, epic: .8, legendary: 1 };
+const NPC_NAMES = ['阿海伯', '漁村阿嬤', '船長大衛', '港口小強', '夜釣阿吉', '珊瑚姐', '林教授', '釣魚王老陳', '小美', '燈塔守衛', '溪谷阿嘉', '深海老K'];
+const pad2 = n => String(n).padStart(2, '0');
+const dkey = d => `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}`;
+function contestHM() { const q = params.get('contest'); if (q && /^\d{1,2}:\d{2}$/.test(q)) return q.split(':').map(Number); return [20, 0]; }   // 測試：?contest=19:30
+function contestAt(key) { const [y, mo, da] = key.split('-').map(Number), [h, m] = contestHM(); return new Date(y, mo - 1, da, h, m).getTime(); }
+function nextContestKey() { const now = new Date(); let k = dkey(now); if (Date.now() >= contestAt(k)) { now.setDate(now.getDate() + 1); k = dkey(now); } return k; }
+function lastContestKey() { const now = new Date(); let k = dkey(now); if (Date.now() < contestAt(k)) { now.setDate(now.getDate() - 1); k = dkey(now); } return k; }
+const contestDayName = k => k === dkey(new Date()) ? '今天' : '明天';
+const hmText = () => { const [h, m] = contestHM(); return `${pad2(h)}:${pad2(m)}`; };
+function rng(seed) { let s = seed >>> 0; return () => { s = (s + 0x6D2B79F5) >>> 0; let t = s; t = Math.imul(t ^ t >>> 15, t | 1); t ^= t + Math.imul(t ^ t >>> 7, t | 61); return ((t ^ t >>> 14) >>> 0) / 4294967296; }; }
+function npcEntries(key, n) {   // 同一天大家看到的電腦參賽者都一樣
+  const R = rng([...key].reduce((a, c) => (a * 31 + c.charCodeAt(0)) | 0, 7)), names = [...NPC_NAMES];
+  for (let i = names.length - 1; i > 0; i--) { const j = Math.floor(R() * (i + 1)); [names[i], names[j]] = [names[j], names[i]]; }
+  const W = { common: 30, uncommon: 30, rare: 22, epic: 13, legendary: 5 }, out = [];
+  for (let i = 0; i < n; i++) {
+    let u = R() * 100, rar = 'common'; for (const [r, w] of Object.entries(W)) if ((u -= w) < 0) { rar = r; break; }
+    const list = FISH.filter(f => f.rarity === rar && !f.weather), def = list[Math.floor(R() * list.length)], k = Math.pow(R(), .6);
+    out.push({ who: names[i % names.length], id: def.id, w: +(def.weightKg[0] + (def.weightKg[1] - def.weightKg[0]) * k).toFixed(2), l: +(def.lengthCm[0] + (def.lengthCm[1] - def.lengthCm[0]) * Math.cbrt(k)).toFixed(1) });
+  }
+  return out;
+}
+function scoreAll(entries) {
+  const mw = Math.max(...entries.map(e => e.w)), ml = Math.max(...entries.map(e => e.l));
+  for (const e of entries) {
+    const pw = 25 * Math.log1p(e.w) / Math.log1p(mw), pl = 25 * Math.log1p(e.l) / Math.log1p(ml), pr = 50 * RAR_SCORE[FISH_BY_ID[e.id].rarity];
+    e.pw = +pw.toFixed(1); e.pl = +pl.toFixed(1); e.pr = +pr.toFixed(1); e.score = +(pw + pl + pr).toFixed(1);
+  }
+  return entries.sort((a, b) => b.score - a.score || b.w - a.w);
+}
+function contestTable(key) {   // 已比完的用存起來的結果；沒參加的場次就算一份純電腦的排名
+  const c = prog.contest[key]; if (c && c.table) return c.table;
+  return scoreAll(npcEntries(key, CONTEST_SIZE));
+}
+function runContest(key) {
+  const c = prog.contest[key], entries = [{ who: '你', me: true, ...c.entry }, ...npcEntries(key, CONTEST_SIZE - 1)];
+  const table = scoreAll(entries), rank = table.findIndex(e => e.me) + 1, prize = CONTEST_PRIZE[rank - 1] || CONTEST_JOIN;
+  Object.assign(c, { done: true, rank, prize, table: table.map(e => ({ who: e.who, me: !!e.me, id: e.id, w: e.w, l: e.l, pw: e.pw, pl: e.pl, pr: e.pr, score: e.score })) });
+  state.coins += prize; prog.contestN = (prog.contestN || 0) + 1; prog.contestBest = prog.contestBest ? Math.min(prog.contestBest, rank) : rank; if (rank === 1) prog.contestWins = (prog.contestWins || 0) + 1;
+  save(); updateHud();
+}
+let contestToasted = '', contestTickT = 0;
+function contestTick(dt) {
+  if ((contestTickT -= dt) > 0) return; contestTickT = 1;
+  for (const [k, c] of Object.entries(prog.contest)) if (c.entry && !c.done && Date.now() >= contestAt(k)) runContest(k);
+  // 開賽前 10 分鐘提醒還沒報名的人
+  const nk = nextContestKey(), left = contestAt(nk) - Date.now();
+  if (left < 600000 && !(prog.contest[nk] && prog.contest[nk].entry) && contestToasted !== nk) { contestToasted = nk; toast(`🏆 ${hmText()} 評比大賽快開始了！到金鱗島的釣魚協會交一條魚報名`, 3600); }
+  // 頒獎動畫：開賽時在玩的人都會強制播放；有參賽但當時不在的人，下次打開遊戲補看
+  const lk = lastContestKey(), lc = prog.contest[lk], since = Date.now() - contestAt(lk);
+  if (!cut && ((lc && lc.entry && lc.done && !lc.seen) || (since >= 0 && since < 600000 && prog.cutSeen !== lk))) {
+    if (['reel', 'trophy', 'result'].includes(fish.state) || document.getElementById('badgePop').classList.contains('show')) return;   // 正在拉魚或看卡片就等一下
+    if (fish.state) endFishing();
+    for (const id of ['panel', 'bigmap']) document.getElementById(id).classList.remove('show');
+    startCeremony(lk);
+  }
+}
+
+// ── 頒獎動畫（2D 像素）：會長把獎盃交給冠軍，冠軍的魚擺在前面 ──
+let cut = null;
+const PRES_LOOK = { hat: 'captain', hair: 'gray', glasses: 'round', beard: 'white', top: 'black_jacket', pants: 'black' };
+function npcLook(name) {   // 每位電腦參賽者都有固定的穿搭
+  const L = {}; let h = [...name].reduce((a, c) => (a * 33 + c.charCodeAt(0)) | 0, 5);
+  for (const k of ['hat', 'hair', 'glasses', 'beard', 'top', 'pants']) { const ids = Object.keys(WR[k]); h = Math.imul(h ^ (h >>> 13), 1274126177); L[k] = ids[Math.abs(h) % ids.length]; }
+  return L;
+}
+function startCeremony(key) {
+  const table = contestTable(key), c = prog.contest[key], win = table[0];
+  const fc = document.createElement('canvas'); fc.width = 64; fc.height = 32; drawFishTo(fc, FISH_BY_ID[win.id]);
+  cut = { key, table, win, t: 0, me: table.find(e => e.me), rank: c && c.rank, prize: c && c.prize, fish: fc,
+    winImg: ART.previewFront(win.me ? prog.look : npcLook(win.who)), presImg: ART.previewFront(PRES_LOOK), stage: 0, conf: [] };
+  if (c) c.seen = true; prog.cutSeen = key; save();
+  const cv2 = document.getElementById('cutCv'); cv2.width = 120; cv2.height = Math.round(120 * innerHeight / innerWidth);
+  for (const id of ['cutTitle', 'cutName', 'cutPlaque', 'cutCap']) { const el = document.getElementById(id); el.textContent = ''; el.style.opacity = 0; }
+  document.getElementById('cut').classList.add('show');
+  if (window.BGM) BGM.duck(8);
+  for (let i = 0; i < 22; i++) tone(170, 150, .05, .1 + i * .006, 'triangle', 1 + i * .085);   // 鼓聲
+}
+document.getElementById('cut').addEventListener('pointerdown', () => {
+  if (!cut) return;
+  if (cut.t < 6) { cut.t = Math.max(cut.t, 4.2); return; }   // 點一下快轉
+  const k = cut.key; cut = null; document.getElementById('cut').classList.remove('show'); showContestResult(k, false);
+});
+function trophySprite(g, x, y, s) {   // 金色獎盃（x,y＝底部中心）
+  const p = (a, b, w, h, c) => { g.fillStyle = c; g.fillRect(x + a * s, y + b * s, w * s, h * s); };
+  p(-4, -2, 8, 2, '#5a3a1e'); p(-1, -5, 2, 3, '#d8a020'); p(-4, -12, 8, 7, '#2a1e14'); p(-3, -11, 6, 5, '#ffd040'); p(-2, -11, 1, 4, '#fff3a0');
+  p(-6, -11, 2, 3, '#d8a020'); p(4, -11, 2, 3, '#d8a020'); p(-2, -6, 4, 1, '#d8a020');
+}
+function drawCut(dt) {
+  if (!cut) return;
+  cut.t += dt; const t = cut.t, cv2 = document.getElementById('cutCv'), g = cv2.getContext('2d'), W2 = cv2.width, H2 = cv2.height;
+  g.imageSmoothingEnabled = false;
+  const floorY = Math.round(H2 * .66), px = (x, y, w, h, c) => { g.fillStyle = c; g.fillRect(x | 0, y | 0, w, h); };
+  // 布幕、彩旗、舞台地板
+  for (let x = 0; x < W2; x += 6) px(x, 0, 6, floorY, (x / 6) % 2 ? '#6a2830' : '#541e26');
+  px(0, 0, W2, 8, '#c8902a'); for (let x = 0; x < W2; x += 8) px(x + 1, 8, 6, 3, '#c8902a');
+  for (let x = 4; x < W2; x += 10) { px(x, 14, 5, 4, ['#ff7a6a', '#ffd040', '#6ac0f0', '#7ad08a'][(x / 10 | 0) % 4]); }
+  px(W2 / 2 - 46, 22, 92, 16, '#2a1e14'); px(W2 / 2 - 45, 23, 90, 14, '#f4ecd8');
+  px(0, floorY, W2, H2 - floorY, '#a8743a'); for (let y = floorY + 4; y < H2; y += 6) px(0, y, W2, 1, '#7a5228');
+  px(0, floorY, W2, 2, '#d8a868');
+  // 聚光燈
+  const lit = t < 3 ? (Math.sin(t * 3) > 0 ? .3 : .7) : .7;
+  g.globalCompositeOperation = 'lighter';
+  const spot = (x, a) => { const gr = g.createRadialGradient(x, floorY, 2, x, floorY - 20, 46); gr.addColorStop(0, `rgba(255,240,180,${a})`); gr.addColorStop(1, 'rgba(255,240,180,0)'); g.fillStyle = gr; g.fillRect(x - 50, 0, 100, floorY + 10); };
+  spot(W2 * .3, .22); spot(W2 * .7, t < 3 ? .12 : .32 * lit + .1);
+  g.globalCompositeOperation = 'source-over';
+  // 會長與冠軍（冠軍在揭曉前是黑影）
+  const S = 2, pres = [W2 * .3, floorY], win = [W2 * .7, floorY], bounce = t > 4.6 ? Math.abs(Math.sin((t - 4.6) * 6)) * 2 : 0;
+  g.drawImage(cut.presImg, pres[0] - 8 * S, pres[1] - 26 * S, 16 * S, 26 * S);
+  if (t < 3) { g.filter = 'brightness(0)'; g.globalAlpha = .85; }
+  g.drawImage(cut.winImg, win[0] - 8 * S, win[1] - 26 * S - bounce, 16 * S, 26 * S);
+  g.filter = 'none'; g.globalAlpha = 1;
+  // 獎盃：會長手上 → 交給冠軍 → 冠軍高舉
+  let tx, ty;
+  const hand = (x, y) => { px(x - 7, y - 3, 3, 3, '#f6d0a8'); px(x + 4, y - 3, 3, 3, '#f6d0a8'); };
+  if (t < 3.4) { tx = pres[0] + 12; ty = pres[1] - 26; hand(tx, ty); }
+  else if (t < 4.6) { const k = (t - 3.4) / 1.2, e = k * k * (3 - 2 * k); tx = pres[0] + 12 + (win[0] - 12 - pres[0] - 12) * e; ty = pres[1] - 26 - Math.sin(k * Math.PI) * 14; }
+  else { tx = win[0]; ty = win[1] - 26 * S - 4 - bounce; hand(tx, ty); }
+  trophySprite(g, Math.round(tx), Math.round(ty), 1);
+  // 冠軍的魚擺在前面的展示台
+  const fw = Math.min(64, W2 * .5), fx = W2 / 2 - fw / 2, fy = floorY + 10 + Math.sin(t * 2) * 1;
+  px(W2 / 2 - fw / 2 - 4, floorY + 30, fw + 8, 14, '#2a1e14'); px(W2 / 2 - fw / 2 - 3, floorY + 31, fw + 6, 12, '#8a5a30'); px(W2 / 2 - 14, floorY + 34, 28, 6, '#ffd040');
+  g.drawImage(cut.fish, fx, fy, fw, fw / 2);
+  // 彩帶
+  if (t > 4.6) {
+    if (cut.conf.length < 60) for (let i = 0; i < 3; i++) cut.conf.push({ x: Math.random() * W2, y: -4, v: 18 + Math.random() * 20, c: ['#ff7a6a', '#ffd040', '#6ac0f0', '#7ad08a', '#ffffff'][Math.floor(Math.random() * 5)], w: Math.random() * 6 });
+    for (const c of cut.conf) { c.y += c.v * dt; if (c.y > H2) c.y = -4; px(c.x + Math.sin(t * 4 + c.w) * 2, c.y, 2, 2, c.c); }
+  }
+  if (t < .8) { g.fillStyle = `rgba(0,0,0,${1 - t / .8})`; g.fillRect(0, 0, W2, H2); }
+  // 文字（HTML，比較清楚）
+  const yy = v => (v / H2 * 100) + '%', set = (id, txt, y, show) => { const el = document.getElementById(id); el.textContent = txt; el.style.top = y; el.style.opacity = show ? 1 : 0; };
+  const fishName = FISH_BY_ID[cut.win.id].name, d = cut.key.slice(5).replace('-', '/');
+  set('cutTitle', `🏆 ${d} 釣魚協會評比大賽`, yy(23.5), t > .6);
+  set('cutName', t < 3 ? '冠軍是……' : `🥇 ${cut.win.me ? '你' : cut.win.who}！`, yy(floorY - 26 * S - 26), t > 1.2);
+  if (t >= 3 && cut.stage === 0) { cut.stage = 1; SFX.caught(); buzz([60, 40, 60, 40, 200]); }
+  set('cutPlaque', `${fishName}・${fmtW(cut.win.w)}・${cut.win.l} cm・${cut.win.score} 分`, yy(floorY + 46), t > 3);
+  const cap = cut.me ? (cut.rank === 1 ? `🎉 你就是冠軍！獎金 🪙${cut.prize}` : `你得到第 ${cut.rank} 名！獎金 🪙${cut.prize}`) : '這次你沒參加，下一場記得來報名！';
+  set('cutCap', t >= 6 ? cap + '\n（點一下看完整排名）' : cap, yy(H2 - 26), t > 5);
+  document.getElementById('cutCap').style.whiteSpace = 'pre-line';
+}
+function showContestResult(key, live) {
+  const table = contestTable(key), c = prog.contest[key], me = table.find(e => e.me);
+  const rows = table.map((e, i) => { const d = FISH_BY_ID[e.id]; return `<tr class="${e.me ? 'me' : ''}"><td>${['🥇', '🥈', '🥉'][i] || i + 1}</td><td>${e.who}</td><td><b style="color:${RAR[d.rarity].color}">${d.name}</b><br><small>${fmtW(e.w)}・${e.l} cm</small></td><td class="sc">${e.score}</td></tr>`; }).join('');
+  const head = me ? `<p><b>你得到第 ${c.rank} 名！</b>獎金 🪙${c.prize}<br><small>你的分數：重量 ${me.pw}＋長度 ${me.pl}＋稀有度 ${me.pr}＝${me.score}</small></p>` : `<p>這場你沒有參加，下一場記得來報名！</p>`;
+  showPanel(`<h2>🏆 ${key.slice(5).replace('-', '/')} 評比大賽結果</h2>${head}<div class="list" style="max-height:46vh"><table class="rank"><tr><th>名次</th><th>參賽者</th><th>魚</th><th style="text-align:right">分數</th></tr>${rows}</table></div><p class="hint" style="text-align:center">評分：重量 25%＋長度 25%＋稀有度 50%</p>`);
+  if (live) { if (me && c.rank <= 3) { SFX.caught(); buzz([60, 40, 60, 40, 200]); } else SFX.badge(); }
+  document.getElementById('closePanel').addEventListener('click', () => { checkAch(); });
+}
+let guildPick = null, guildConfirm = false;
+function openGuild() {
+  const nk = nextContestKey(), c = prog.contest[nk], left = Math.max(0, contestAt(nk) - Date.now()), lk = lastContestKey();
+  const hh = Math.floor(left / 3600000), mm = Math.floor(left % 3600000 / 60000);
+  let body;
+  if (c && c.entry) { const d = FISH_BY_ID[c.entry.id]; body = `<p>✅ 你已經報名了：<b style="color:${RAR[d.rarity].color}">${d.name}</b>（${fmtW(c.entry.w)}・${c.entry.l} cm）<br>${hmText()} 開始評比，結果出來會通知你。</p>`; }
+  else if (!state.bag.length) body = '<p>魚簍是空的，先去釣一條得意的魚再來報名吧！</p>';
+  else {
+    body = `<h3>選一條魚報名（每場只能交一條）</h3><div class="list" style="max-height:30vh">${state.bag.map((f, i) => [f, i]).reverse().map(([f, i]) => fishRow(f, i, true).replace('class="bagRow pick"', `class="bagRow pick ${guildPick === i ? 'sel' : ''}"`)).join('')}</div>
+      <div style="margin-top:8px;min-height:44px">${guildPick !== null ? `<button id="submitFish" style="${guildConfirm ? 'background:#ff9a6a' : ''}">${guildConfirm ? '確定交出？協會會收走，不會還給你' : '交出這條魚報名'}</button>` : '<p class="hint" style="text-align:center">點一條魚選擇</p>'}</div>`;
+  }
+  showPanel(`<h2>🏆 釣魚協會</h2>
+    <p>每天 <b>${hmText()}</b> 舉行魚的評比大賽，共 ${CONTEST_SIZE} 條魚參賽（人數不夠由協會會員補上）。<br>評分：重量 25%＋長度 25%＋稀有度 50%<br>獎金：🥇🪙${CONTEST_PRIZE[0]}　🥈🪙${CONTEST_PRIZE[1]}　🥉🪙${CONTEST_PRIZE[2]}　其他🪙${CONTEST_JOIN}<br><small>交出的魚比完會被協會收走，不會還。</small></p>
+    <p><b>下一場：${contestDayName(nk)} ${hmText()}</b>（還有 ${hh} 小時 ${mm} 分）</p>${body}
+    <div style="margin-top:6px"><button id="lastResult" style="background:#bfe6ff">看上一場排名</button></div>
+    <p class="hint" style="text-align:center">參賽 ${prog.contestN || 0} 次・最佳第 ${prog.contestBest || '－'} 名・冠軍 ${prog.contestWins || 0} 次</p>`);
+  paintFishCanvases();
+  document.querySelectorAll('[data-pick]').forEach(el => el.onclick = () => { guildPick = +el.dataset.pick; guildConfirm = false; openGuild(); });
+  const sub = document.getElementById('submitFish');
+  if (sub) sub.onclick = () => {
+    if (!guildConfirm) { guildConfirm = true; return openGuild(); }
+    const f = state.bag.splice(guildPick, 1)[0]; guildPick = null; guildConfirm = false;
+    prog.contest[nk] = { entry: { id: f.id, w: f.w, l: f.l } }; save(); updateHud(); SFX.hook(); buzz(40);
+    toast(`報名成功！${FISH_BY_ID[f.id].name} 交給協會了，${contestDayName(nk)} ${hmText()} 見分曉`, 3000); openGuild();
+  };
+  document.getElementById('lastResult').onclick = () => showContestResult(lk, false);
 }
 // ── 服飾店：可以先試穿再買 ──
 let tailorTry = null, tailorSlot = null;
@@ -1048,6 +1263,7 @@ function update(dt) {
   if (state.onBoat && wx.wave > .3) { const tt = performance.now() / 1000; b.vx += Math.sin(tt * .37) * wx.wave * .9 * dt; b.vy += Math.cos(tt * .29) * wx.wave * .9 * dt; }
   updateWeather(dt);
   updateDrift(dt);
+  contestTick(dt);
   updateSick(dt);
   updateFishing(dt);
   const target = fish.state && fish.state !== 'cast' ? 1 : fish.state === 'cast' ? Math.min(1, fish.t / .5) : 0;
@@ -1361,6 +1577,7 @@ function frame(now) {
     ctx.font = `bold ${12 * DPR}px sans-serif`; ctx.textAlign = 'center'; ctx.lineWidth = 3 * DPR;
     for (const b of BUILDINGS) { if (Math.hypot(b.door[0] - pl.x, b.door[1] - pl.y) > 6) continue; const p = iso(b.x + b.w / 2, b.y + b.h / 2); const sx = (p.x - vx) * PIX * DPR, sy = (p.y - vy - LH - b.hgt - 14) * PIX * DPR; ctx.strokeStyle = '#3a2a18'; ctx.strokeText(b.sign + ' ' + b.name, sx, sy); ctx.fillStyle = '#fff6dd'; ctx.fillText(b.sign + ' ' + b.name, sx, sy); }
   }
+  drawCut(dt);
   drawMini();   // 小地圖每格都更新，才不會一跳一跳
   if ((hudTick += dt) > .12) { hudTick = 0; updateHud(); }
   requestAnimationFrame(frame);
@@ -1368,7 +1585,7 @@ function frame(now) {
 load(); applyGear(); applyLook(); updateHud(); drawMini(); setInterval(save, 10000); addEventListener('pagehide', save);
 toast('歡迎來到漁港鎮！走到碼頭盡頭「上船」出海，或在水邊直接「拋竿」', 3200);
 if (params.get('demo') === 'boat') { state.onBoat = true; }
-window.__game = { state, fish, FISH, docks, BUILDINGS, prog, ACH, save, applyGear, openBuilding, checkAch, openDex }; window.__walk = walkable; window.__pick = pickFish; window.__drifts = drifts;   // 給測試用
+window.__game = { state, fish, FISH, docks, BUILDINGS, prog, ACH, save, applyGear, openBuilding, checkAch, openDex }; window.__walk = walkable; window.__pick = pickFish; window.__drifts = drifts; window.__contest = { nextContestKey, contestAt, runContest, openGuild, contestTable, startCeremony, get cut() { return cut; } };   // 給測試用
 requestAnimationFrame(frame);
 </script>
 </body>
