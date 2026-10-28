@@ -1,0 +1,922 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
+<title>海灣釣魚日記</title>
+<style>
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  html, body { margin: 0; height: 100%; overflow: hidden; background: #1b2a44; font-family: "PingFang TC", "Noto Sans TC", "Microsoft JhengHei", sans-serif; color: #3a2a18; touch-action: none; user-select: none; -webkit-user-select: none; }
+  canvas#c { position: fixed; inset: 0; width: 100vw; height: 100vh; image-rendering: pixelated; }
+  .hud { position: fixed; left: 10px; top: calc(10px + env(safe-area-inset-top)); display: flex; flex-direction: column; gap: 6px; z-index: 5; }
+  .chip { background: rgba(255,248,230,.92); border: 2px solid #6b4a2a; border-radius: 8px; padding: 3px 9px; font-size: 13px; font-weight: 700; box-shadow: 0 2px 0 #6b4a2a; white-space: nowrap; }
+  .chip.row { display: flex; gap: 10px; }
+  #mini { position: fixed; right: 10px; top: calc(10px + env(safe-area-inset-top)); width: 128px; height: 96px; border: 3px solid #6b4a2a; border-radius: 10px; background: #26508f; z-index: 5; image-rendering: pixelated; box-shadow: 0 2px 0 #6b4a2a; }
+  #miniHint { position: fixed; right: 12px; top: calc(112px + env(safe-area-inset-top)); font-size: 11px; color: #fff; text-shadow: 0 1px 2px #000; z-index: 5; }
+  #vib { position: fixed; right: 10px; top: calc(128px + env(safe-area-inset-top)); z-index: 5; font-size: 12px; padding: 3px 8px; cursor: pointer; }
+  #joy { position: fixed; left: calc(18px + env(safe-area-inset-left)); bottom: calc(18px + env(safe-area-inset-bottom)); width: 120px; height: 120px; border-radius: 50%; background: rgba(255,248,230,.25); border: 3px solid rgba(255,248,230,.6); z-index: 6; }
+  #knob { position: absolute; left: 35px; top: 35px; width: 44px; height: 44px; border-radius: 50%; background: rgba(255,248,230,.9); border: 3px solid #6b4a2a; }
+  .btn { position: fixed; z-index: 6; border: 3px solid #6b4a2a; border-radius: 50%; background: #ffd56a; color: #4a2e12; font-weight: 800; font-size: 15px; box-shadow: 0 4px 0 #6b4a2a; display: flex; align-items: center; justify-content: center; text-align: center; line-height: 1.1; padding: 4px; cursor: pointer; }
+  .btn:active, .btn.down { transform: translateY(3px); box-shadow: 0 1px 0 #6b4a2a; }
+  .btn.off { opacity: .35; }
+  #btnA { right: calc(20px + env(safe-area-inset-right)); bottom: calc(26px + env(safe-area-inset-bottom)); width: 92px; height: 92px; }
+  #btnB { right: calc(122px + env(safe-area-inset-right)); bottom: calc(20px + env(safe-area-inset-bottom)); width: 66px; height: 66px; font-size: 13px; background: #bfe6ff; }
+  #toast { position: fixed; left: 50%; top: calc(150px + env(safe-area-inset-top)); transform: translateX(-50%); background: rgba(40,28,14,.85); color: #fff6dd; padding: 6px 14px; border-radius: 16px; font-size: 14px; font-weight: 700; z-index: 7; opacity: 0; transition: opacity .3s; pointer-events: none; max-width: 86vw; width: max-content; text-align: center; }
+  #toast.show { opacity: 1; }
+  .overlay { position: fixed; inset: 0; display: none; align-items: center; justify-content: center; z-index: 20; background: rgba(10,16,30,.55); }
+  .overlay.show { display: flex; }
+  .card { background: #fff8e6; border: 4px solid #6b4a2a; border-radius: 14px; padding: 14px 16px; width: min(92vw, 380px); max-height: 86vh; overflow: auto; box-shadow: 0 6px 0 #6b4a2a; text-align: center; }
+  .card h3 { margin: 10px 0 4px; font-size: 15px; text-align: left; }
+  .list { max-height: 52vh; overflow: auto; text-align: left; }
+  .row { display: flex; justify-content: space-between; align-items: center; gap: 8px; padding: 6px 4px; border-bottom: 1px dashed #c8b08a; font-size: 14px; }
+  .row button, .tabs button { font-size: 13px; padding: 4px 10px; white-space: nowrap; }
+  .row button:disabled { opacity: .4; }
+  .row em { font-size: 12px; color: #8a6a4a; white-space: nowrap; }
+  .row.unk { opacity: .5; }
+  .tabs { display: flex; gap: 6px; justify-content: center; margin-bottom: 6px; }
+  .tabs button.on { background: #ffb840; }
+  .dex { display: grid; grid-template-columns: repeat(auto-fill, minmax(70px, 1fr)); gap: 4px; }
+  .dex .cell { background: #f3e6c8; border-radius: 6px; padding: 3px; text-align: center; font-size: 11px; cursor: pointer; }
+  .dex .cell canvas { width: 64px; height: 32px; margin: 0 auto; }
+  .dex .cell.unk span { color: #9a8a7a; }
+  .card h2 { margin: 0 0 6px; font-size: 20px; }
+  .card .rar { display: inline-block; padding: 1px 10px; border-radius: 10px; color: #fff; font-size: 13px; font-weight: 800; }
+  .card canvas { width: 256px; height: 128px; image-rendering: pixelated; display: block; margin: 6px auto; }
+  .card .stats { display: flex; justify-content: center; gap: 14px; font-size: 15px; font-weight: 700; margin: 6px 0; }
+  .card p { margin: 4px 0 10px; font-size: 14px; color: #6b5034; }
+  .card button { border: 3px solid #6b4a2a; border-radius: 10px; background: #ffd56a; font-weight: 800; font-size: 16px; padding: 8px 18px; box-shadow: 0 3px 0 #6b4a2a; cursor: pointer; color: #4a2e12; }
+  #bigmap .card { width: min(96vw, 560px); }
+  #bigCv { width: 100%; aspect-ratio: 480 / 250; image-rendering: pixelated; border: 3px solid #6b4a2a; border-radius: 8px; background: #26508f; }
+  .legend { display: flex; flex-wrap: wrap; justify-content: center; gap: 4px 10px; font-size: 12px; margin: 6px 0 10px; }
+  .legend i { display: inline-block; width: 12px; height: 12px; border: 1px solid #0004; vertical-align: -2px; margin-right: 3px; }
+  #bars { position: fixed; left: 50%; top: calc(200px + env(safe-area-inset-top)); transform: translateX(-50%); width: min(78vw, 360px); z-index: 7; display: none; }
+  #bars.show { display: block; }
+  .bar { height: 14px; background: rgba(255,248,230,.85); border: 2px solid #6b4a2a; border-radius: 8px; margin-bottom: 6px; overflow: hidden; position: relative; }
+  .bar > div { height: 100%; width: 0; }
+  .bar span { position: absolute; left: 6px; top: -2px; font-size: 11px; font-weight: 800; color: #3a2a18; }
+  #tension > div { background: linear-gradient(90deg, #6ccf6c, #ffd040 60%, #e8503a); }
+  #dist > div { background: #5aa8e8; }
+</style>
+</head>
+<body>
+<canvas id="c"></canvas>
+<div class="hud">
+  <div class="chip" id="timeChip">🌞 白天</div>
+  <div class="chip" id="areaChip">📍 漁港鎮</div>
+  <div class="chip row"><span id="coinChip">🪙 0</span><span id="bagChip">🐟 0</span><span id="baitChip">🪱 0</span></div>
+</div>
+<canvas id="mini" width="128" height="96"></canvas>
+<div id="miniHint">點地圖放大</div>
+<div class="chip" id="vib">📳 震動：開</div>
+<div id="joy"><div id="knob"></div></div>
+<div class="btn" id="btnB">上船</div>
+<div class="btn" id="btnA">拋竿</div>
+<div id="toast"></div>
+<div id="bars"><div class="bar" id="tension"><div></div><span>張力</span></div><div class="bar" id="dist"><div></div><span>距離</span></div></div>
+<div class="overlay" id="catch"><div class="card" id="catchCard"></div></div>
+<div class="overlay" id="bigmap"><div class="card">
+  <h2>🗺️ 地圖</h2>
+  <canvas id="bigCv" width="480" height="250"></canvas>
+  <div class="legend">
+    <span><i style="background:#3f8fd0"></i>港灣（近岸）</span><span><i style="background:#26508f"></i>深海</span>
+    <span><i style="background:#3fc3c0"></i>珊瑚礁</span><span><i style="background:#4aa88a"></i>翠湖</span>
+    <span><i style="background:#4fb0b8"></i>溪谷</span><span><i style="background:#ff5040"></i>你</span><span><i style="background:#ffd040"></i>船</span>
+  </div>
+  <button id="closeMap">關閉</button>
+</div></div>
+<div class="overlay" id="panel"><div class="card" id="panelCard"></div></div>
+
+<script src="data/fish.js"></script>
+<script src="art.js"></script>
+<script>
+'use strict';
+// ════════════════ 基本設定 ════════════════
+const FISH = window.FISH_DATA || [];
+const N = 80, TW = 32, TH = 16, LH = 4;          // 地圖格數、等角格寬高、陸地高度
+const OX = N * TW / 2, OY = 24;
+const T = { DEEP: 0, SEA: 1, REEF: 2, LAKE: 3, RIVER: 4, SAND: 5, GRASS: 6, STONE: 7, DOCK: 8 };
+const WATER = new Set([T.DEEP, T.SEA, T.REEF, T.LAKE, T.RIVER]);
+const BOATABLE = new Set([T.DEEP, T.SEA, T.REEF]);
+const REGION_OF = { [T.SEA]: 'harbor', [T.DEEP]: 'deep', [T.REEF]: 'reef', [T.LAKE]: 'lake', [T.RIVER]: 'river' };
+const REGION_NAME = { harbor: '港灣', deep: '深海', reef: '珊瑚礁', lake: '翠湖', river: '溪谷' };
+const RAR = {
+  common: { name: '普通', color: '#8a9a7a', w: 60, pow: .55 },
+  uncommon: { name: '少見', color: '#4a9a5a', w: 25, pow: .75 },
+  rare: { name: '稀有', color: '#3a7ad0', w: 10, pow: 1.0 },
+  epic: { name: '史詩', color: '#9a4ad0', w: 4, pow: 1.25 },
+  legendary: { name: '傳說', color: '#e0902a', w: 1, pow: 1.55 },
+};
+const TILE_COLOR = { [T.DEEP]: '#26508f', [T.SEA]: '#3f8fd0', [T.REEF]: '#3fc3c0', [T.LAKE]: '#4aa88a', [T.RIVER]: '#4fb0b8', [T.SAND]: '#e8d49a', [T.GRASS]: '#7cc04f', [T.STONE]: '#cdbda2', [T.DOCK]: '#a8784a' };
+const params = new URLSearchParams(location.search);
+
+// 可重現的雜訊
+function hash(x, y, s = 0) { let h = (x * 374761393 + y * 668265263 + s * 2147483647) | 0; h = (h ^ (h >>> 13)) * 1274126177 | 0; return ((h ^ (h >>> 16)) >>> 0) / 4294967296; }
+function shade(hex, k) { const n = parseInt(hex.slice(1), 16); const f = v => Math.max(0, Math.min(255, Math.round(v + (k > 0 ? (255 - v) * k : v * k)))); return `rgb(${f(n >> 16)},${f(n >> 8 & 255)},${f(n & 255)})`; }
+const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
+const rand = (a, b) => a + Math.random() * (b - a);
+
+// ════════════════ 地圖生成 ════════════════
+const tile = new Uint8Array(N * N).fill(T.DEEP);
+const block = new Uint8Array(N * N);         // 1＝樹、建築、岩石擋路
+const landOf = new Uint8Array(N * N);        // 屬於哪座島（ISLANDS 索引＋1）
+const at = (x, y) => (x < 0 || y < 0 || x >= N || y >= N) ? T.DEEP : tile[y * N + x];
+const set = (x, y, v) => { if (x >= 0 && y >= 0 && x < N && y < N) tile[y * N + x] = v; };
+const ISLANDS = [
+  { name: '漁港鎮', cx: 40, cy: 45, rx: 8.5, ry: 7.5, trees: .06, dock: [40, 46, 0, 1, 4] },
+  { name: '翠湖森林島', cx: 17, cy: 17, rx: 11, ry: 10, trees: .2, dock: [17, 22, 0, 1, 3] },
+  { name: '溪谷山島', cx: 63, cy: 16, rx: 10, ry: 9, trees: .14, dock: [62, 20, 0, 1, 3] },
+  { name: '珊瑚小島', cx: 60, cy: 64, rx: 3.2, ry: 2.6, trees: .1, dock: [60, 64, -1, 0, 3] },
+  { name: '西南孤島', cx: 15, cy: 62, rx: 4, ry: 3.2, trees: .15, dock: [15, 62, 1, 0, 3] },
+];
+const ell = (x, y, cx, cy, rx, ry) => ((x + .5 - cx) / rx) ** 2 + ((y + .5 - cy) / ry) ** 2;
+ISLANDS.forEach((is, i) => {
+  for (let y = 0; y < N; y++) for (let x = 0; x < N; x++) {
+    const e = ell(x, y, is.cx, is.cy, is.rx, is.ry) + (hash(x, y, 7) - .5) * .28;
+    if (e < .78) { set(x, y, T.GRASS); landOf[y * N + x] = i + 1; }
+    else if (e < 1.05 && WATER.has(at(x, y))) { set(x, y, T.SAND); landOf[y * N + x] = i + 1; }
+  }
+});
+// 翠湖（森林島中間的湖）
+for (let y = 0; y < N; y++) for (let x = 0; x < N; x++) if (ell(x, y, 17, 15.5, 5, 4) + (hash(x, y, 3) - .5) * .2 < 1) set(x, y, T.LAKE);
+// 溪谷（山島上由西往東流入海的溪）
+const bridgeX = 64;
+for (let x = 55; x < 76; x++) {
+  const yy = Math.round(13 + Math.sin(x / 2.6) * 1.6);
+  for (const y of [yy, yy + 1]) if (at(x, y) !== T.DEEP && at(x, y) !== T.SEA) set(x, y, x === bridgeX ? T.DOCK : T.RIVER);
+}
+// 小鎮石板地
+for (let y = 0; y < N; y++) for (let x = 0; x < N; x++) if (at(x, y) === T.GRASS && ell(x, y, 40, 45, 6, 5) < 1) set(x, y, T.STONE);
+// 碼頭：從島上某點往指定方向走到水邊，再往外鋪木棧道
+const docks = [];
+for (const is of ISLANDS) {
+  let [x, y, dx, dy, len] = is.dock;
+  while (!WATER.has(at(x + dx, y + dy))) { x += dx; y += dy; }
+  const d = { x0: x, y0: y, tiles: [] };
+  for (let k = 1; k <= len; k++) { set(x + dx * k, y + dy * k, T.DOCK); d.tiles.push([x + dx * k, y + dy * k]); }
+  d.end = [x + dx * len, y + dy * len]; d.dir = [dx, dy]; docks.push(d);
+}
+// 海水分類：離陸地 >5 格是深海；東南角是珊瑚礁
+(function classifySea() {
+  const dist = new Int16Array(N * N).fill(999), q = [];
+  for (let i = 0; i < N * N; i++) if (!WATER.has(tile[i]) || tile[i] === T.LAKE || tile[i] === T.RIVER) { dist[i] = 0; q.push(i); }
+  for (let h = 0; h < q.length; h++) {
+    const i = q[h], x = i % N, y = (i / N) | 0;
+    for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
+      const nx = x + dx, ny = y + dy; if (nx < 0 || ny < 0 || nx >= N || ny >= N) continue;
+      const j = ny * N + nx; if (dist[j] > dist[i] + 1) { dist[j] = dist[i] + 1; q.push(j); }
+    }
+  }
+  for (let y = 0; y < N; y++) for (let x = 0; x < N; x++) {
+    const i = y * N + x; if (tile[i] !== T.DEEP) continue;
+    if (ell(x, y, 60, 64, 11, 9) + (hash(x, y, 9) - .5) * .25 < 1) tile[i] = T.REEF;
+    else if (dist[i] <= 5) tile[i] = T.SEA;
+  }
+})();
+// 建築（小鎮）
+const BUILDINGS = [
+  { id: 'shop', name: '釣具店', x: 36, y: 41, w: 3, h: 2, hgt: 16, wall: '#f0dfbf', roof: '#c8503a', sign: '🎣' },
+  { id: 'market', name: '魚市', x: 42, y: 41, w: 3, h: 2, hgt: 14, wall: '#e8e2d0', roof: '#3a78c0', sign: '🐟' },
+  { id: 'home', name: '我的小屋', x: 36, y: 46, w: 2, h: 2, hgt: 14, wall: '#f4e6c8', roof: '#4a9a5a', sign: '🏠' },
+  { id: 'board', name: '圖鑑館', x: 43, y: 47, w: 2, h: 2, hgt: 15, wall: '#efe0d0', roof: '#9a5ab0', sign: '📖' },
+];
+for (const b of BUILDINGS) {
+  for (let y = b.y; y < b.y + b.h; y++) for (let x = b.x; x < b.x + b.w; x++) { set(x, y, T.STONE); block[y * N + x] = 1; }
+  b.door = [b.x + b.w / 2, b.y + b.h + .5];   // 門在建築的左前方（＋y 那一面）
+}
+// 燈塔：從小鎮往 +x 走到最後一格陸地
+const lighthouse = (() => { let x = 40, y = 44; while (!WATER.has(at(x + 1, y))) x++; block[y * N + x] = 1; return { x, y }; })();
+// 樹與岩石、路燈
+const trees = [], rocks = [], lamps = [];
+for (let y = 1; y < N - 1; y++) for (let x = 1; x < N - 1; x++) {
+  const i = y * N + x, tt = tile[i]; if (block[i]) continue;
+  let nearWater = false;
+  for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1], [1, 1], [-1, -1], [1, -1], [-1, 1]]) if (WATER.has(at(x + dx, y + dy)) || at(x + dx, y + dy) === T.DOCK) nearWater = true;
+  const is = ISLANDS[landOf[i] - 1];
+  if (tt === T.GRASS && !nearWater && is && hash(x, y, 11) < is.trees) {
+    const dockNear = docks.some(d => Math.abs(d.x0 - x) + Math.abs(d.y0 - y) < 3);
+    if (!dockNear) { block[i] = 1; trees.push({ x: x + .5, y: y + .5, k: hash(x, y, 12) }); }
+  } else if (tt === T.GRASS && is && is.name === '溪谷山島' && !nearWater && hash(x, y, 13) < .07) { block[i] = 1; rocks.push({ x: x + .5, y: y + .5 }); }
+}
+for (const [x, y] of [[39, 43], [41, 48], [35, 44], [45, 44], [40, 50]]) if (at(x, y) === T.STONE && !block[y * N + x]) { block[y * N + x] = 1; lamps.push({ x: x + .5, y: y + .5 }); }
+const walkable = (x, y) => { const xi = Math.floor(x), yi = Math.floor(y); if (xi < 0 || yi < 0 || xi >= N || yi >= N) return false; const t = tile[yi * N + xi]; return !WATER.has(t) && !block[yi * N + xi]; };
+const boatable = (x, y) => { const xi = Math.floor(x), yi = Math.floor(y); if (xi < 1 || yi < 1 || xi >= N - 1 || yi >= N - 1) return false; return BOATABLE.has(tile[yi * N + xi]); };
+const iso = (x, y) => ({ x: (x - y) * TW / 2 + OX, y: (x + y) * TH / 2 + OY });
+
+// ════════════════ 預先畫好地面 ════════════════
+const ground = document.createElement('canvas'); ground.width = N * TW; ground.height = N * TH + OY + 40;
+(function drawGround() {
+  const g = ground.getContext('2d');
+  g.fillStyle = TILE_COLOR[T.DEEP]; g.fillRect(0, 0, ground.width, ground.height);
+  const dia = (x, y, fill) => { g.fillStyle = fill; g.beginPath(); g.moveTo(x, y); g.lineTo(x + TW / 2, y + TH / 2); g.lineTo(x, y + TH); g.lineTo(x - TW / 2, y + TH / 2); g.closePath(); g.fill(); };
+  for (let s = 0; s < 2 * N; s++) for (let x = 0; x < N; x++) {
+    const y = s - x; if (y < 0 || y >= N) continue;
+    const t = tile[y * N + x], p = iso(x, y), v = (hash(x, y, 1) - .5) * .12;
+    if (WATER.has(t)) {
+      dia(p.x, p.y, shade(TILE_COLOR[t], v * .6));
+      if (t === T.REEF && hash(x, y, 4) < .3) { g.fillStyle = ['#ff8a8a', '#ffb070', '#e070c0', '#80e0a0'][Math.floor(hash(x, y, 5) * 4)]; g.fillRect(p.x - 4 + hash(x, y, 6) * 8 | 0, p.y + 6, 3, 2); g.fillRect(p.x - 2 + hash(x, y, 8) * 6 | 0, p.y + 9, 2, 2); }
+      // 岸邊淺水
+      if (t === T.DEEP && hash(x, y, 21) < .25) { g.fillStyle = 'rgba(10,30,70,.35)'; g.fillRect(p.x - 6 + hash(x, y, 22) * 10 | 0, p.y + 5 + hash(x, y, 23) * 6 | 0, 4, 1); }
+      // 岸邊白浪（四個方向都畫）
+      if (t !== T.DEEP) for (const [dx, dy, ox, oy] of [[-1, 0, -10, 5], [0, -1, 6, 5], [1, 0, 6, 11], [0, 1, -10, 11]]) if (!WATER.has(at(x + dx, y + dy))) { g.fillStyle = 'rgba(255,255,255,.45)'; g.fillRect(p.x + ox, p.y + oy - 1, 5, 1); g.fillStyle = 'rgba(255,255,255,.22)'; g.fillRect(p.x + ox + 1, p.y + oy + 1, 4, 1); }
+      continue;
+    }
+    if (t === T.DOCK) {
+      dia(p.x, p.y, 'rgba(0,0,0,.18)');                                // 水上陰影
+      g.fillStyle = '#5a3a1e'; g.fillRect(p.x - 9, p.y + TH / 2 - 1, 2, 6); g.fillRect(p.x + 7, p.y + TH / 2 - 1, 2, 6);
+      dia(p.x, p.y - 3, '#b07e4c');
+      g.fillStyle = '#8a5a30'; for (let k = 0; k < 4; k++) g.fillRect(p.x - 10 + k * 6, p.y + 2 + (k % 2), 1, 8);
+      continue;
+    }
+    const top = TILE_COLOR[t];
+    // 側面（2.5D 高度）
+    // 側面（2.5D 高度）：左右兩面深淺不同，加一條土層線（🎨 美術部 Issue #43）
+    const side = t === T.SAND ? '#b89a5a' : '#6a4a2a';
+    g.fillStyle = side; g.beginPath(); g.moveTo(p.x - TW / 2, p.y + TH / 2 - LH); g.lineTo(p.x, p.y + TH - LH); g.lineTo(p.x, p.y + TH); g.lineTo(p.x - TW / 2, p.y + TH / 2); g.closePath(); g.fill();
+    g.fillStyle = shade(side, -.22); g.beginPath(); g.moveTo(p.x, p.y + TH - LH); g.lineTo(p.x + TW / 2, p.y + TH / 2 - LH); g.lineTo(p.x + TW / 2, p.y + TH / 2); g.lineTo(p.x, p.y + TH); g.closePath(); g.fill();
+    dia(p.x, p.y - LH, shade(top, v));
+    const inTile = (sx, sy) => Math.abs(sx) / (TW / 2) + Math.abs(sy - TH / 2) / (TH / 2) < .82;
+    const dots = (n, seed, col, w = 1, hh = 1) => { g.fillStyle = col; for (let k = 0; k < n; k++) { const sx = (hash(x, y, seed + k) - .5) * TW * .8 | 0, sy = hash(x, y, seed + k + 50) * TH | 0; if (inTile(sx, sy)) g.fillRect(p.x + sx, p.y - LH + sy, w, hh); } };
+    if (t === T.GRASS) {
+      dots(6, 100, shade(top, -.12), 2, 1); dots(4, 120, shade(top, .14), 1, 1);
+      if (hash(x, y, 2) < .45) { g.fillStyle = shade(top, -.28); const gx = p.x - 6 + hash(x, y, 3) * 12 | 0, gy = p.y + 1; g.fillRect(gx, gy, 1, 2); g.fillRect(gx + 2, gy - 1, 1, 3); g.fillRect(gx + 4, gy, 1, 2); }
+      // 草地邊緣往下垂一點
+      if (WATER.has(at(x, y + 1))) { g.fillStyle = shade(top, -.2); for (let k = 0; k < 14; k += 3) g.fillRect(p.x - 14 + k, p.y + TH / 2 - LH + Math.round(k / 2) + 1, 2, 2); }
+    }
+    if (t === T.GRASS && hash(x, y, 14) < .07) { const c = ['#fff3a0', '#ffb0c8', '#ffffff', '#b0c8ff'][Math.floor(hash(x, y, 15) * 4)]; g.fillStyle = c; g.fillRect(p.x - 2, p.y + 2, 1, 1); g.fillRect(p.x - 3, p.y + 3, 3, 1); g.fillRect(p.x - 2, p.y + 4, 1, 1); g.fillStyle = '#ffd040'; g.fillRect(p.x - 2, p.y + 3, 1, 1); }
+    if (t === T.SAND) { dots(7, 200, shade(top, -.14)); dots(3, 230, '#fff8e0'); if (hash(x, y, 240) < .06) { g.fillStyle = '#f4b0a0'; g.fillRect(p.x + 2, p.y + 4, 3, 2); g.fillStyle = '#fff'; g.fillRect(p.x + 3, p.y + 4, 1, 1); } }
+    if (t === T.STONE) {
+      // 石板路：交錯的小石塊
+      for (let r = 0; r < 4; r++) for (let c = -3; c <= 3; c++) {
+        const sx = c * 6 + (r % 2) * 3, sy = 2 + r * 3; if (!inTile(sx, sy + 1)) continue;
+        g.fillStyle = shade(top, (hash(x * 7 + c, y * 7 + r, 300) - .5) * .18); g.fillRect(p.x + sx - 2, p.y - LH + sy, 5, 2);
+        g.fillStyle = 'rgba(110,86,60,.35)'; g.fillRect(p.x + sx - 2, p.y - LH + sy + 2, 5, 1);
+      }
+    }
+  }
+})();
+
+// ════════════════ 小地圖（菱形，與畫面方向一致）════════════════
+const mapImg = document.createElement('canvas'); mapImg.width = N * 4; mapImg.height = N * 2 + 4;
+(function drawMap() {
+  const g = mapImg.getContext('2d');
+  for (let y = 0; y < N; y++) for (let x = 0; x < N; x++) {
+    let c = TILE_COLOR[tile[y * N + x]]; if (block[y * N + x]) c = '#3f7a32';
+    if (BUILDINGS.some(b => x >= b.x && x < b.x + b.w && y >= b.y && y < b.y + b.h)) c = '#c8503a';
+    g.fillStyle = c; const px = (x - y) * 2 + N * 2, py = (x + y);
+    g.fillRect(px - 2, py, 4, 2); g.fillRect(px - 1, py - 1, 2, 4);
+  }
+})();
+const mapPos = (x, y, sc) => ({ x: ((x - y) * 2 + N * 2) * sc, y: (x + y) * sc });
+
+// ════════════════ 狀態 ════════════════
+const startDock = docks[0];
+const state = {
+  player: { x: startDock.x0 + .5, y: startDock.y0 + .5, fx: 0, fy: 1, walk: 0 },
+  boat: { x: startDock.end[0] + startDock.dir[0] + .5, y: startDock.end[1] + startDock.dir[1] + .5, vx: 0, vy: 0, ang: 0 },
+  onBoat: false,
+  coins: 0, bag: [],
+  rod: { power: 1, luck: 0, name: '竹竿' },   // 商店子任務會用到
+  vib: true,
+};
+const fish = { state: null };                  // 釣魚狀態機
+let viewMix = 0;                                // 0＝等角地圖視角，1＝第三人稱釣魚視角
+
+// ════════════════ 時間（照現實時間）════════════════
+function phaseNow() {
+  const q = params.get('time'); if (q && ['dawn', 'day', 'dusk', 'night'].includes(q)) return q;
+  const h = new Date().getHours();
+  return h >= 5 && h < 8 ? 'dawn' : h >= 8 && h < 17 ? 'day' : h >= 17 && h < 19 ? 'dusk' : 'night';
+}
+const PHASE = {
+  dawn: { name: '🌅 清晨', tint: 'rgba(255,150,130,.16)', sky: ['#f8b8a0', '#ffe2b0'], sea: '#5a8ac0', dark: 0 },
+  day: { name: '🌞 白天', tint: null, sky: ['#7ec8f8', '#d8f0ff'], sea: '#3f8fd0', dark: 0 },
+  dusk: { name: '🌇 黃昏', tint: 'rgba(255,120,40,.2)', sky: ['#f08a50', '#ffd080'], sea: '#c07a6a', dark: .1 },
+  night: { name: '🌙 夜晚', tint: 'rgba(12,20,60,.5)', sky: ['#0c1430', '#2a3a70'], sea: '#1a2a50', dark: .5 },
+};
+let phase = phaseNow();
+
+// ════════════════ 畫布 ════════════════
+const cv = document.getElementById('c'), ctx = cv.getContext('2d');
+const low = document.createElement('canvas'), lx = low.getContext('2d');
+let W, H, PIX, DPR;
+function resize() {
+  DPR = Math.min(devicePixelRatio || 1, 2); W = innerWidth; H = innerHeight;
+  cv.width = W * DPR; cv.height = H * DPR; PIX = W < 700 ? 2 : 3;
+  low.width = Math.ceil(W / PIX); low.height = Math.ceil(H / PIX);
+}
+addEventListener('resize', resize); resize();
+
+// ════════════════ 輸入：搖桿、鍵盤、按鈕 ════════════════
+const joy = document.getElementById('joy'), knob = document.getElementById('knob');
+let jv = { x: 0, y: 0 }, joyId = null; const keys = {};
+function joyMove(e) { const r = joy.getBoundingClientRect(); let dx = e.clientX - (r.left + r.width / 2), dy = e.clientY - (r.top + r.height / 2); const m = Math.hypot(dx, dy), max = 46; if (m > max) { dx *= max / m; dy *= max / m; } jv = { x: dx / max, y: dy / max }; knob.style.transform = `translate(${dx}px,${dy}px)`; }
+joy.addEventListener('pointerdown', e => { joyId = e.pointerId; joy.setPointerCapture(e.pointerId); joyMove(e); });
+joy.addEventListener('pointermove', e => { if (e.pointerId === joyId) joyMove(e); });
+const joyEnd = e => { if (e.pointerId === joyId) { joyId = null; jv = { x: 0, y: 0 }; knob.style.transform = ''; } };
+joy.addEventListener('pointerup', joyEnd); joy.addEventListener('pointercancel', joyEnd);
+addEventListener('keydown', e => { keys[e.key.toLowerCase()] = true; if (e.repeat) return; if (e.key === ' ' || e.key.toLowerCase() === 'j') { pressA(true); e.preventDefault(); } if (e.key.toLowerCase() === 'e' || e.key.toLowerCase() === 'k') pressB(); if (e.key.toLowerCase() === 'm') toggleMap(); });
+addEventListener('keyup', e => { keys[e.key.toLowerCase()] = false; if (e.key === ' ' || e.key.toLowerCase() === 'j') pressA(false); });
+const btnA = document.getElementById('btnA'), btnB = document.getElementById('btnB');
+btnA.addEventListener('pointerdown', e => { btnA.setPointerCapture(e.pointerId); btnA.classList.add('down'); pressA(true); });
+const upA = () => { btnA.classList.remove('down'); pressA(false); };
+btnA.addEventListener('pointerup', upA); btnA.addEventListener('pointercancel', upA);
+btnB.addEventListener('pointerdown', () => pressB());
+document.getElementById('mini').addEventListener('pointerdown', toggleMap);
+document.getElementById('closeMap').addEventListener('click', toggleMap);
+const vibBtn = document.getElementById('vib');
+vibBtn.addEventListener('click', () => { state.vib = !state.vib; vibBtn.textContent = '📳 震動：' + (state.vib ? '開' : '關'); if (state.vib) buzz(60); });
+function buzz(p) { if (state.vib && navigator.vibrate) try { navigator.vibrate(p); } catch (e) {} }
+let toastT = 0;
+function toast(t, ms = 1800) { const el = document.getElementById('toast'); el.textContent = t; el.classList.add('show'); clearTimeout(toastT); toastT = setTimeout(() => el.classList.remove('show'), ms); }
+
+// 螢幕方向 → 世界方向（等角）
+function screenToWorld(dx, dy) { const wx = dx / TW + dy / TH, wy = dy / TH - dx / TW; const m = Math.hypot(wx, wy) || 1; return { x: wx / m, y: wy / m }; }
+
+// ════════════════ 動作判斷 ════════════════
+function waterAhead(ox, oy, fx, fy) {
+  const tryDir = (dx, dy) => { for (const r of [2.4, 1.8, 1.3]) { const x = ox + dx * r, y = oy + dy * r; if (WATER.has(at(Math.floor(x), Math.floor(y)))) return { x, y }; } return null; };
+  let hit = tryDir(fx, fy); if (hit) return { ...hit, fx, fy };
+  for (let a = 0; a < 8; a++) { const dx = Math.cos(a * Math.PI / 4), dy = Math.sin(a * Math.PI / 4); hit = tryDir(dx, dy); if (hit) return { ...hit, fx: dx, fy: dy }; }
+  return null;
+}
+function nearBuilding() { const p = state.player; return BUILDINGS.find(b => Math.hypot(b.door[0] - p.x, b.door[1] - p.y) < 1.3); }
+function landingSpot() {
+  const b = state.boat;
+  for (let r = 1; r <= 1.6; r += .3) for (let a = 0; a < 16; a++) { const x = b.x + Math.cos(a * Math.PI / 8) * r, y = b.y + Math.sin(a * Math.PI / 8) * r; if (walkable(x, y)) return { x: Math.floor(x) + .5, y: Math.floor(y) + .5 }; }
+  return null;
+}
+function contextB() {
+  if (fish.state === 'wait' || fish.state === 'cast') return { label: '收竿', fn: () => endFishing('收竿了') };
+  if (fish.state) return null;
+  if (state.onBoat) { const s = landingSpot(); return s ? { label: '下船', fn: () => { state.onBoat = false; Object.assign(state.player, s); toast('上岸了'); } } : null; }
+  const p = state.player;
+  if (Math.hypot(state.boat.x - p.x, state.boat.y - p.y) < 1.8) return { label: '上船', fn: () => { state.onBoat = true; toast('⛵ 用搖桿開船，到不同海域釣不同的魚'); } };
+  const b = nearBuilding(); if (b) return { label: '進入', fn: () => openBuilding(b) };
+  return null;
+}
+function contextA() {
+  if (fish.state === 'wait') return '拉竿';
+  if (fish.state === 'bite') return '拉竿！';
+  if (fish.state === 'reel') return '收線\n（按住）';
+  if (fish.state) return '…';
+  const o = state.onBoat ? state.boat : state.player;
+  return waterAhead(o.x, o.y, state.player.fx, state.player.fy) ? '拋竿' : null;
+}
+function pressB() { const c = contextB(); if (c) c.fn(); }
+let holding = false;
+function pressA(down) {
+  holding = down; if (!down) return;
+  if (!fish.state) return startCast();
+  if (fish.state === 'wait') return fail('太早拉竿，魚被嚇跑了…');
+  if (fish.state === 'bite') return hook();
+}
+
+// ════════════════ 釣魚 ════════════════
+function regionAt(x, y) { return REGION_OF[at(Math.floor(x), Math.floor(y))] || 'harbor'; }
+function startCast() {
+  const o = state.onBoat ? state.boat : state.player;
+  const w = waterAhead(o.x, o.y, state.player.fx, state.player.fy);
+  if (!w) return toast('前面沒有水，換個方向試試');
+  state.player.fx = w.fx; state.player.fy = w.fy;
+  Object.assign(fish, { state: 'cast', t: 0, region: regionAt(w.x, w.y), fx: w.x, fy: w.y, nibbles: [], d: 100, tension: 0, struggle: false, swap: 0 });
+  const wait = rand(2.2, 6.5) / (1 + state.rod.luck * .2);
+  fish.biteAt = .7 + wait;
+  for (let k = 0, n = Math.floor(rand(0, 3)); k < n; k++) fish.nibbles.push(rand(1.2, fish.biteAt - .3));
+  toast(`🎣 拋竿！（${REGION_NAME[fish.region]}）浮標沉下去再拉竿`);
+}
+function pickFish(region) {
+  const pool = FISH.filter(f => f.regions.includes(region) && f.times.includes(phase));
+  const byR = {}; for (const f of pool) (byR[f.rarity] = byR[f.rarity] || []).push(f);
+  const rs = Object.keys(byR); let tot = 0; const wts = rs.map(r => { const w = RAR[r].w * (r === 'common' ? 1 : 1 + state.rod.luck * .3); tot += w; return w; });
+  let u = Math.random() * tot, r = rs[0]; for (let i = 0; i < rs.length; i++) { u -= wts[i]; if (u <= 0) { r = rs[i]; break; } }
+  const list = byR[r]; const def = list[Math.floor(Math.random() * list.length)];
+  const k = Math.pow(Math.random(), 2.2);
+  const w = def.weightKg[0] + (def.weightKg[1] - def.weightKg[0]) * k;
+  const l = clamp(def.lengthCm[0] + (def.lengthCm[1] - def.lengthCm[0]) * Math.cbrt(k) * rand(.94, 1.06), def.lengthCm[0], def.lengthCm[1]);
+  return { def, weight: w, length: l, price: Math.round(def.price * (.6 + .8 * k)), k };
+}
+function hook() {
+  fish.catch = pickFish(fish.region); useBait();
+  const rar = RAR[fish.catch.def.rarity];
+  fish.power = rar.pow * (.8 + fish.catch.k * .5);
+  fish.state = 'reel'; fish.t = 0; fish.d = 100; fish.tension = 20; fish.swap = rand(.4, 1.2);
+  buzz([60, 30, 60]);
+  toast(fish.catch.def.rarity === 'legendary' || fish.catch.def.rarity === 'epic' ? '‼️ 好重！是大傢伙！按住收線，張力太高就放手' : '上鉤了！按住「收線」，張力太高就放手');
+}
+function fail(msg) { buzz(200); fish.state = 'fail'; fish.t = 0; fish.msg = msg; toast(msg, 2200); }
+function endFishing(msg) { fish.state = null; holding = false; if (msg) toast(msg); }
+function caught() {
+  fish.state = 'result'; buzz([40, 30, 40, 30, 160]);
+  const c = fish.catch; const isNew = !prog.dex[c.def.id]; state.bag.push({ id: c.def.id, w: +c.weight.toFixed(2), l: +c.length.toFixed(1), price: c.price, at: Date.now() });
+  recordCatch(c);
+  const rar = RAR[c.def.rarity];
+  const card = document.getElementById('catchCard');
+  card.innerHTML = `<h2>🎉 釣到了！${isNew ? ' <small style="color:#e05a2a">NEW 圖鑑登錄</small>' : ''}</h2><span class="rar" style="background:${rar.color}">${rar.name}</span>
+    <canvas id="fishPic" width="64" height="32"></canvas>
+    <h2 style="margin:2px 0">${c.def.name}</h2>
+    <div class="stats"><span>⚖️ ${fmtW(c.weight)}</span><span>📏 ${c.length.toFixed(1)} cm</span><span>🪙 ${c.price}</span></div>
+    <p>${c.def.desc}<br><small>出沒：${c.def.regions.map(r => REGION_NAME[r]).join('、')}</small></p>
+    <button id="keepBtn">放進魚簍</button>`;
+  drawFishTo(document.getElementById('fishPic'), c.def);
+  document.getElementById('catch').classList.add('show');
+  document.getElementById('keepBtn').onclick = () => { document.getElementById('catch').classList.remove('show'); endFishing(); updateHud(); };
+}
+const fmtW = w => w < 1 ? Math.round(w * 1000) + ' g' : w.toFixed(2) + ' kg';
+function updateFishing(dt) {
+  if (!fish.state) return;
+  fish.t += dt;
+  if (fish.state === 'cast' && fish.t > .7) fish.state = 'wait';
+  if (fish.state === 'wait') {
+    for (let i = 0; i < fish.nibbles.length; i++) if (fish.t > fish.nibbles[i]) { fish.nibbles.splice(i, 1); fish.nib = .35; buzz(15); }
+    if (fish.nib > 0) fish.nib -= dt;
+    if (fish.t > fish.biteAt) { fish.state = 'bite'; fish.biteT = 0; buzz([90, 40, 90]); }
+  } else if (fish.state === 'bite') {
+    fish.biteT += dt; if (fish.biteT > .9 + state.rod.power * .1) fail('沒拉到…魚跑掉了');
+  } else if (fish.state === 'reel') {
+    fish.swap -= dt;
+    if (fish.swap <= 0) { fish.struggle = !fish.struggle; fish.swap = fish.struggle ? rand(.5, 1.3) * fish.power : rand(.6, 1.6) / fish.power; if (fish.struggle) buzz(35); }
+    const rp = state.rod.power;
+    if (holding) { fish.d -= (fish.struggle ? 6 : 19) * rp * dt; fish.tension += (fish.struggle ? 62 * fish.power : 16 * fish.power) * dt / rp; }
+    else { fish.tension -= 45 * dt; fish.d += (fish.struggle ? 9 : 3) * fish.power * dt; }
+    fish.tension = clamp(fish.tension, 0, 100); fish.d = clamp(fish.d, 0, 110);
+    if (fish.tension >= 100) fail('啪！線斷了…');
+    else if (fish.d >= 110) fail('魚游走了…');
+    else if (fish.d <= 0) caught();
+  } else if (fish.state === 'fail' && fish.t > 1.2) endFishing();
+}
+
+// ════════════════ 商店、魚市、圖鑑、成就、存檔 ════════════════
+const RODS = [
+  { id: 'bamboo', name: '竹竿', price: 0, power: 1, luck: 0, desc: '新手的老朋友。' },
+  { id: 'carbon', name: '碳纖竿', price: 300, power: 1.25, luck: .5, desc: '收線更快，稀有魚稍微容易上鉤。' },
+  { id: 'sea', name: '遠洋海釣竿', price: 1500, power: 1.6, luck: 1, desc: '拉得動深海大魚。' },
+  { id: 'legend', name: '傳說之竿', price: 6000, power: 2.1, luck: 2, desc: '傳說魚也逃不掉。' },
+];
+const BOATS = [
+  { lv: 0, name: '小木船', price: 0, speed: 6 },
+  { lv: 1, name: '馬達小艇', price: 800, speed: 8.5 },
+  { lv: 2, name: '遠洋快艇', price: 3000, speed: 11 },
+];
+const BAIT = { name: '萬能魚餌', price: 40, count: 10, desc: '每次上鉤用掉一個，有餌時稀有魚機率提高。' };
+const ACH = [
+  ['first', '🎣 第一條魚', '釣到第一條魚', s => s.catches >= 1],
+  ['c10', '🐟 小有收穫', '累計釣到 10 條魚', s => s.catches >= 10],
+  ['c50', '🧺 魚簍滿滿', '累計釣到 50 條魚', s => s.catches >= 50],
+  ['c200', '🏆 釣魚達人', '累計釣到 200 條魚', s => s.catches >= 200],
+  ['d10', '📖 圖鑑入門', '圖鑑收集 10 種', s => s.dexN >= 10],
+  ['d30', '📗 圖鑑學徒', '圖鑑收集 30 種', s => s.dexN >= 30],
+  ['d60', '📘 圖鑑專家', '圖鑑收集 60 種', s => s.dexN >= 60],
+  ['dall', '👑 海灣博物學家', `圖鑑收集全部 ${FISH.length} 種`, s => s.dexN >= FISH.length],
+  ['r_harbor', '⚓ 港灣釣手', '在港灣釣到魚', s => s.region.harbor > 0],
+  ['r_lake', '🌲 翠湖釣手', '在翠湖釣到魚', s => s.region.lake > 0],
+  ['r_river', '🏞️ 溪谷釣手', '在溪谷釣到魚', s => s.region.river > 0],
+  ['r_reef', '🪸 珊瑚礁釣手', '在珊瑚礁釣到魚', s => s.region.reef > 0],
+  ['r_deep', '🌊 深海釣手', '在深海釣到魚', s => s.region.deep > 0],
+  ['t_dawn', '🌅 早起的釣客', '清晨釣到魚', s => s.time.dawn > 0],
+  ['t_dusk', '🌇 夕陽下的收穫', '黃昏釣到魚', s => s.time.dusk > 0],
+  ['t_night', '🌙 夜釣高手', '夜晚釣到魚', s => s.time.night > 0],
+  ['rare', '💎 稀有發現', '釣到稀有魚', s => s.rar.rare > 0],
+  ['epic', '🔮 史詩大魚', '釣到史詩魚', s => s.rar.epic > 0],
+  ['legend', '🐉 傳說降臨', '釣到傳說魚', s => s.rar.legendary > 0],
+  ['legend_all', '✨ 傳說收藏家', '傳說魚全部收集', s => FISH.filter(f => f.rarity === 'legendary').every(f => s.dex[f.id])],
+  ['w10', '💪 大物', '釣到 10 公斤以上的魚', s => s.maxW >= 10],
+  ['w100', '🦈 巨物', '釣到 100 公斤以上的魚', s => s.maxW >= 100],
+  ['m1000', '🪙 小富翁', '賣魚累計賺 1000', s => s.earned >= 1000],
+  ['m10000', '💰 漁港大亨', '賣魚累計賺 10000', s => s.earned >= 10000],
+  ['rod', '🛒 新裝備', '買一支新釣竿', s => s.rodIdx > 0],
+  ['boat', '🚤 加速前進', '升級你的船', s => s.boatLv > 0],
+];
+const SAVE_KEY = 'bay-fishing-save-v1';
+const prog = { dex: {}, ach: {}, catches: 0, region: {}, time: {}, rar: {}, maxW: 0, earned: 0, rodIdx: 0, boatLv: 0, bait: 0 };
+function save() {
+  try { localStorage.setItem(SAVE_KEY, JSON.stringify({ v: 1, coins: state.coins, bag: state.bag, prog, pos: { x: state.player.x, y: state.player.y, bx: state.boat.x, by: state.boat.y, onBoat: state.onBoat } })); } catch (e) {}
+}
+function load() {
+  try {
+    const d = JSON.parse(localStorage.getItem(SAVE_KEY) || 'null'); if (!d || d.v !== 1) return false;
+    state.coins = d.coins || 0; state.bag = d.bag || []; Object.assign(prog, d.prog || {});
+    if (d.pos && walkable(d.pos.x, d.pos.y)) { state.player.x = d.pos.x; state.player.y = d.pos.y; }
+    if (d.pos && boatable(d.pos.bx, d.pos.by)) { state.boat.x = d.pos.bx; state.boat.y = d.pos.by; }
+    if (d.pos && d.pos.onBoat && boatable(d.pos.bx, d.pos.by)) { state.onBoat = true; state.player.x = state.boat.x; state.player.y = state.boat.y; }
+    return true;
+  } catch (e) { return false; }
+}
+function applyGear() {
+  const r = RODS[prog.rodIdx] || RODS[0]; state.rod = { power: r.power, luck: r.luck + (prog.bait > 0 ? 1 : 0), name: r.name };
+  state.boatSpeed = (BOATS[prog.boatLv] || BOATS[0]).speed;
+}
+function stats() { return { ...prog, dexN: Object.keys(prog.dex).length }; }
+function checkAch() {
+  const s = stats(); const got = [];
+  for (const [id, name] of ACH) if (!prog.ach[id] && ACH.find(a => a[0] === id)[3](s)) { prog.ach[id] = Date.now(); got.push(name); }
+  if (got.length) { buzz([30, 30, 30, 30, 120]); setTimeout(() => toast('🏅 達成成就：' + got.join('、'), 2800), 400); }
+}
+function recordCatch(c) {
+  prog.catches++; const id = c.def.id;
+  const d = prog.dex[id] || (prog.dex[id] = { n: 0, maxW: 0, maxL: 0, first: Date.now() });
+  d.n++; d.maxW = Math.max(d.maxW, +c.weight.toFixed(2)); d.maxL = Math.max(d.maxL, +c.length.toFixed(1));
+  prog.region[fish.region] = (prog.region[fish.region] || 0) + 1;
+  prog.time[phase] = (prog.time[phase] || 0) + 1;
+  prog.rar[c.def.rarity] = (prog.rar[c.def.rarity] || 0) + 1;
+  prog.maxW = Math.max(prog.maxW, c.weight);
+  checkAch(); save();
+}
+function useBait() { if (prog.bait > 0) { prog.bait--; applyGear(); } }
+
+const panelEl = () => document.getElementById('panel');
+function showPanel(html) {
+  document.getElementById('panelCard').innerHTML = html + '<div style="margin-top:10px"><button id="closePanel">離開</button></div>';
+  panelEl().classList.add('show');
+  document.getElementById('closePanel').onclick = () => panelEl().classList.remove('show');
+}
+const FISH_BY_ID = Object.fromEntries(FISH.map(f => [f.id, f]));
+function openBuilding(b) { ({ shop: openShop, market: openMarket, home: openHome, board: openDex })[b.id](); }
+function openMarket() {
+  const total = state.bag.reduce((a, f) => a + f.price, 0);
+  const rows = state.bag.map((f, i) => { const d = FISH_BY_ID[f.id]; return `<div class="row"><span><b style="color:${RAR[d.rarity].color}">${d.name}</b> ${fmtW(f.w)}・${f.l} cm</span><button data-sell="${i}">賣 🪙${f.price}</button></div>`; }).join('');
+  showPanel(`<h2>🐟 魚市</h2><p>魚簍裡有 ${state.bag.length} 條魚，全部可賣 🪙${total}</p>
+    <div class="list">${rows || '<p>魚簍是空的，先去釣魚吧！</p>'}</div>
+    ${state.bag.length ? '<button id="sellAll">全部賣出</button>' : ''}`);
+  const sell = idx => { const sold = idx === 'all' ? state.bag.splice(0) : state.bag.splice(idx, 1); const g = sold.reduce((a, f) => a + f.price, 0); state.coins += g; prog.earned += g; buzz(30); toast(`賣出 ${sold.length} 條魚，得到 🪙${g}`); checkAch(); save(); updateHud(); openMarket(); };
+  document.querySelectorAll('[data-sell]').forEach(el => el.onclick = () => sell(+el.dataset.sell));
+  const all = document.getElementById('sellAll'); if (all) all.onclick = () => sell('all');
+}
+function openShop() {
+  const rodRows = RODS.map((r, i) => { const own = i <= prog.rodIdx; const cur = i === prog.rodIdx; return `<div class="row"><span><b>${r.name}</b>　力量 ${r.power}・幸運 ${r.luck}<br><small>${r.desc}</small></span>${cur ? '<em>使用中</em>' : own ? '<em>已擁有</em>' : `<button data-rod="${i}" ${i !== prog.rodIdx + 1 ? 'disabled' : ''}>🪙${r.price}</button>`}</div>`; }).join('');
+  const boatRows = BOATS.map(b => `<div class="row"><span><b>${b.name}</b>　速度 ${b.speed}</span>${b.lv <= prog.boatLv ? (b.lv === prog.boatLv ? '<em>使用中</em>' : '<em>已擁有</em>') : `<button data-boat="${b.lv}" ${b.lv !== prog.boatLv + 1 ? 'disabled' : ''}>🪙${b.price}</button>`}</div>`).join('');
+  showPanel(`<h2>🎣 釣具店</h2><p>你有 🪙${state.coins}</p>
+    <div class="list"><h3>釣竿（依序升級）</h3>${rodRows}
+    <h3>魚餌（剩 ${prog.bait} 個）</h3><div class="row"><span><b>${BAIT.name} ×${BAIT.count}</b><br><small>${BAIT.desc}</small></span><button id="buyBait">🪙${BAIT.price}</button></div>
+    <h3>船</h3>${boatRows}</div>`);
+  const pay = (cost, fn) => { if (state.coins < cost) { toast('錢不夠，先去魚市賣魚吧'); buzz(120); return; } state.coins -= cost; fn(); applyGear(); buzz(40); checkAch(); save(); updateHud(); openShop(); };
+  document.querySelectorAll('[data-rod]').forEach(el => el.onclick = () => { const i = +el.dataset.rod; pay(RODS[i].price, () => { prog.rodIdx = i; toast('換上了 ' + RODS[i].name + '！'); }); });
+  document.querySelectorAll('[data-boat]').forEach(el => el.onclick = () => { const lv = +el.dataset.boat; pay(BOATS[lv].price, () => { prog.boatLv = lv; toast('船升級成 ' + BOATS[lv].name + '！'); }); });
+  document.getElementById('buyBait').onclick = () => pay(BAIT.price, () => { prog.bait += BAIT.count; toast('買了 10 個魚餌'); });
+}
+function openHome() {
+  const s = stats(), achN = Object.keys(prog.ach).length;
+  showPanel(`<h2>🏠 我的小屋</h2><p>遊戲會自動存在這台裝置上。</p>
+    <div class="list" style="text-align:left">
+    <div class="row"><span>累計釣到</span><b>${s.catches} 條</b></div>
+    <div class="row"><span>圖鑑</span><b>${s.dexN} / ${FISH.length} 種</b></div>
+    <div class="row"><span>成就</span><b>${achN} / ${ACH.length}</b></div>
+    <div class="row"><span>最重的魚</span><b>${fmtW(s.maxW || 0)}</b></div>
+    <div class="row"><span>賣魚總收入</span><b>🪙${s.earned}</b></div>
+    <div class="row"><span>釣竿／船</span><b>${RODS[prog.rodIdx].name}／${BOATS[prog.boatLv].name}</b></div></div>`);
+}
+function openDex(tab = 'dex') {
+  const s = stats();
+  let body;
+  if (tab === 'dex') {
+    const order = ['common', 'uncommon', 'rare', 'epic', 'legendary'];
+    body = order.map(r => { const list = FISH.filter(f => f.rarity === r); const got = list.filter(f => prog.dex[f.id]).length;
+      return `<h3 style="color:${RAR[r].color}">${RAR[r].name}（${got}/${list.length}）</h3><div class="dex">` + list.map(f => `<div class="cell ${prog.dex[f.id] ? '' : 'unk'}" data-fish="${f.id}"><canvas width="64" height="32" data-pic="${f.id}"></canvas><span>${prog.dex[f.id] ? f.name : '？？？'}</span></div>`).join('') + '</div>'; }).join('');
+  } else {
+    body = ACH.map(([id, name, desc]) => `<div class="row ${prog.ach[id] ? '' : 'unk'}"><span><b>${name}</b><br><small>${desc}</small></span>${prog.ach[id] ? '✅' : '🔒'}</div>`).join('');
+  }
+  showPanel(`<h2>📖 圖鑑館</h2>
+    <div class="tabs"><button id="tDex" class="${tab === 'dex' ? 'on' : ''}">魚類圖鑑 ${s.dexN}/${FISH.length}</button><button id="tAch" class="${tab === 'ach' ? 'on' : ''}">成就 ${Object.keys(prog.ach).length}/${ACH.length}</button></div>
+    <div class="list">${body}</div><p id="dexInfo" style="min-height:2.4em"></p>`);
+  document.getElementById('tDex').onclick = () => openDex('dex'); document.getElementById('tAch').onclick = () => openDex('ach');
+  document.querySelectorAll('[data-pic]').forEach(c => { const f = FISH_BY_ID[c.dataset.pic]; drawFishTo(c, f); if (!prog.dex[f.id]) { const g = c.getContext('2d'); g.globalCompositeOperation = 'source-in'; g.fillStyle = '#5a5048'; g.fillRect(0, 0, 64, 32); } });
+  document.querySelectorAll('[data-fish]').forEach(el => el.onclick = () => { const f = FISH_BY_ID[el.dataset.fish], d = prog.dex[f.id]; document.getElementById('dexInfo').innerHTML = d ? `<b>${f.name}</b>：${f.desc}<br>釣到 ${d.n} 次・最重 ${fmtW(d.maxW)}・最長 ${d.maxL} cm・出沒：${f.regions.map(r => REGION_NAME[r]).join('、')}` : `還沒釣到。提示：出沒在${f.regions.map(r => REGION_NAME[r]).join('、')}，${f.times.length === 4 ? '任何時間' : f.times.map(t => PHASE[t].name.slice(3)).join('、')}。`; });
+}
+
+// ════════════════ 地圖 ════════════════
+function toggleMap() {
+  const ov = document.getElementById('bigmap'); const show = !ov.classList.contains('show');
+  ov.classList.toggle('show', show); if (!show) return;
+  const c = document.getElementById('bigCv'), g = c.getContext('2d'); g.imageSmoothingEnabled = false;
+  g.fillStyle = '#26508f'; g.fillRect(0, 0, c.width, c.height);
+  const sc = c.width / mapImg.width; g.drawImage(mapImg, 0, (c.height - mapImg.height * sc) / 2, mapImg.width * sc, mapImg.height * sc);
+  const oy = (c.height - mapImg.height * sc) / 2;
+  g.font = 'bold 17px sans-serif'; g.textAlign = 'center'; g.lineWidth = 4;
+  const label = (t, x, y, col = '#fff') => { const p = mapPos(x, y, sc); g.strokeStyle = '#000a'; g.strokeText(t, p.x, p.y + oy); g.fillStyle = col; g.fillText(t, p.x, p.y + oy); };
+  for (const is of ISLANDS) label(is.name, is.cx, is.cy - 1, '#fff3c0');
+  label('翠湖', 17, 15.5, '#c8ffe8'); label('溪谷', 70, 13, '#c8ffff'); label('珊瑚礁', 64, 70, '#c8ffff');
+  label('深海', 70, 40); label('深海', 10, 42); label('港灣', 40, 56);
+  const pl = state.onBoat ? state.boat : state.player, p = mapPos(pl.x, pl.y, sc);
+  const bp = mapPos(state.boat.x, state.boat.y, sc);
+  g.fillStyle = '#ffd040'; g.fillRect(bp.x - 3, bp.y + oy - 3, 6, 6);
+  g.fillStyle = '#ff5040'; g.beginPath(); g.arc(p.x, p.y + oy, 7, 0, 7); g.fill(); g.strokeStyle = '#fff'; g.lineWidth = 2; g.stroke();
+}
+const mini = document.getElementById('mini'), mg = mini.getContext('2d');
+function drawMini() {
+  const pl = state.onBoat ? state.boat : state.player, sc = 2;
+  const p = mapPos(pl.x, pl.y, sc / 2);
+  mg.imageSmoothingEnabled = false; mg.fillStyle = '#26508f'; mg.fillRect(0, 0, 128, 96);
+  mg.drawImage(mapImg, 64 - p.x, 48 - p.y, mapImg.width * sc / 2, mapImg.height * sc / 2);
+  const bp = mapPos(state.boat.x, state.boat.y, sc / 2);
+  mg.fillStyle = '#ffd040'; mg.fillRect(64 - p.x + bp.x - 2, 48 - p.y + bp.y - 2, 4, 4);
+  mg.fillStyle = '#ff5040'; mg.beginPath(); mg.arc(64, 48, 3.5, 0, 7); mg.fill(); mg.strokeStyle = '#fff'; mg.lineWidth = 1.5; mg.stroke();
+}
+
+// ════════════════ 更新 ════════════════
+let lastArea = '';
+function areaName() {
+  const o = state.onBoat ? state.boat : state.player, xi = Math.floor(o.x), yi = Math.floor(o.y);
+  if (state.onBoat) return REGION_NAME[REGION_OF[at(xi, yi)]] || '海上';
+  const is = ISLANDS[landOf[yi * N + xi] - 1]; return is ? is.name : (at(xi, yi) === T.DOCK ? '碼頭' : '岸邊');
+}
+function update(dt) {
+  let ix = jv.x, iy = jv.y;
+  if (keys['arrowleft'] || keys['a']) ix -= 1; if (keys['arrowright'] || keys['d']) ix += 1;
+  if (keys['arrowup'] || keys['w']) iy -= 1; if (keys['arrowdown'] || keys['s']) iy += 1;
+  const mag = Math.min(1, Math.hypot(ix, iy));
+  const locked = fish.state || document.querySelector('.overlay.show');
+  const p = state.player, b = state.boat;
+  if (!locked && mag > .15) {
+    const d = screenToWorld(ix, iy); p.fx = d.x; p.fy = d.y;
+    if (state.onBoat) { const acc = 1.5 * (state.boatSpeed || 6); b.vx += d.x * mag * acc * dt; b.vy += d.y * mag * acc * dt; }
+    else {
+      const sp = 3.6 * mag * dt, r = .22;
+      const ok = (x, y) => walkable(x - r, y - r) && walkable(x + r, y - r) && walkable(x - r, y + r) && walkable(x + r, y + r);
+      if (ok(p.x + d.x * sp, p.y)) p.x += d.x * sp;
+      if (ok(p.x, p.y + d.y * sp)) p.y += d.y * sp;
+      p.walk += dt * 8 * mag;
+    }
+  }
+  if (state.onBoat || Math.hypot(b.vx, b.vy) > .01) {
+    const sp = Math.hypot(b.vx, b.vy), max = state.boatSpeed || 6;
+    if (sp > max) { b.vx *= max / sp; b.vy *= max / sp; }
+    const nx = b.x + b.vx * dt, ny = b.y + b.vy * dt;
+    if (boatable(nx, b.y)) b.x = nx; else b.vx *= -.3;
+    if (boatable(b.x, ny)) b.y = ny; else b.vy *= -.3;
+    b.vx *= Math.pow(.35, dt); b.vy *= Math.pow(.35, dt);
+    if (sp > .3) { const s = iso(b.vx, b.vy); b.ang = Math.atan2(s.y - OY, s.x - OX); }
+    if (state.onBoat) { p.x = b.x; p.y = b.y; }
+  }
+  updateFishing(dt);
+  const target = fish.state && fish.state !== 'cast' ? 1 : fish.state === 'cast' ? Math.min(1, fish.t / .5) : 0;
+  viewMix += (target - viewMix) * Math.min(1, dt * 6);
+  const an = areaName(); if (an !== lastArea) { if (lastArea) toast('📍 ' + an); lastArea = an; updateHud(); }
+}
+let hudTick = 0;
+function updateHud() {
+  phase = phaseNow();
+  const d = new Date();
+  document.getElementById('timeChip').textContent = `${PHASE[phase].name} ${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
+  document.getElementById('areaChip').textContent = '📍 ' + areaName();
+  document.getElementById('coinChip').textContent = '🪙 ' + state.coins;
+  document.getElementById('bagChip').textContent = '🐟 ' + state.bag.length;
+  document.getElementById('baitChip').textContent = '🪱 ' + prog.bait;
+  const a = contextA(), b = contextB();
+  btnA.textContent = a || '拋竿'; btnA.classList.toggle('off', !a);
+  btnB.textContent = b ? b.label : ''; btnB.style.visibility = b ? 'visible' : 'hidden';
+  const bars = document.getElementById('bars'); bars.classList.toggle('show', fish.state === 'reel');
+  if (fish.state === 'reel') { document.querySelector('#tension>div').style.width = fish.tension + '%'; document.querySelector('#dist>div').style.width = (100 - Math.min(100, fish.d)) + '%'; }
+}
+
+// ════════════════ 繪圖：等角地圖視角 ════════════════
+function drawIso(g, t) {
+  const lw = low.width, lh = low.height, pl = state.onBoat ? state.boat : state.player;
+  const c = iso(pl.x, pl.y); const vx = Math.round(c.x - lw / 2), vy = Math.round(c.y - lh / 2);
+  g.fillStyle = TILE_COLOR[T.DEEP]; g.fillRect(0, 0, lw, lh);
+  const sx = Math.max(0, vx), sy = Math.max(0, vy), ex = Math.min(ground.width, vx + lw), ey = Math.min(ground.height, vy + lh);
+  if (ex > sx && ey > sy) g.drawImage(ground, sx, sy, ex - sx, ey - sy, sx - vx, sy - vy, ex - sx, ey - sy);
+  // 水面波光
+  const R = Math.ceil(Math.max(lw / TW, lh / TH)) + 2, px = Math.floor(pl.x), py = Math.floor(pl.y), fr = Math.floor(t * 1.6);
+  g.fillStyle = 'rgba(255,255,255,.55)';
+  for (let y = py - R; y <= py + R; y++) for (let x = px - R; x <= px + R; x++) {
+    const tt = at(x, y); if (!WATER.has(tt)) continue;
+    if (hash(x, y, fr) < .07) { const p = iso(x + hash(x, y, fr + 1), y + .5); g.fillRect(Math.round(p.x - vx), Math.round(p.y - vy), 3, 1); }
+    if (tt === T.RIVER && hash(x, y, 30) < .4) { const p = iso(x + ((t * .6 + hash(x, y, 31)) % 1), y + .5); g.fillRect(Math.round(p.x - vx), Math.round(p.y - vy), 2, 1); }
+  }
+  // 依深度排序的物件
+  const objs = [];
+  const near = o => Math.abs(o.x - pl.x) < R && Math.abs(o.y - pl.y) < R;
+  for (const tr of trees) if (near(tr)) objs.push({ k: tr.x + tr.y, f: () => drawTree(g, tr, vx, vy, t) });
+  for (const r of rocks) if (near(r)) objs.push({ k: r.x + r.y, f: () => drawRock(g, r, vx, vy) });
+  for (const l of lamps) if (near(l)) objs.push({ k: l.x + l.y, f: () => drawLamp(g, l, vx, vy) });
+  for (const b of BUILDINGS) if (near(b)) objs.push({ k: b.x + b.w + b.y + b.h - 1, f: () => drawBuilding(g, b, vx, vy) });
+  objs.push({ k: lighthouse.x + lighthouse.y + 1, f: () => drawLighthouse(g, vx, vy, t) });
+  objs.push({ k: state.boat.x + state.boat.y, f: () => drawBoat(g, vx, vy, t) });
+  if (!state.onBoat) objs.push({ k: state.player.x + state.player.y + .01, f: () => { const p = iso(state.player.x, state.player.y); drawPerson(g, Math.round(p.x - vx), Math.round(p.y - vy - LH), t); } });
+  objs.sort((a, b) => a.k - b.k).forEach(o => o.f());
+  // 時段色調與夜晚燈光
+  const ph = PHASE[phase];
+  if (ph.tint) { g.fillStyle = ph.tint; g.fillRect(0, 0, lw, lh); }
+  if (phase === 'night' || phase === 'dusk') {
+    g.globalCompositeOperation = 'lighter';
+    const glow = (x, y, r, a) => { const p = iso(x, y), gx = p.x - vx, gy = p.y - vy; const gr = g.createRadialGradient(gx, gy, 0, gx, gy, r); gr.addColorStop(0, `rgba(255,200,110,${a})`); gr.addColorStop(1, 'rgba(255,200,110,0)'); g.fillStyle = gr; g.fillRect(gx - r, gy - r, r * 2, r * 2); };
+    const a = phase === 'night' ? .55 : .25;
+    for (const l of lamps) glow(l.x, l.y - .8, 26, a);
+    for (const b of BUILDINGS) glow(b.door[0], b.door[1] - .6, 20, a * .8);
+    glow(lighthouse.x + .5, lighthouse.y - 1.5, 40, a);
+    glow(pl.x, pl.y, 22, a * .6);
+    g.globalCompositeOperation = 'source-over';
+  }
+}
+function drawTree(g, tr, vx, vy, t) {
+  const p = iso(tr.x, tr.y), x = Math.round(p.x - vx), y = Math.round(p.y - vy - LH);
+  const sway = Math.round(Math.sin(t * 1.5 + tr.k * 10) * .6);
+  g.fillStyle = 'rgba(0,0,0,.18)'; g.fillRect(x - 7, y - 1, 14, 3);
+  g.fillStyle = '#6a4224'; g.fillRect(x - 1, y - 9, 3, 9);
+  const c1 = tr.k < .5 ? '#3f8a3a' : '#4f9a3a', c2 = shade(c1, .25), c3 = shade(c1, -.25);
+  g.fillStyle = c3; g.fillRect(x - 7 + sway, y - 19, 15, 10); g.fillRect(x - 5 + sway, y - 22, 11, 15);
+  g.fillStyle = c1; g.fillRect(x - 6 + sway, y - 20, 12, 9); g.fillRect(x - 4 + sway, y - 23, 8, 13);
+  g.fillStyle = c2; g.fillRect(x - 3 + sway, y - 21, 4, 3); g.fillRect(x - 5 + sway, y - 17, 3, 2);
+}
+function drawRock(g, r, vx, vy) { const p = iso(r.x, r.y), x = Math.round(p.x - vx), y = Math.round(p.y - vy - LH); g.fillStyle = '#6a6a72'; g.fillRect(x - 6, y - 7, 12, 7); g.fillRect(x - 4, y - 10, 8, 4); g.fillStyle = '#9a9aa4'; g.fillRect(x - 4, y - 9, 4, 3); }
+function drawLamp(g, l, vx, vy) { const p = iso(l.x, l.y), x = Math.round(p.x - vx), y = Math.round(p.y - vy - LH); g.fillStyle = '#3a3a40'; g.fillRect(x, y - 16, 2, 16); g.fillStyle = phase === 'night' || phase === 'dusk' ? '#ffe680' : '#f0f0e0'; g.fillRect(x - 2, y - 20, 6, 5); g.fillStyle = '#3a3a40'; g.fillRect(x - 2, y - 21, 6, 1); }
+function isoBox(g, x0, y0, w, h, hgt, wall, roof, vx, vy) {
+  const P = (x, y, z = 0) => { const p = iso(x, y); return [Math.round(p.x - vx), Math.round(p.y - vy - LH - z)]; };
+  const poly = (pts, c) => { g.fillStyle = c; g.beginPath(); g.moveTo(...pts[0]); for (const q of pts.slice(1)) g.lineTo(...q); g.closePath(); g.fill(); };
+  poly([P(x0, y0 + h), P(x0 + w, y0 + h), P(x0 + w, y0 + h, hgt), P(x0, y0 + h, hgt)], shade(wall, -.12));      // 左前牆
+  poly([P(x0 + w, y0 + h), P(x0 + w, y0), P(x0 + w, y0, hgt), P(x0 + w, y0 + h, hgt)], shade(wall, -.3));        // 右前牆
+  poly([P(x0, y0, hgt), P(x0 + w, y0, hgt), P(x0 + w, y0 + h, hgt), P(x0, y0 + h, hgt)], roof);
+  return P;
+}
+function drawBuilding(g, b, vx, vy) {
+  const P = isoBox(g, b.x, b.y, b.w, b.h, b.hgt, b.wall, b.roof, vx, vy);
+  // 斜屋頂：中脊
+  const ridge = [P(b.x + .5, b.y + b.h / 2, b.hgt + 8), P(b.x + b.w - .5, b.y + b.h / 2, b.hgt + 8)];
+  g.fillStyle = shade(b.roof, -.15); g.beginPath(); g.moveTo(...P(b.x, b.y + b.h, b.hgt)); g.lineTo(...P(b.x + b.w, b.y + b.h, b.hgt)); g.lineTo(...ridge[1]); g.lineTo(...ridge[0]); g.closePath(); g.fill();
+  g.fillStyle = shade(b.roof, .12); g.beginPath(); g.moveTo(...P(b.x + b.w, b.y + b.h, b.hgt)); g.lineTo(...P(b.x + b.w, b.y, b.hgt)); g.lineTo(...ridge[1]); g.closePath(); g.fill();
+  // 門與窗
+  const [dx, dy] = P(b.door[0], b.y + b.h); g.fillStyle = '#6a4224'; g.fillRect(dx - 3, dy - 9, 6, 9); g.fillStyle = '#ffd56a'; g.fillRect(dx + 1, dy - 5, 1, 1);
+  const win = phase === 'night' || phase === 'dusk' ? '#ffe680' : '#9ad0f0';
+  const [wx, wy] = P(b.x + .5, b.y + b.h); g.fillStyle = win; g.fillRect(wx - 2, wy - 11, 5, 4);
+  const [rx, ry] = P(b.x + b.w, b.y + .7); g.fillRect(rx - 3, ry - 11, 4, 4);
+  if (window.ART) ART.decorateBuilding(g, b, P, phase === 'night' || phase === 'dusk', performance.now() / 1000);
+}
+function drawLighthouse(g, vx, vy, t) {
+  const { x, y } = lighthouse; const p = iso(x + .5, y + .5), cx = Math.round(p.x - vx), cy = Math.round(p.y - vy - LH);
+  for (let k = 0; k < 6; k++) { g.fillStyle = k % 2 ? '#f4f0e8' : '#d0403a'; g.fillRect(cx - 5 + (k >> 1), cy - 6 - k * 6, 10 - (k >> 1) * 2, 6); }
+  g.fillStyle = '#3a3a40'; g.fillRect(cx - 4, cy - 44, 8, 2);
+  const lit = phase === 'night' || phase === 'dusk' || Math.sin(t * 3) > .6;
+  g.fillStyle = lit ? '#fff2a0' : '#c8e8ff'; g.fillRect(cx - 3, cy - 42, 6, 5);
+  g.fillStyle = '#d0403a'; g.fillRect(cx - 4, cy - 46, 8, 2); g.fillRect(cx - 2, cy - 48, 4, 2);
+}
+function drawBoat(g, vx, vy, t) {
+  const b = state.boat, p = iso(b.x, b.y), x = Math.round(p.x - vx), y = Math.round(p.y - vy + Math.sin(t * 2.4) * 1);
+  if (window.ART) { ART.drawBoat(g, x, y, b.ang, prog.boatLv || 0, t, state.onBoat && Math.hypot(b.vx, b.vy) > .5); if (state.onBoat) drawPerson(g, x - 1, y - 2, t, true); return; }
+  const ca = Math.cos(b.ang), sa = Math.sin(b.ang);
+  const R = (u, v) => [x + u * ca - v * sa * .6, y + u * sa * .5 + v * ca * .6];
+  const poly = (pts, c) => { g.fillStyle = c; g.beginPath(); g.moveTo(...R(...pts[0])); for (const q of pts.slice(1)) g.lineTo(...R(...q)); g.closePath(); g.fill(); };
+  g.fillStyle = 'rgba(255,255,255,.35)'; g.fillRect(x - 10, y + 4, 20, 1);
+  poly([[-11, -6], [8, -6], [14, 0], [8, 6], [-11, 6]], '#6a3e1e');
+  poly([[-10, -4], [7, -4], [11, 0], [7, 4], [-10, 4]], '#b07a46');
+  poly([[-4, -4], [-2, -4], [-2, 4], [-4, 4]], '#8a5a30');
+  if (state.onBoat) drawPerson(g, x - 1, y - 2, t, true);
+}
+function drawPerson(g, x, y, t, sitting) {
+  const p = state.player, s = iso(p.fx, p.fy), sdx = s.x - OX, sdy = s.y - OY;
+  const back = sdy < -.1, flip = sdx < 0;
+  if (window.ART) {   // 🎨 美術部像素主角（走路三格動畫）
+    const ph = Math.sin(p.walk), moving = Math.abs(ph) > .35 && !sitting;
+    const frame = !moving ? 0 : (ph > 0 ? 1 : 2);
+    ART.drawPerson(g, x, y - (moving ? 1 : 0) * (frame === 2 ? 1 : 0), { back, flip, frame, sitting, rod: true });
+    return;
+  }
+  const step = sitting ? 0 : Math.round(Math.sin(p.walk) * 1);
+  g.fillStyle = 'rgba(0,0,0,.2)'; if (!sitting) g.fillRect(x - 4, y - 1, 8, 2);
+  if (!sitting) { g.fillStyle = '#3a4a7a'; g.fillRect(x - 3, y - 6, 2, 5 + step); g.fillRect(x + 1, y - 6, 2, 5 - step); }
+  g.fillStyle = '#e8a040'; g.fillRect(x - 4, y - 12, 8, 7);            // 黃色雨衣
+  g.fillStyle = '#c88028'; g.fillRect(x - 4, y - 6, 8, 1);
+  g.fillStyle = '#f6d0a8'; g.fillRect(x - 3, y - 17, 6, 5);            // 臉
+  g.fillStyle = '#2a7a5a'; g.fillRect(x - 4, y - 19, 8, 3); g.fillRect(flip ? x - 6 : x + 2, y - 17, 4, 1);   // 帽子
+  if (!back) { g.fillStyle = '#3a2a18'; g.fillRect(flip ? x - 2 : x, y - 15, 1, 1); g.fillRect(flip ? x + 1 : x + 2, y - 15, 1, 1); }
+  else { g.fillStyle = '#5a3a1e'; g.fillRect(x - 3, y - 16, 6, 3); }
+  g.strokeStyle = '#6a4224'; g.lineWidth = 1; g.beginPath(); g.moveTo(x + (flip ? -3 : 3), y - 9); g.lineTo(x + (flip ? -9 : 9), y - 22); g.stroke();   // 釣竿
+}
+
+// ════════════════ 繪圖：第三人稱釣魚視角（不切視窗）════════════════
+function drawThird(g, t) {
+  const lw = low.width, lh = low.height, ph = PHASE[phase], reg = fish.region || 'harbor';
+  const hz = Math.round(lh * .36);
+  let gr = g.createLinearGradient(0, 0, 0, hz); gr.addColorStop(0, ph.sky[0]); gr.addColorStop(1, ph.sky[1]); g.fillStyle = gr; g.fillRect(0, 0, lw, hz);
+  if (phase === 'night') { for (let i = 0; i < 40; i++) { g.fillStyle = `rgba(255,255,255,${.4 + hash(i, 1) * .6 * (Math.sin(t * 2 + i) * .3 + .7)})`; g.fillRect(hash(i, 2) * lw | 0, hash(i, 3) * hz * .9 | 0, 1, 1); } g.fillStyle = '#fff6d0'; g.fillRect(lw * .78 | 0, hz * .25 | 0, 8, 8); g.fillStyle = ph.sky[0]; g.fillRect((lw * .78 | 0) + 3, (hz * .25 | 0) - 1, 6, 6); }
+  else { g.fillStyle = phase === 'day' ? '#fff8d0' : '#ffd890'; const sy = phase === 'day' ? hz * .2 : hz * .7; g.fillRect(lw * .75 | 0, sy | 0, 10, 10); g.fillRect((lw * .75 | 0) - 2, (sy | 0) + 2, 14, 6); }
+  // 雲
+  if (phase !== 'night') { g.fillStyle = 'rgba(255,255,255,.75)'; for (let i = 0; i < 4; i++) { const cx = ((hash(i, 7) * lw + t * 3 * (1 + i * .3)) % (lw + 40)) - 20, cy = hash(i, 8) * hz * .6 + 6; g.fillRect(cx | 0, cy | 0, 22, 4); g.fillRect((cx | 0) + 4, (cy | 0) - 3, 12, 4); } }
+  // 遠景：依區域
+  const far = { harbor: '#5a7a6a', deep: null, reef: '#e8d49a', lake: '#3a6a3a', river: '#5a6a5a' }[reg];
+  if (far) { g.fillStyle = phase === 'night' ? shade(far, -.6) : far; for (let x = 0; x < lw; x += 2) { const h = (Math.sin(x * .03 + 1) * .5 + Math.sin(x * .011) * .8 + 1.4) * (reg === 'lake' || reg === 'river' ? 9 : 5); g.fillRect(x, hz - h | 0, 2, h + 1 | 0); } }
+  if (reg === 'harbor') { g.fillStyle = phase === 'night' ? '#2a2a3a' : '#c8b8a0'; g.fillRect(lw * .15 | 0, hz - 12, 14, 12); g.fillRect(lw * .22 | 0, hz - 9, 10, 9); g.fillStyle = '#d0403a'; g.fillRect(lw * .3 | 0, hz - 22, 4, 22); }
+  if (reg === 'lake' || reg === 'river') { g.fillStyle = phase === 'night' ? '#1a2a1a' : '#2f6a2f'; for (let i = 0; i < 9; i++) { const x = hash(i, 20) * lw | 0; g.fillRect(x, hz - 16, 6, 10); g.fillRect(x + 2, hz - 20, 2, 6); } }
+  // 水面
+  const wc = { harbor: '#3f8fd0', deep: '#1e3f7a', reef: '#3fc3c0', lake: '#3a9a7a', river: '#4fb0b8' }[reg];
+  const top = phase === 'day' ? shade(wc, .25) : shade(ph.sea, .1);
+  gr = g.createLinearGradient(0, hz, 0, lh); gr.addColorStop(0, top); gr.addColorStop(1, phase === 'night' ? shade(wc, -.65) : shade(wc, -.2)); g.fillStyle = gr; g.fillRect(0, hz, lw, lh - hz);
+  if (phase !== 'day') { g.fillStyle = phase === 'night' ? 'rgba(255,240,200,.25)' : 'rgba(255,200,120,.35)'; for (let k = 0; k < 10; k++) { const yy = hz + 2 + k * k * 1.2; g.fillRect(lw * .78 - 6 + Math.sin(t * 2 + k) * 3 | 0, yy | 0, 12 + k, 1); } }
+  if (reg === 'reef') for (let i = 0; i < 18; i++) { const y = hz + 20 + hash(i, 40) * (lh - hz - 20), x = hash(i, 41) * lw; g.fillStyle = ['rgba(255,138,138,.45)', 'rgba(255,176,112,.45)', 'rgba(224,112,192,.45)'][i % 3]; g.fillRect(x | 0, y | 0, 4 + (y - hz) * .05 | 0, 2); }
+  // 透視波紋線
+  g.fillStyle = 'rgba(255,255,255,.35)';
+  for (let k = 1; k < 26; k++) {
+    const z = k / 26, y = hz + (lh - hz) * z * z; const n = 5 + k;
+    for (let i = 0; i < n; i++) { const x = ((hash(k, i) * lw + t * (6 + k * 2) * (reg === 'river' ? 3 : 1)) % (lw + 20)) - 10; g.fillRect(x | 0, y | 0, 2 + k * .4 | 0, 1); }
+  }
+  // 浮標（越收線越靠近）
+  const near = fish.state === 'reel' ? 1 - fish.d / 110 : 0;
+  const fy0 = hz + (lh - hz) * (.28 + near * .45), fx0 = lw * (.56 - near * .1);
+  let bob = Math.sin(t * 3) * 1.2, sink = 0;
+  if (fish.state === 'cast') { const k = Math.min(1, fish.t / .7); bob = -Math.sin(k * Math.PI) * 30; }
+  if (fish.nib > 0) sink = 2;
+  if (fish.state === 'bite') sink = 6 + Math.sin(t * 30) * 1;
+  const fx = Math.round(fx0 + (fish.state === 'reel' ? Math.sin(t * (fish.struggle ? 14 : 3)) * (fish.struggle ? 6 : 2) : 0)), fy = Math.round(fy0 + bob + sink);
+  // 漣漪
+  g.strokeStyle = 'rgba(255,255,255,.6)'; g.lineWidth = 1;
+  const rip = (t * 1.2) % 1; g.beginPath(); g.ellipse(fx, Math.round(fy0) + 2, 4 + rip * 12, (4 + rip * 12) * .3, 0, 0, 7); g.globalAlpha = 1 - rip; g.stroke(); g.globalAlpha = 1;
+  if (fish.state === 'bite' || (fish.state === 'reel' && fish.struggle)) { g.fillStyle = 'rgba(255,255,255,.85)'; for (let i = 0; i < 6; i++) { const a = t * 8 + i; g.fillRect(fx + Math.cos(a) * 7 | 0, Math.round(fy0) - 2 - Math.abs(Math.sin(a * 1.7)) * 6 | 0, 2, 2); } }
+  if (fish.state !== 'reel') {
+    if (window.ART && fish.state !== 'cast') ART.drawBobber(g, fx, Math.round(fy0), fy - Math.round(fy0));
+    else {
+    g.fillStyle = '#f4f0e8'; g.fillRect(fx - 2, fy - 3, 4, 3);
+    if (sink < 5) { g.fillStyle = '#e8402e'; g.fillRect(fx - 2, fy - 7, 4, 4); g.fillStyle = '#ffd040'; g.fillRect(fx, fy - 10, 1, 3); }
+    }
+  } else if (fish.struggle) { g.fillStyle = shade(fish.catch.def.palette.body, -.2); g.fillRect(fx - 6, Math.round(fy0) - 4, 12, 3); }
+  // 前景：船頭或岸邊
+  if (state.onBoat) { g.fillStyle = '#6a3e1e'; g.beginPath(); g.moveTo(0, lh); g.lineTo(lw * .1, lh * .82); g.lineTo(lw * .55, lh * .8); g.lineTo(lw * .7, lh); g.fill(); g.fillStyle = '#b07a46'; g.beginPath(); g.moveTo(0, lh); g.lineTo(lw * .12, lh * .86); g.lineTo(lw * .52, lh * .84); g.lineTo(lw * .64, lh); g.fill(); }
+  else { const col = fish.region === 'lake' || fish.region === 'river' ? '#5a9a3a' : '#c8a870'; g.fillStyle = col; g.fillRect(0, lh * .9 | 0, lw * .5 | 0, lh); g.fillStyle = shade(col, -.25); g.fillRect(0, lh * .9 | 0, lw * .5 | 0, 2); }
+  // 主角背影（第三人稱）
+  const s = Math.max(2, Math.round(lh / 120)), bx = Math.round(lw * .28), by = Math.round(lh * .98);
+  const R = (x, y, w, h, c) => { g.fillStyle = c; g.fillRect(bx + x * s, by + y * s, w * s, h * s); };
+  const pull = fish.state === 'reel' && holding ? 1 : 0;
+  let hx, hy;
+  if (window.ART) {   // 🎨 美術部像素背影：拋竿舉手、拉竿雙手上提
+    const pose = fish.state === 'cast' && fish.t < .35 ? 'cast' : (pull || fish.state === 'bite' && holding) ? 'pull' : 'idle';
+    [hx, hy] = ART.drawThirdPerson(g, bx, by, s, pose);
+  } else {
+  R(-6, -22, 12, 14, '#e8a040'); R(-6, -9, 12, 2, '#c88028'); R(-7, -20, 2, 9, '#d89030'); R(5, -20, 2, 9, '#d89030');
+  R(-4, -29, 8, 7, '#5a3a1e'); R(-6, -31, 12, 3, '#2a7a5a'); R(-5, -34, 10, 3, '#2a7a5a');
+  R(5, -16 - pull * 2, 3, 3, '#f6d0a8');
+  hx = bx + 7 * s; hy = by + (-15 - pull * 2) * s;
+  }
+  // 釣竿與釣線
+  const bend = fish.state === 'reel' ? (fish.tension / 100) * 0.5 + (fish.struggle ? .15 : 0) : fish.state === 'bite' ? .2 : 0;
+  const tipX = lerp(hx + lw * .22, fx, bend * .5), tipY = lerp(by - lh * .55, fy, bend * .6);
+  g.strokeStyle = '#6a4224'; g.lineWidth = Math.max(1, s * .8); g.beginPath(); g.moveTo(hx, hy); g.quadraticCurveTo(hx + (tipX - hx) * .5, hy + (tipY - hy) * .3, tipX, tipY); g.stroke();
+  g.strokeStyle = 'rgba(255,255,255,.75)'; g.lineWidth = 1; g.beginPath(); g.moveTo(tipX, tipY);
+  const sag = fish.state === 'reel' ? 4 * (1 - fish.tension / 100) : 14; g.quadraticCurveTo((tipX + fx) / 2, Math.max(tipY, fy) + sag, fx, fy - 6); g.stroke();
+  // 時段色調
+  if (phase === 'night') { g.fillStyle = 'rgba(10,16,50,.25)'; g.fillRect(0, 0, lw, lh); }
+}
+const lerp = (a, b, k) => a + (b - a) * k;
+
+// ════════════════ 魚的像素圖（優先用 GPT 的 SVG 像素圖，否則用程式畫的暫用圖）════════════════
+const fishImg = {};
+const fishTried = {};
+function drawFishTo(cvs, def) {
+  const g = cvs.getContext('2d'); g.imageSmoothingEnabled = false; g.clearRect(0, 0, 64, 32);
+  if (fishImg[def.id]) { g.drawImage(fishImg[def.id], 0, 0, 64, 32); return; }
+  if (!fishTried[def.id]) {
+    fishTried[def.id] = 1;
+    // GPT 交的是 SVG 像素圖（2026-006）；沒有 SVG 時再試 fish.json 的 PNG，都沒有就用下面程式畫的暫用圖
+    const im = new Image(); let triedPng = false;
+    im.onload = () => { fishImg[def.id] = im; drawFishTo(cvs, def); };
+    im.onerror = () => { if (!triedPng && def.image) { triedPng = true; im.src = 'assets/fish/' + def.image; } };
+    im.src = 'assets/fish/' + def.id + '.svg';
+  }
+  const P = def.palette, px = (x, y, w, h, c) => { g.fillStyle = c; g.fillRect(x, y, w, h); };
+  const body = (cx, cy, rx, ry) => { for (let y = -ry; y <= ry; y++) { const w = Math.round(rx * Math.sqrt(1 - (y / (ry + .5)) ** 2)); px(cx - w, cy + y, w * 2, 1, y > ry * .25 ? P.belly : P.body); } px(cx - rx + 2, cy - ry + 1, rx * 2 - 6, 1, shade(P.body, .25)); };
+  const eye = (x, y) => { px(x, y, 2, 2, '#fff'); px(x + 1, y + 1, 1, 1, '#111'); };
+  const tail = (x, cy, h) => { for (let i = 0; i < 6; i++) px(x - i, cy - Math.round(h * i / 6) - 1, 1, Math.round(h * i / 3) + 2, P.fin); };
+  switch (def.shape) {
+    case 'round': body(30, 16, 15, 9); tail(15, 16, 7); px(26, 6, 8, 2, P.fin); eye(38, 13); px(30, 13, 1, 7, P.accent); break;
+    case 'flat': body(30, 16, 13, 11); tail(17, 16, 7); px(24, 4, 10, 2, P.fin); px(24, 27, 10, 2, P.fin); eye(37, 12); px(28, 9, 2, 14, P.accent); break;
+    case 'long': body(28, 16, 18, 5); tail(10, 16, 7); px(46, 15, 14, 2, P.fin); px(22, 9, 10, 2, P.accent); eye(40, 14); break;
+    case 'eel': for (let x = 6; x < 58; x++) { const y = 16 + Math.round(Math.sin(x / 6) * 3); px(x, y - 2, 1, 5, x % 7 ? P.body : P.accent); px(x, y + 2, 1, 1, P.belly); } eye(54, 14); break;
+    case 'shark': body(30, 17, 20, 6); tail(10, 16, 10); px(26, 6, 6, 5, P.fin); px(28, 4, 3, 2, P.fin); eye(44, 15); px(44, 19, 4, 1, '#222'); break;
+    case 'ray': for (let y = -10; y <= 10; y++) { const w = 22 - Math.abs(y) * 2; px(32 - w, 16 + y, w * 2, 1, Math.abs(y) < 3 ? P.body : shade(P.body, -.12)); } px(8, 16, 14, 1, P.fin); eye(40, 13); eye(40, 18); break;
+    case 'squid': body(22, 16, 12, 6); for (let k = 0; k < 6; k++) px(34, 11 + k * 2, 18 + (k % 2) * 6, 1, P.accent); eye(30, 13); break;
+    case 'crab': body(32, 18, 12, 6); px(14, 10, 6, 5, P.body); px(44, 10, 6, 5, P.body); for (let k = 0; k < 3; k++) { px(18 + k * 4, 24, 1, 5, P.fin); px(42 - k * 4, 24, 1, 5, P.fin); } eye(28, 10); eye(34, 10); break;
+    case 'turtle': body(30, 17, 13, 8); px(22, 12, 16, 8, P.accent); px(43, 14, 7, 5, P.body); px(18, 23, 4, 3, P.body); px(38, 23, 4, 3, P.body); eye(46, 15); break;
+    case 'seahorse': for (let y = 4; y < 28; y++) { const x = 30 + Math.round(Math.sin(y / 5) * 4); px(x, y, 6 - (y > 20 ? 3 : 0), 1, y % 4 ? P.body : P.accent); } px(36, 5, 8, 3, P.body); eye(33, 6); break;
+    case 'myth': body(30, 16, 17, 9); tail(13, 16, 10); for (let k = 0; k < 5; k++) px(22 + k * 4, 5 - (k % 2) * 2, 2, 4 + (k % 2) * 2, P.accent); px(24, 13, 14, 1, P.accent); eye(40, 13); px(46, 18, 6, 1, P.accent); break;
+    default: body(30, 16, 18, 6); tail(12, 16, 7); px(26, 8, 8, 2, P.fin); px(16, 15, 24, 1, P.accent); eye(42, 14);
+  }
+  if (def.rarity === 'epic' || def.rarity === 'legendary') for (let k = 0; k < 6; k++) px(hash(k, def.id.length) * 60 | 0, hash(k, 3) * 30 | 0, 1, 1, '#fff6a0');
+}
+
+// ════════════════ 主迴圈 ════════════════
+let last = performance.now();
+function frame(now) {
+  const dt = Math.min(.05, (now - last) / 1000); last = now; const t = now / 1000;
+  update(dt);
+  lx.imageSmoothingEnabled = false;
+  if (viewMix < .99) drawIso(lx, t);
+  if (viewMix > .01) {
+    if (viewMix < .99) { lx.save(); lx.globalAlpha = viewMix; }
+    drawThird(lx, t);
+    if (viewMix < .99) lx.restore();
+  }
+  ctx.imageSmoothingEnabled = false; ctx.setTransform(1, 0, 0, 1, 0, 0);
+  ctx.drawImage(low, 0, 0, low.width, low.height, 0, 0, low.width * PIX * DPR, low.height * PIX * DPR);
+  // 建築名稱（高解析度文字）
+  if (viewMix < .5 && !state.onBoat) {
+    const pl = state.player, c = iso(pl.x, pl.y), vx = c.x - low.width / 2, vy = c.y - low.height / 2;
+    ctx.font = `bold ${12 * DPR}px sans-serif`; ctx.textAlign = 'center'; ctx.lineWidth = 3 * DPR;
+    for (const b of BUILDINGS) { if (Math.hypot(b.door[0] - pl.x, b.door[1] - pl.y) > 6) continue; const p = iso(b.x + b.w / 2, b.y + b.h / 2); const sx = (p.x - vx) * PIX * DPR, sy = (p.y - vy - LH - b.hgt - 14) * PIX * DPR; ctx.strokeStyle = '#3a2a18'; ctx.strokeText(b.sign + ' ' + b.name, sx, sy); ctx.fillStyle = '#fff6dd'; ctx.fillText(b.sign + ' ' + b.name, sx, sy); }
+  }
+  if ((hudTick += dt) > .12) { hudTick = 0; updateHud(); drawMini(); }
+  requestAnimationFrame(frame);
+}
+load(); applyGear(); updateHud(); drawMini(); setInterval(save, 10000); addEventListener('pagehide', save);
+toast('歡迎來到漁港鎮！走到碼頭盡頭「上船」出海，或在水邊直接「拋竿」', 3200);
+if (params.get('demo') === 'boat') { state.onBoat = true; }
+window.__game = { state, fish, FISH, docks, BUILDINGS, prog, ACH, save, applyGear, openBuilding };   // 給測試用
+requestAnimationFrame(frame);
+</script>
+</body>
+</html>
