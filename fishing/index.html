@@ -310,11 +310,18 @@ let phase = phaseNow();
 // ════════════════ 畫布 ════════════════
 const cv = document.getElementById('c'), ctx = cv.getContext('2d');
 const low = document.createElement('canvas'), lx = low.getContext('2d');
+// 平滑鏡頭：背景依小數位移，主角（或船）單獨畫，前面擋住主角的樹和房子另畫一層
+const lowF = document.createElement('canvas'), lfx = lowF.getContext('2d');
+const low3 = document.createElement('canvas'), l3x = low3.getContext('2d');
+const pcv = document.createElement('canvas'); pcv.width = 128; pcv.height = 128; const pgx = pcv.getContext('2d');
+const PC_X = 64, PC_Y = 88;                      // 主角圖層的錨點
+let cam = { vx: 0, vy: 0, fx: 0, fy: 0, px: 0, py: 0 };
 let W, H, PIX, DPR;
 function resize() {
   DPR = Math.min(devicePixelRatio || 1, 2); W = innerWidth; H = innerHeight;
   cv.width = W * DPR; cv.height = H * DPR; PIX = W < 700 ? 2 : 3;
-  low.width = Math.ceil(W / PIX); low.height = Math.ceil(H / PIX);
+  low.width = Math.ceil(W / PIX) + 1; low.height = Math.ceil(H / PIX) + 1;
+  for (const c of [lowF, low3]) { c.width = low.width; c.height = low.height; }
 }
 addEventListener('resize', resize); resize();
 
@@ -709,7 +716,7 @@ function update(dt) {
       const ok = (x, y) => walkable(x - r, y - r) && walkable(x + r, y - r) && walkable(x - r, y + r) && walkable(x + r, y + r);
       if (ok(p.x + d.x * sp, p.y)) p.x += d.x * sp;
       if (ok(p.x, p.y + d.y * sp)) p.y += d.y * sp;
-      p.walk += dt * 8 * mag;
+      p.walk += dt * 11 * mag;
     }
   }
   if (state.onBoat || Math.hypot(b.vx, b.vy) > .01) {
@@ -750,9 +757,11 @@ function updateHud() {
 }
 
 // ════════════════ 繪圖：等角地圖視角 ════════════════
-function drawIso(g, t) {
+function drawIso(g, gf, t) {
   const lw = low.width, lh = low.height, pl = state.onBoat ? state.boat : state.player;
-  const c = iso(pl.x, pl.y); const vx = Math.round(c.x - lw / 2), vy = Math.round(c.y - lh / 2);
+  const c = iso(pl.x, pl.y), camX = c.x - W / PIX / 2, camY = c.y - H / PIX / 2;
+  const vx = Math.floor(camX), vy = Math.floor(camY);
+  cam.vx = vx; cam.vy = vy; cam.fx = camX - vx; cam.fy = camY - vy;
   g.fillStyle = TILE_COLOR[T.DEEP]; g.fillRect(0, 0, lw, lh);
   const sx = Math.max(0, vx), sy = Math.max(0, vy), ex = Math.min(ground.width, vx + lw), ey = Math.min(ground.height, vy + lh);
   if (ex > sx && ey > sy) g.drawImage(ground, sx, sy, ex - sx, ey - sy, sx - vx, sy - vy, ex - sx, ey - sy);
@@ -767,17 +776,26 @@ function drawIso(g, t) {
   // 依深度排序的物件
   const objs = [];
   const near = o => Math.abs(o.x - pl.x) < R && Math.abs(o.y - pl.y) < R;
-  for (const tr of trees) if (near(tr)) objs.push({ k: tr.x + tr.y, f: () => drawTree(g, tr, vx, vy, t) });
-  for (const r of rocks) if (near(r)) objs.push({ k: r.x + r.y, f: () => drawRock(g, r, vx, vy) });
-  for (const l of lamps) if (near(l)) objs.push({ k: l.x + l.y, f: () => drawLamp(g, l, vx, vy) });
-  for (const b of BUILDINGS) if (near(b)) objs.push({ k: b.x + b.w + b.y + b.h - 1, f: () => drawBuilding(g, b, vx, vy) });
-  objs.push({ k: lighthouse.x + lighthouse.y + 1, f: () => drawLighthouse(g, vx, vy, t) });
-  objs.push({ k: state.boat.x + state.boat.y, f: () => drawBoat(g, vx, vy, t) });
-  if (!state.onBoat) objs.push({ k: state.player.x + state.player.y + .01, f: () => { const p = iso(state.player.x, state.player.y); drawPerson(g, Math.round(p.x - vx), Math.round(p.y - vy - LH), t); } });
-  objs.sort((a, b) => a.k - b.k).forEach(o => o.f());
+  for (const tr of trees) if (near(tr)) objs.push({ k: tr.x + tr.y, f: G => drawTree(G, tr, vx, vy, t) });
+  for (const r of rocks) if (near(r)) objs.push({ k: r.x + r.y, f: G => drawRock(G, r, vx, vy) });
+  for (const l of lamps) if (near(l)) objs.push({ k: l.x + l.y, f: G => drawLamp(G, l, vx, vy) });
+  for (const b of BUILDINGS) if (near(b)) objs.push({ k: b.x + b.w + b.y + b.h - 1, f: G => drawBuilding(G, b, vx, vy) });
+  objs.push({ k: lighthouse.x + lighthouse.y + 1, f: G => drawLighthouse(G, vx, vy, t) });
+  if (!state.onBoat) objs.push({ k: state.boat.x + state.boat.y, f: G => drawBoat(G, vx, vy, t) });
+  // 主角（在船上就是整艘船）不貼齊像素格，畫在自己的圖層，鏡頭跟著它平滑移動
+  const focusK = state.onBoat ? state.boat.x + state.boat.y : state.player.x + state.player.y + .01;
+  pgx.imageSmoothingEnabled = false; pgx.clearRect(0, 0, pcv.width, pcv.height);
+  if (state.onBoat) { const p = iso(state.boat.x, state.boat.y); drawBoat(pgx, p.x - PC_X, p.y - PC_Y, t); cam.px = p.x - PC_X - vx; cam.py = p.y - PC_Y - vy; }
+  else { const p = iso(state.player.x, state.player.y); drawPerson(pgx, PC_X, PC_Y, t); cam.px = p.x - PC_X - vx; cam.py = p.y - LH - PC_Y - vy; }
+  gf.imageSmoothingEnabled = false; gf.clearRect(0, 0, lw, lh);
+  objs.sort((a, b) => a.k - b.k).forEach(o => o.f(o.k > focusK ? gf : g));
+}
+// 時段色調與夜晚燈光：畫在最上面，主角也會被染色
+function drawIsoFx(g) {
+  const lw = low.width, lh = low.height, pl = state.onBoat ? state.boat : state.player, vx = cam.vx, vy = cam.vy;
   // 時段色調與夜晚燈光
   const ph = PHASE[phase];
-  if (ph.tint) { g.fillStyle = ph.tint; g.fillRect(0, 0, lw, lh); }
+  if (ph.tint) { g.fillStyle = ph.tint; g.fillRect(-2, -2, lw + 4, lh + 4); }
   if (phase === 'night' || phase === 'dusk') {
     g.globalCompositeOperation = 'lighter';
     const glow = (x, y, r, a) => { const p = iso(x, y), gx = p.x - vx, gy = p.y - vy; const gr = g.createRadialGradient(gx, gy, 0, gx, gy, r); gr.addColorStop(0, `rgba(255,200,110,${a})`); gr.addColorStop(1, 'rgba(255,200,110,0)'); g.fillStyle = gr; g.fillRect(gx - r, gy - r, r * 2, r * 2); };
@@ -984,31 +1002,31 @@ let last = performance.now();
 function frame(now) {
   const dt = Math.min(.05, (now - last) / 1000); last = now; const t = now / 1000;
   update(dt);
-  lx.imageSmoothingEnabled = false;
-  if (viewMix < .99) drawIso(lx, t);
-  if (viewMix > .01) {
-    if (viewMix < .99) { lx.save(); lx.globalAlpha = viewMix; }
-    drawThird(lx, t);
-    if (viewMix < .99) lx.restore();
-  }
+  const isoOn = viewMix < .99, thirdOn = viewMix > .01, S = PIX * DPR;
+  lx.imageSmoothingEnabled = false; l3x.imageSmoothingEnabled = false;
+  if (isoOn) drawIso(lx, lfx, t);
+  if (thirdOn) drawThird(l3x, t);
   ctx.imageSmoothingEnabled = false; ctx.setTransform(1, 0, 0, 1, 0, 0);
   // 暈船：整個畫面跟著搖晃（釣魚視角晃得更明顯），再蓋一層淡綠色
-  const sk = sickAmount();
-  if (sk > 0) {
-    const amp = sk * (.45 + .55 * viewMix), cw = cv.width, ch = cv.height;
-    const ang = Math.sin(t * 1.3) * .05 * amp, dx = Math.sin(t * .7) * cw * .015 * amp, dy = Math.sin(t * .9 + 1) * ch * .02 * amp, z = 1 + .18 * amp;
-    ctx.fillStyle = '#1b2a44'; ctx.fillRect(0, 0, cw, ch);
-    ctx.translate(cw / 2 + dx, ch / 2 + dy); ctx.rotate(ang); ctx.scale(z, z); ctx.translate(-cw / 2, -ch / 2);
+  const sk = sickAmount(), cw = cv.width, ch = cv.height;
+  const amp = sk * (.45 + .55 * viewMix);
+  const sway = sk > 0 ? { ang: Math.sin(t * 1.3) * .05 * amp, dx: Math.sin(t * .7) * cw * .015 * amp, dy: Math.sin(t * .9 + 1) * ch * .02 * amp, z: 1 + .18 * amp } : null;
+  const base = () => { ctx.setTransform(1, 0, 0, 1, 0, 0); if (sway) { ctx.translate(cw / 2 + sway.dx, ch / 2 + sway.dy); ctx.rotate(sway.ang); ctx.scale(sway.z, sway.z); ctx.translate(-cw / 2, -ch / 2); } };
+  if (sway) { ctx.fillStyle = '#1b2a44'; ctx.fillRect(0, 0, cw, ch); }
+  if (isoOn) {   // 背景 → 主角 → 擋在主角前面的物件 → 時段光線，全部用同一個小數位移
+    base(); ctx.translate(-cam.fx * S, -cam.fy * S); ctx.scale(S, S);
+    ctx.drawImage(low, 0, 0); ctx.drawImage(pcv, cam.px, cam.py); ctx.drawImage(lowF, 0, 0); drawIsoFx(ctx);
   }
-  ctx.drawImage(low, 0, 0, low.width, low.height, 0, 0, low.width * PIX * DPR, low.height * PIX * DPR);
+  if (thirdOn) { base(); ctx.scale(S, S); ctx.globalAlpha = isoOn ? viewMix : 1; ctx.drawImage(low3, 0, 0); ctx.globalAlpha = 1; }
   if (sk > 0) { ctx.setTransform(1, 0, 0, 1, 0, 0); ctx.fillStyle = `rgba(110,170,60,${.16 * sk})`; ctx.fillRect(0, 0, cv.width, cv.height); }
   // 建築名稱（高解析度文字）
   if (viewMix < .5 && !state.onBoat) {
-    const pl = state.player, c = iso(pl.x, pl.y), vx = c.x - low.width / 2, vy = c.y - low.height / 2;
+    const pl = state.player, vx = cam.vx + cam.fx, vy = cam.vy + cam.fy;
     ctx.font = `bold ${12 * DPR}px sans-serif`; ctx.textAlign = 'center'; ctx.lineWidth = 3 * DPR;
     for (const b of BUILDINGS) { if (Math.hypot(b.door[0] - pl.x, b.door[1] - pl.y) > 6) continue; const p = iso(b.x + b.w / 2, b.y + b.h / 2); const sx = (p.x - vx) * PIX * DPR, sy = (p.y - vy - LH - b.hgt - 14) * PIX * DPR; ctx.strokeStyle = '#3a2a18'; ctx.strokeText(b.sign + ' ' + b.name, sx, sy); ctx.fillStyle = '#fff6dd'; ctx.fillText(b.sign + ' ' + b.name, sx, sy); }
   }
-  if ((hudTick += dt) > .12) { hudTick = 0; updateHud(); drawMini(); }
+  drawMini();   // 小地圖每格都更新，才不會一跳一跳
+  if ((hudTick += dt) > .12) { hudTick = 0; updateHud(); }
   requestAnimationFrame(frame);
 }
 load(); applyGear(); updateHud(); drawMini(); setInterval(save, 10000); addEventListener('pagehide', save);
