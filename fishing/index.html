@@ -129,6 +129,15 @@
   .rank tr.me { background: #ffe7b0; font-weight: 800; } .rank td.sc { text-align: right; font-weight: 800; }
   /* 頒獎動畫 */
   #cut.overlay.show { display: block; background: #000; z-index: 40; }
+  /* 水族館 */
+  #aquarium.overlay.show { display: block; background: #0a2a4a; z-index: 18; }
+  #aqCv { position: absolute; inset: 0; width: 100%; height: 100%; image-rendering: pixelated; touch-action: none; }
+  .aqBar { position: absolute; left: 0; right: 0; top: 0; padding: calc(8px + env(safe-area-inset-top)) 10px 8px; display: flex; align-items: center; gap: 6px; background: linear-gradient(#0a1e34ee, #0a1e3400); color: #fff6dd; font-weight: 900; }
+  .aqBar .ttl { font-size: 16px; text-shadow: 0 2px 0 #000; flex: 1; }
+  .aqBar button, .aqBtm button { font-size: 13px; padding: 5px 10px; border: 2px solid #6b4a2a; border-radius: 10px; background: #ffd56a; font-weight: 800; color: #4a2e12; box-shadow: 0 2px 0 #6b4a2a; }
+  .aqBtm { position: absolute; left: 0; right: 0; bottom: 0; padding: 8px 10px calc(10px + env(safe-area-inset-bottom)); display: flex; justify-content: center; gap: 8px; }
+  #aqLabel { position: absolute; transform: translate(-50%, -100%); background: rgba(10,20,40,.85); color: #fff6dd; font-size: 12px; font-weight: 800; padding: 3px 8px; border-radius: 8px; pointer-events: none; white-space: nowrap; display: none; }
+  #aqEmpty { position: absolute; left: 0; right: 0; top: 42%; text-align: center; color: #d8f0ff; font-weight: 800; font-size: 15px; text-shadow: 0 2px 0 #000; pointer-events: none; }
   #cut canvas { position: absolute; inset: 0; width: 100%; height: 100%; image-rendering: pixelated; }
   #cut .t { position: absolute; left: 0; right: 0; text-align: center; color: #fff6dd; font-weight: 900; text-shadow: 0 2px 0 #3a2a18, 0 0 8px #000; pointer-events: none; transition: opacity .4s; padding: 0 12px; }
   #statusChip.sick { background: #d8f0b0; border-color: #4a7a2a; box-shadow: 0 2px 0 #4a7a2a; color: #2a4a14; }
@@ -168,6 +177,9 @@
   <button id="closeMap">關閉</button>
 </div></div>
 <div class="overlay" id="panel"><div class="card" id="panelCard"></div></div>
+<div class="overlay" id="aquarium"><canvas id="aqCv"></canvas><div id="aqLabel"></div><div id="aqEmpty"></div>
+  <div class="aqBar"><span class="ttl">🐠 我的水族館 <small id="aqCount"></small></span><button id="aqClose">離開</button></div>
+  <div class="aqBtm"><button id="aqAdd">＋ 放魚進去</button><button id="aqManage" style="background:#bfe6ff">📋 管理</button></div></div>
 <div class="overlay" id="cut"><canvas id="cutCv"></canvas><div class="t" id="cutTitle" style="font-size:18px"></div><div class="t" id="cutName" style="font-size:22px"></div><div class="t" id="cutPlaque" style="font-size:13px"></div><div class="t" id="cutCap" style="font-size:16px"></div></div>
 <div class="overlay" id="fishDetail"><div class="card" id="fishDetailCard"></div></div>
 <div class="overlay" id="badgePop"><div class="card" id="badgeCard"></div></div>
@@ -281,6 +293,7 @@ const BUILDINGS = [
   { id: 'market', name: '魚市', x: 62, y: 61, w: 3, h: 2, hgt: 14, wall: '#e8e2d0', roof: '#3a78c0', sign: '🐟' },
   { id: 'home', name: '我的小屋', x: 56, y: 66, w: 2, h: 2, hgt: 14, wall: '#f4e6c8', roof: '#4a9a5a', sign: '🏠' },
   { id: 'board', name: '圖鑑館', x: 63, y: 67, w: 2, h: 2, hgt: 15, wall: '#efe0d0', roof: '#9a5ab0', sign: '📖' },
+  { id: 'aquarium', name: '水族館', x: 60, y: 63, w: 3, h: 2, hgt: 18, wall: '#e4f2fa', roof: '#2a78b0', sign: '🐠' },   // 小鎮廣場正中間
 ];
 // 服飾店：放在其他島的碼頭附近（翠湖森林島、溪谷山島），並鋪一條石板路接到碼頭
 function placeShop(dock, w, h) {
@@ -853,11 +866,14 @@ const ACH = [
   ['contest1', '🎫 初次參賽', '參加一次釣魚協會評比大賽', s => (s.contestN || 0) >= 1],
   ['podium', '🎖️ 登上頒獎台', '評比大賽拿到前三名', s => s.contestBest > 0 && s.contestBest <= 3],
   ['champion', '🏆 評比冠軍', '評比大賽拿到第一名', s => s.contestBest === 1],
+  ['aq1', '🐠 水族館開幕', '在水族館放進第一條魚', s => (s.aquarium || []).length >= 1],
+  ['aqleg', '✨ 傳說展示', '水族館裡養一條傳說魚', s => (s.aquarium || []).some(f => FISH_BY_ID[f.id] && FISH_BY_ID[f.id].rarity === 'legendary')],
+  ['aq20', '🐋 海洋館長', '水族館養到 20 條魚', s => (s.aquarium || []).length >= 20],
 ];
 // 徽章等級：bronze 銅、silver 銀、gold 金、rainbow 彩虹（最難）
 const TIER = { first: 'bronze', c10: 'bronze', c50: 'silver', c200: 'gold', d10: 'bronze', d30: 'silver', d60: 'gold', dall: 'rainbow',
   r_harbor: 'bronze', r_lake: 'bronze', r_river: 'bronze', r_reef: 'silver', r_deep: 'silver', t_dawn: 'bronze', t_dusk: 'bronze', t_night: 'silver',
-  rare: 'silver', epic: 'gold', legend: 'gold', legend_all: 'rainbow', w10: 'silver', w100: 'gold', m1000: 'bronze', m10000: 'gold', rod: 'bronze', boat: 'bronze', style1: 'bronze', style10: 'gold', wx_rain: 'bronze', wx_typhoon: 'gold', wx_special: 'silver', drift10: 'silver', contest1: 'bronze', podium: 'silver', champion: 'gold', r_cold: 'silver', r_mangrove: 'bronze', r_volcano: 'silver' };
+  rare: 'silver', epic: 'gold', legend: 'gold', legend_all: 'rainbow', w10: 'silver', w100: 'gold', m1000: 'bronze', m10000: 'gold', rod: 'bronze', boat: 'bronze', style1: 'bronze', style10: 'gold', wx_rain: 'bronze', wx_typhoon: 'gold', wx_special: 'silver', drift10: 'silver', contest1: 'bronze', podium: 'silver', champion: 'gold', r_cold: 'silver', r_mangrove: 'bronze', r_volcano: 'silver', aq1: 'bronze', aqleg: 'silver', aq20: 'gold' };
 const TIER_NAME = { bronze: '銅', silver: '銀', gold: '金', rainbow: '彩虹' };
 const achParts = a => { const i = a[1].indexOf(' '); return { id: a[0], icon: a[1].slice(0, i), title: a[1].slice(i + 1), desc: a[2], tier: TIER[a[0]] || 'bronze' }; };
 const medalHtml = (b, got) => `<div class="medal ${got ? b.tier : 'lock'}"><i>${got ? b.icon : '？'}</i></div>`;
@@ -879,7 +895,7 @@ function showNextBadge() {
   document.getElementById('badgeBook').onclick = () => { badgeQueue.length = 0; pop.classList.remove('show'); openDex('ach'); };
 }
 const SAVE_KEY = 'bay-fishing-save-v1';
-const prog = { dex: {}, ach: {}, catches: 0, region: {}, time: {}, rar: {}, maxW: 0, earned: 0, rodIdx: 0, boatLv: 0, bait: 0, pills: 0, look: null, closet: [], wxc: {}, drift: 0, contest: {}, contestN: 0, contestBest: 0, contestWins: 0 };
+const prog = { dex: {}, ach: {}, catches: 0, region: {}, time: {}, rar: {}, maxW: 0, earned: 0, rodIdx: 0, boatLv: 0, bait: 0, pills: 0, look: null, closet: [], wxc: {}, drift: 0, contest: {}, contestN: 0, contestBest: 0, contestWins: 0, aquarium: [] };
 function save() {
   try { localStorage.setItem(SAVE_KEY, JSON.stringify({ v: 1, mapV: 2, coins: state.coins, bag: state.bag, prog, pos: { x: state.player.x, y: state.player.y, bx: state.boat.x, by: state.boat.y, onBoat: state.onBoat } })); } catch (e) {}
 }
@@ -931,7 +947,7 @@ function showPanel(html) {
   document.getElementById('closePanel').onclick = () => panelEl().classList.remove('show');
 }
 const FISH_BY_ID = Object.fromEntries(FISH.map(f => [f.id, f]));
-function openBuilding(b) { ({ shop: openShop, market: openMarket, home: openHome, board: openDex, tailorA: () => openTailor(b), tailorB: () => openTailor(b), guild: () => openGuild() })[b.id](); }
+function openBuilding(b) { ({ shop: openShop, market: openMarket, home: openHome, board: openDex, tailorA: () => openTailor(b), tailorB: () => openTailor(b), guild: () => openGuild(), aquarium: () => openAquarium() })[b.id](); }
 function openMarket() {
   const total = state.bag.reduce((a, f) => a + f.price, 0);
   const rows = state.bag.map((f, i) => { const d = FISH_BY_ID[f.id]; return `<div class="row"><span><b style="color:${RAR[d.rarity].color}">${d.name}</b> ${fmtW(f.w)}・${f.l} cm</span><button data-sell="${i}">賣 🪙${f.price}</button></div>`; }).join('');
@@ -1212,6 +1228,96 @@ function openTailor(b, keep) {
 }
 // ── 圖鑑：點魚放大介紹（左右箭頭看上一條／下一條）──
 const DEX_ORDER = ['common', 'uncommon', 'rare', 'epic', 'legendary'].flatMap(r => FISH.filter(f => f.rarity === r));
+// ════════════════ 🐠 水族館：把釣到的魚放進超大水族箱，看牠們游 ════════════════
+const AQ_CAP = 30;
+let aq = null;
+const BOTTOM_SHAPES = new Set(['crab', 'ray', 'turtle']);
+function aqFish(f) {   // 水族箱裡的一條魚（位置、速度、要游去哪）
+  const def = FISH_BY_ID[f.id], img = document.createElement('canvas'); img.width = 64; img.height = 32; drawFishTo(img, def);
+  const W2 = aq.W, H2 = aq.H, w = clamp(12 + Math.log10(Math.max(3, f.l)) * 15, 16, 66);
+  return { f, def, img, w, h: w / 2, x: rand(w, W2 - w), y: BOTTOM_SHAPES.has(def.shape) ? aq.sandY - w * .2 : rand(H2 * .2, H2 * .75), vx: rand(-8, 8), vy: 0, tx: 0, ty: 0, ph: Math.random() * 6, bottom: BOTTOM_SHAPES.has(def.shape), wait: 0 };
+}
+function aqTarget(o) { const W2 = aq.W, H2 = aq.H; o.tx = rand(o.w * .6, W2 - o.w * .6); o.ty = o.bottom ? aq.sandY - o.h * .35 : rand(H2 * .16, aq.sandY - o.h); }
+function openAquarium() {
+  const cv2 = document.getElementById('aqCv'); cv2.width = 200; cv2.height = Math.round(200 * innerHeight / innerWidth);
+  aq = { W: cv2.width, H: cv2.height, t: 0, fish: [], bubbles: [], label: null };
+  aq.sandY = Math.round(aq.H * .84);
+  aq.fish = prog.aquarium.map(aqFish); aq.fish.forEach(aqTarget);
+  aq.weeds = Array.from({ length: 9 }, (_, i) => ({ x: 8 + i * (aq.W - 16) / 8 + rand(-6, 6), h: rand(aq.H * .12, aq.H * .3), c: ['#2f8a4a', '#3aa060', '#5ab070', '#2a7a5a'][i % 4] }));
+  document.getElementById('aquarium').classList.add('show'); aqHud();
+}
+function aqHud() {
+  document.getElementById('aqCount').textContent = `🐟 ${prog.aquarium.length} / ${AQ_CAP}`;
+  document.getElementById('aqEmpty').textContent = prog.aquarium.length ? '' : '水族箱還是空的～按下面「放魚進去」，把釣到的魚放進來吧！';
+}
+function aqSync() { if (!aq) return; const keep = new Set(prog.aquarium); aq.fish = aq.fish.filter(o => keep.has(o.f)); for (const f of prog.aquarium) if (!aq.fish.some(o => o.f === f)) { const o = aqFish(f); o.x = rand(o.w, aq.W - o.w); o.y = aq.H * .1; aqTarget(o); aq.fish.push(o); } aqHud(); }
+function aqAddPanel() {
+  const rows = state.bag.map((f, i) => [f, i]).reverse().map(([f, i]) => fishRow(f, i, true)).join('');
+  showPanel(`<h2>＋ 放魚進水族箱</h2><p>水族箱 ${prog.aquarium.length} / ${AQ_CAP}・點一條魚放進去<br><small>放進去的魚不能賣，但隨時可以在「管理」放回魚簍。</small></p><div class="list" style="max-height:52vh">${rows || '<p>魚簍是空的，先去釣魚吧！</p>'}</div>`);
+  paintFishCanvases();
+  document.querySelectorAll('[data-pick]').forEach(el => el.onclick = () => {
+    if (prog.aquarium.length >= AQ_CAP) { toast(`水族箱滿了（${AQ_CAP} 條），先放回幾條再放新的`); buzz(120); return; }
+    const f = state.bag.splice(+el.dataset.pick, 1)[0]; prog.aquarium.push(f); aqSync(); SFX.pickup(); buzz(30);
+    toast(`🐠 ${FISH_BY_ID[f.id].name} 游進水族箱了！`); save(); updateHud(); aqAddPanel(); checkAch();
+  });
+}
+function aqManagePanel() {
+  const rows = prog.aquarium.map((f, i) => fishRow(f, i).replace('</span></div>', `</span><button data-back="${i}" style="font-size:12px;padding:3px 8px;margin-left:6px">放回魚簍</button></div>`)).join('');
+  showPanel(`<h2>📋 水族箱管理</h2><p>${prog.aquarium.length} / ${AQ_CAP} 條</p><div class="list" style="max-height:52vh">${rows || '<p>水族箱是空的。</p>'}</div>`);
+  paintFishCanvases();
+  document.querySelectorAll('[data-back]').forEach(el => el.onclick = () => { const f = prog.aquarium.splice(+el.dataset.back, 1)[0]; state.bag.push(f); aqSync(); save(); updateHud(); toast(`${FISH_BY_ID[f.id].name} 放回魚簍了`); aqManagePanel(); });
+}
+document.getElementById('aqAdd').onclick = aqAddPanel;
+document.getElementById('aqManage').onclick = aqManagePanel;
+document.getElementById('aqClose').onclick = () => { aq = null; document.getElementById('aquarium').classList.remove('show'); document.getElementById('aqLabel').style.display = 'none'; };
+document.getElementById('aqCv').addEventListener('pointerdown', e => {   // 點魚看名字
+  if (!aq) return; const r = e.target.getBoundingClientRect(), x = (e.clientX - r.left) / r.width * aq.W, y = (e.clientY - r.top) / r.height * aq.H;
+  let best = null, bd = 1e9; for (const o of aq.fish) { const d = Math.hypot(o.x - x, o.y - y); if (d < Math.max(10, o.w * .6) && d < bd) { bd = d; best = o; } }
+  if (best) { aq.label = { o: best, t: 3 }; SFX.nibble(); }
+});
+function drawAquarium(dt) {
+  if (!aq) return;
+  aq.t += dt; const t = aq.t, g = document.getElementById('aqCv').getContext('2d'), W2 = aq.W, H2 = aq.H, sy = aq.sandY;
+  g.imageSmoothingEnabled = false;
+  // 水、光束
+  const gr = g.createLinearGradient(0, 0, 0, sy); gr.addColorStop(0, '#5ac8f0'); gr.addColorStop(.5, '#2a8ac8'); gr.addColorStop(1, '#1a5a98'); g.fillStyle = gr; g.fillRect(0, 0, W2, H2);
+  g.globalCompositeOperation = 'lighter';
+  for (let i = 0; i < 5; i++) { const x0 = ((i * 53 + t * 4) % (W2 + 60)) - 30; g.fillStyle = 'rgba(200,240,255,.07)'; g.beginPath(); g.moveTo(x0, 0); g.lineTo(x0 + 18, 0); g.lineTo(x0 + 48, sy); g.lineTo(x0 + 22, sy); g.fill(); }
+  g.globalCompositeOperation = 'source-over';
+  g.fillStyle = 'rgba(255,255,255,.35)'; for (let x = 0; x < W2; x += 4) g.fillRect(x, 2 + Math.round(Math.sin(x * .2 + t * 2)), 3, 1);   // 水面波紋
+  // 沙、石頭、珊瑚
+  g.fillStyle = '#e8d49a'; g.fillRect(0, sy, W2, H2 - sy); g.fillStyle = '#d0b878'; g.fillRect(0, sy, W2, 2);
+  for (let i = 0; i < 60; i++) { g.fillStyle = ['#c8b070', '#f4e4b8', '#b89a5a'][i % 3]; g.fillRect(hash(i, 1) * W2 | 0, sy + 3 + hash(i, 2) * (H2 - sy - 4) | 0, 2, 1); }
+  const rock = (x, w, h, c) => { g.fillStyle = '#2a2a34'; g.fillRect(x - 1, sy - h - 1, w + 2, h + 2); g.fillStyle = c; g.fillRect(x, sy - h, w, h); g.fillStyle = 'rgba(255,255,255,.25)'; g.fillRect(x + 2, sy - h + 1, w * .4 | 0, 2); };
+  rock(W2 * .08, 26, 14, '#6a6a78'); rock(W2 * .7, 34, 20, '#7a7280'); rock(W2 * .76, 18, 30, '#6a6a78');
+  for (const [cx, col] of [[W2 * .35, '#ff7a8a'], [W2 * .5, '#ffb070'], [W2 * .9, '#e070c0']]) { g.fillStyle = col; g.fillRect(cx, sy - 16, 3, 16); g.fillRect(cx - 5, sy - 12, 3, 8); g.fillRect(cx + 5, sy - 10, 3, 7); g.fillRect(cx - 5, sy - 12, 8, 2); }
+  // 海草（搖擺）
+  for (const w of aq.weeds) { g.fillStyle = w.c; for (let k = 0; k < w.h; k += 2) { const sx = w.x + Math.sin(t * 1.4 + k * .12 + w.x) * (k / w.h) * 5; g.fillRect(sx | 0, sy - k, 3, 2); } }
+  // 打氣機與氣泡
+  for (const bx of [W2 * .22, W2 * .62]) { g.fillStyle = '#3a3a44'; g.fillRect(bx - 3, sy - 4, 6, 4); if (Math.random() < dt * 6) aq.bubbles.push({ x: bx + rand(-2, 2), y: sy - 5, r: rand(1, 2.5) }); }
+  g.fillStyle = 'rgba(230,250,255,.75)';
+  for (let i = aq.bubbles.length - 1; i >= 0; i--) { const b = aq.bubbles[i]; b.y -= (14 + b.r * 6) * dt; b.x += Math.sin(t * 5 + b.y * .1) * .2; if (b.y < 3) { aq.bubbles.splice(i, 1); continue; } g.fillRect(b.x | 0, b.y | 0, Math.ceil(b.r), Math.ceil(b.r)); }
+  // 魚
+  for (const o of aq.fish) {
+    const dx = o.tx - o.x, dy = o.ty - o.y, d = Math.hypot(dx, dy), sp = (o.bottom ? 8 : 22) / Math.pow(o.w / 30, .35);
+    if (d < 3 || Math.random() < dt * .08) { if ((o.wait -= dt) <= 0) { aqTarget(o); o.wait = o.bottom ? rand(1, 4) : rand(0, 1.5); } }
+    else { o.vx += (dx / d * sp - o.vx) * Math.min(1, dt * 1.5); o.vy += (dy / d * sp * .6 - o.vy) * Math.min(1, dt * 1.5); }
+    o.vx *= Math.pow(.6, dt); o.vy *= Math.pow(.6, dt);
+    o.x += o.vx * dt; o.y += o.vy * dt; o.ph += dt * (3 + Math.abs(o.vx) * .4);
+    if (Math.abs(o.vx) > .8) o.flip = o.vx < 0;
+    g.save(); g.translate(Math.round(o.x), Math.round(o.y + (o.bottom ? 0 : Math.sin(o.ph * .5) * 1))); g.scale(o.flip ? -1 : 1, 1 + Math.sin(o.ph) * .04);
+    g.drawImage(o.img, -o.w / 2, -o.h / 2, o.w, o.h); g.restore();
+  }
+  // 玻璃反光與邊框
+  g.fillStyle = 'rgba(255,255,255,.08)'; g.beginPath(); g.moveTo(W2 * .1, 0); g.lineTo(W2 * .22, 0); g.lineTo(W2 * .02, H2); g.lineTo(0, H2); g.lineTo(0, H2 * .6); g.fill();
+  g.strokeStyle = '#1a2a3a'; g.lineWidth = 4; g.strokeRect(0, 0, W2, H2);
+  // 點到的魚：名字標籤
+  const lab = document.getElementById('aqLabel');
+  if (aq.label && (aq.label.t -= dt) > 0 && aq.fish.includes(aq.label.o)) {
+    const o = aq.label.o, f = o.f; lab.style.display = 'block'; lab.style.left = (o.x / W2 * 100) + '%'; lab.style.top = ((o.y - o.h / 2 - 2) / H2 * 100) + '%';
+    lab.innerHTML = `<span style="color:${RAR[o.def.rarity].color === '#8a9a7a' ? '#d8e8c8' : RAR[o.def.rarity].color}">${o.def.name}</span>・${fmtW(f.w)}・${f.l} cm`;
+  } else lab.style.display = 'none';
+}
 function openFishDetail(id) {
   const i = DEX_ORDER.findIndex(f => f.id === id), f = DEX_ORDER[i], d = prog.dex[f.id], rar = RAR[f.rarity];
   const where = f.regions.map(r => REGION_NAME[r]).join('、'), when = f.times.length === 4 ? '任何時間' : f.times.map(t => PHASE[t].name).join('、');
@@ -1669,6 +1775,7 @@ function frame(now) {
     for (const b of BUILDINGS) { if (Math.hypot(b.door[0] - pl.x, b.door[1] - pl.y) > 6) continue; const p = iso(b.x + b.w / 2, b.y + b.h / 2); const sx = (p.x - vx) * PIX * DPR, sy = (p.y - vy - LH - b.hgt - 14) * PIX * DPR; ctx.strokeStyle = '#3a2a18'; ctx.strokeText(b.sign + ' ' + b.name, sx, sy); ctx.fillStyle = '#fff6dd'; ctx.fillText(b.sign + ' ' + b.name, sx, sy); }
   }
   drawCut(dt);
+  drawAquarium(dt);
   drawMini();   // 小地圖每格都更新，才不會一跳一跳
   if ((hudTick += dt) > .12) { hudTick = 0; updateHud(); }
   requestAnimationFrame(frame);
@@ -1676,7 +1783,7 @@ function frame(now) {
 load(); applyGear(); applyLook(); updateHud(); drawMini(); setInterval(save, 10000); addEventListener('pagehide', save);
 toast('歡迎來到漁港鎮！走到碼頭盡頭「上船」出海，或在水邊直接「拋竿」', 3200);
 if (params.get('demo') === 'boat') { state.onBoat = true; }
-window.__game = { state, fish, FISH, docks, BUILDINGS, prog, ACH, save, applyGear, openBuilding, checkAch, openDex }; window.__walk = walkable; window.__pick = pickFish; window.__drifts = drifts; window.__regionAt = regionAt; window.__boatable = boatable; window.__islands = ISLANDS; window.__openFishDetail = openFishDetail; window.__contest = { nextContestKey, contestAt, runContest, openGuild, contestTable, startCeremony, get cut() { return cut; } };   // 給測試用
+window.__game = { state, fish, FISH, docks, BUILDINGS, prog, ACH, save, applyGear, openBuilding, checkAch, openDex }; window.__walk = walkable; window.__pick = pickFish; window.__drifts = drifts; window.__regionAt = regionAt; window.__boatable = boatable; window.__islands = ISLANDS; window.__openFishDetail = openFishDetail; window.__aq = () => aq; window.__tile = at; window.__contest = { nextContestKey, contestAt, runContest, openGuild, contestTable, startCeremony, get cut() { return cut; } };   // 給測試用
 requestAnimationFrame(frame);
 </script>
 </body>

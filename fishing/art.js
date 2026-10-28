@@ -351,6 +351,14 @@ window.ART = (() => {
       awning('#c85a8a', '#fff0f6');
       sign(x0 + .7, (sx, sy) => { px(sx, sy - 5, 1, 2, '#3a3a40'); px(sx - 4, sy - 3, 9, 1, '#3a3a40'); px(sx - 4, sy - 2, 1, 1, '#3a3a40'); px(sx + 4, sy - 2, 1, 1, '#3a3a40'); });
       const [mx, my] = P(xR + .3, yF + .3, 0); px(mx, my - 4, 1, 4, '#5a3a1e'); px(mx - 3, my - 12, 7, 8, '#3ab0c0'); px(mx - 1, my - 15, 3, 3, '#e8d8c0'); px(mx - 2, my - 9, 1, 1, '#ff8aa0'); px(mx + 1, my - 7, 1, 1, '#ff8aa0');
+    } else if (b.id === 'aquarium') {   // 水族館：藍色雨遮、魚招牌、正面大玻璃（裡面有魚游）
+      awning('#2a78b0', '#e8f6ff');
+      sign(x0 + 1.5, (sx, sy) => { px(sx - 3, sy - 4, 5, 3, '#3a9ad8'); px(sx + 2, sy - 5, 2, 5, '#3a9ad8'); px(sx - 2, sy - 3, 1, 1, '#fff'); });
+      for (let i = 0; i < 2; i++) {
+        const [gx, gy] = P(x0 + .35 + i * 1.3, yF, 3), ww = 14;
+        px(gx - 1, gy - 10, ww + 2, 9, '#1a2a3a'); px(gx, gy - 9, ww, 7, '#5ac8f0'); px(gx, gy - 9, ww, 2, '#8ae0ff');
+        const fx = gx + 2 + ((t * 6 + i * 7) % (ww - 4)) | 0; px(fx, gy - 6, 3, 2, i ? '#ffb070' : '#ff7a8a'); px(fx - 1, gy - 6, 1, 2, i ? '#e0904a' : '#d05a6a');
+      }
     } else if (b.id === 'guild') {   // 釣魚協會：金色雨遮、獎盃招牌、兩支旗子、門口的大魚看板
       awning('#c8902a', '#fff6d0');
       sign(x0 + 1.5, (sx, sy) => { px(sx - 2, sy - 5, 5, 3, '#ffd040'); px(sx - 1, sy - 2, 3, 1, '#ffd040'); px(sx - 2, sy - 1, 5, 1, '#8a5a20'); px(sx - 3, sy - 5, 1, 2, '#ffd040'); px(sx + 3, sy - 5, 1, 2, '#ffd040'); });
