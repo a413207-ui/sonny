@@ -13,7 +13,8 @@
   .chip.row { display: flex; gap: 10px; }
   #mini { position: fixed; right: 10px; top: calc(10px + env(safe-area-inset-top)); width: 128px; height: 96px; border: 3px solid #6b4a2a; border-radius: 10px; background: #26508f; z-index: 5; image-rendering: pixelated; box-shadow: 0 2px 0 #6b4a2a; }
   #miniHint { position: fixed; right: 12px; top: calc(112px + env(safe-area-inset-top)); font-size: 11px; color: #fff; text-shadow: 0 1px 2px #000; z-index: 5; }
-  #vib { position: fixed; right: 10px; top: calc(128px + env(safe-area-inset-top)); z-index: 5; font-size: 12px; padding: 3px 8px; cursor: pointer; }
+  #toggles { position: fixed; right: 10px; top: calc(128px + env(safe-area-inset-top)); z-index: 5; display: flex; flex-direction: column; align-items: flex-end; gap: 4px; }
+  #toggles .chip { font-size: 12px; padding: 3px 8px; cursor: pointer; }
   #joy { position: fixed; left: calc(18px + env(safe-area-inset-left)); bottom: calc(18px + env(safe-area-inset-bottom)); width: 120px; height: 120px; border-radius: 50%; background: rgba(255,248,230,.25); border: 3px solid rgba(255,248,230,.6); z-index: 6; }
   #knob { position: absolute; left: 35px; top: 35px; width: 44px; height: 44px; border-radius: 50%; background: rgba(255,248,230,.9); border: 3px solid #6b4a2a; }
   .btn { position: fixed; z-index: 6; border: 3px solid #6b4a2a; border-radius: 50%; background: #ffd56a; color: #4a2e12; font-weight: 800; font-size: 15px; box-shadow: 0 4px 0 #6b4a2a; display: flex; align-items: center; justify-content: center; text-align: center; line-height: 1.1; padding: 4px; cursor: pointer; }
@@ -21,7 +22,7 @@
   .btn.off { opacity: .35; }
   #btnA { right: calc(20px + env(safe-area-inset-right)); bottom: calc(26px + env(safe-area-inset-bottom)); width: 92px; height: 92px; }
   #btnB { right: calc(122px + env(safe-area-inset-right)); bottom: calc(20px + env(safe-area-inset-bottom)); width: 66px; height: 66px; font-size: 13px; background: #bfe6ff; }
-  #toast { position: fixed; left: 50%; top: calc(190px + env(safe-area-inset-top)); transform: translateX(-50%); background: rgba(40,28,14,.85); color: #fff6dd; padding: 6px 14px; border-radius: 16px; font-size: 14px; font-weight: 700; z-index: 7; opacity: 0; transition: opacity .3s; pointer-events: none; max-width: 86vw; width: max-content; text-align: center; }
+  #toast { position: fixed; left: 50%; top: calc(214px + env(safe-area-inset-top)); transform: translateX(-50%); background: rgba(40,28,14,.85); color: #fff6dd; padding: 6px 14px; border-radius: 16px; font-size: 14px; font-weight: 700; z-index: 7; opacity: 0; transition: opacity .3s; pointer-events: none; max-width: 86vw; width: max-content; text-align: center; }
   #toast.show { opacity: 1; }
   .overlay { position: fixed; inset: 0; display: none; align-items: center; justify-content: center; z-index: 20; background: rgba(10,16,30,.55); }
   .overlay.show { display: flex; }
@@ -49,7 +50,7 @@
   #bigCv { width: 100%; aspect-ratio: 480 / 250; image-rendering: pixelated; border: 3px solid #6b4a2a; border-radius: 8px; background: #26508f; }
   .legend { display: flex; flex-wrap: wrap; justify-content: center; gap: 4px 10px; font-size: 12px; margin: 6px 0 10px; }
   .legend i { display: inline-block; width: 12px; height: 12px; border: 1px solid #0004; vertical-align: -2px; margin-right: 3px; }
-  #bars { position: fixed; left: 50%; top: calc(232px + env(safe-area-inset-top)); transform: translateX(-50%); width: min(78vw, 360px); z-index: 7; display: none; }
+  #bars { position: fixed; left: 50%; top: calc(256px + env(safe-area-inset-top)); transform: translateX(-50%); width: min(78vw, 360px); z-index: 7; display: none; }
   #bars.show { display: block; }
   .bar { height: 14px; background: rgba(255,248,230,.85); border: 2px solid #6b4a2a; border-radius: 8px; margin-bottom: 6px; overflow: hidden; position: relative; }
   .bar > div { height: 100%; width: 0; }
@@ -57,7 +58,6 @@
   #tension > div { background: linear-gradient(90deg, #6ccf6c, #ffd040 60%, #e8503a); }
   #dist > div { background: #5aa8e8; }
   /* 音效開關、咬鉤閃光、拉竿按鈕跳動、狀態標籤 */
-  #snd { position: fixed; right: 10px; top: calc(154px + env(safe-area-inset-top)); z-index: 5; font-size: 12px; padding: 3px 8px; cursor: pointer; }
   #flash { position: fixed; inset: 0; z-index: 4; pointer-events: none; opacity: 0; box-shadow: inset 0 0 0 10px #ffd040, inset 0 0 90px 36px rgba(255,208,64,.6); }
   #flash.on { animation: flash 1s ease-out; }
   @keyframes flash { 0% { opacity: 1; } 15% { opacity: .25; } 30% { opacity: 1; } 45% { opacity: .3; } 60% { opacity: .9; } 100% { opacity: 0; } }
@@ -77,8 +77,11 @@
 </div>
 <canvas id="mini" width="128" height="96"></canvas>
 <div id="miniHint">點地圖放大</div>
-<div class="chip" id="vib">📳 震動：開</div>
-<div class="chip" id="snd">🔊 音效：開</div>
+<div id="toggles">
+  <div class="chip" id="vib">📳 震動：開</div>
+  <div class="chip" id="snd">🔊 音效：開</div>
+  <div class="chip" id="mus">🎵 音樂：開</div>
+</div>
 <div id="flash"></div>
 <div id="joy"><div id="knob"></div></div>
 <div class="btn" id="btnB">上船</div>
@@ -100,6 +103,7 @@
 
 <script src="data/fish.js"></script>
 <script src="art.js"></script>
+<script src="music.js"></script>
 <script>
 'use strict';
 // ════════════════ 基本設定 ════════════════
@@ -347,7 +351,7 @@ vibBtn.addEventListener('click', () => { state.vib = !state.vib; vibBtn.textCont
 function buzz(p) { if (state.vib && navigator.vibrate) try { navigator.vibrate(p); } catch (e) {} }
 // iPhone 的網頁不能震動：把震動開關藏起來，音效開關往上移
 const sndBtn = document.getElementById('snd');
-if (!navigator.vibrate) { vibBtn.style.display = 'none'; sndBtn.style.top = 'calc(128px + env(safe-area-inset-top))'; }
+if (!navigator.vibrate) vibBtn.style.display = 'none';
 
 // ════════════════ 音效（程式合成，不用音檔）════════════════
 const SND_KEY = 'bay-fishing-sound';
@@ -360,7 +364,24 @@ function audio() {
   return actx;
 }
 // iPhone 規定要在玩家點畫面時才能打開聲音，所以第一次點擊時就先準備好
-addEventListener('pointerdown', () => { if (state.snd) audio(); }, { capture: true });
+addEventListener('pointerdown', () => { if (state.snd || state.music) audio(); if (state.music) startMusic(); }, { capture: true });
+// ── 背景音樂：四首原創曲輪播（music.js），預設開；iPhone 要點一下畫面才會開始 ──
+const MUS_KEY = 'bay-fishing-music', musBtn = document.getElementById('mus');
+try { state.music = localStorage.getItem(MUS_KEY) !== 'off'; } catch (e) { state.music = true; }
+const musLabel = () => { musBtn.textContent = '🎵 音樂：' + (state.music ? '開' : '關'); };
+musLabel();
+function startMusic() { if (window.BGM && state.music && !document.hidden) BGM.start(audio); }
+if (window.BGM) BGM.onTrack = name => toast('🎵 ' + name, 2200);
+musBtn.addEventListener('click', () => {
+  state.music = !state.music; musLabel(); try { localStorage.setItem(MUS_KEY, state.music ? 'on' : 'off'); } catch (e) {}
+  if (state.music) startMusic(); else if (window.BGM) BGM.stop();
+});
+// 切到別的 App 或關掉螢幕時停止音樂，回來再繼續
+document.addEventListener('visibilitychange', () => {
+  if (!window.BGM) return;
+  if (document.hidden) { BGM.stop(); if (actx) actx.suspend(); }
+  else if (state.music) { if (actx) actx.resume(); startMusic(); }
+});
 sndBtn.addEventListener('click', () => { state.snd = !state.snd; sndBtn.textContent = '🔊 音效：' + (state.snd ? '開' : '關'); try { localStorage.setItem(SND_KEY, state.snd ? 'on' : 'off'); } catch (e) {} if (state.snd) SFX.hook(); });
 function tone(f0, f1, dur, vol = .3, type = 'sine', delay = 0) {
   if (!state.snd) return; const a = audio(); if (!a) return;
