@@ -602,12 +602,15 @@ try { state.snd = localStorage.getItem(SND_KEY) !== 'off'; } catch (e) { state.s
 sndBtn.textContent = '🔊 音效：' + (state.snd ? '開' : '關');
 let actx = null;
 function audio() {
+  // iPhone 切到別的 App、鎖螢幕、來電之後，聲音會變成 suspended 或 interrupted（甚至被關掉 closed），都要能救回來
+  if (actx && actx.state === 'closed') { actx = null; rainNode = null; }
   if (!actx) { const AC = window.AudioContext || window.webkitAudioContext; if (!AC) return null; try { actx = new AC(); } catch (e) { return null; } }
-  if (actx.state === 'suspended') actx.resume();
+  if (actx.state !== 'running') { try { const p = actx.resume(); if (p && p.catch) p.catch(() => {}); } catch (e) {} }
   return actx;
 }
 // iPhone 規定要在玩家點畫面時才能打開聲音，所以第一次點擊時就先準備好
 addEventListener('pointerdown', () => { if (state.snd || state.music) audio(); if (state.music) startMusic(); }, { capture: true });
+addEventListener('pageshow', () => { if (actx && (state.snd || state.music)) audio(); });
 // ── 背景音樂：四首原創曲輪播（music.js），預設開；iPhone 要點一下畫面才會開始 ──
 const MUS_KEY = 'bay-fishing-music', musBtn = document.getElementById('mus');
 try { state.music = localStorage.getItem(MUS_KEY) !== 'off'; } catch (e) { state.music = true; }
@@ -622,8 +625,8 @@ musBtn.addEventListener('click', () => {
 // 切到別的 App 或關掉螢幕時停止音樂，回來再繼續
 document.addEventListener('visibilitychange', () => {
   if (!window.BGM) return;
-  if (document.hidden) { BGM.stop(); if (actx) actx.suspend(); }
-  else if (state.music) { if (actx) actx.resume(); startMusic(); }
+  if (document.hidden) { BGM.stop(); if (actx && actx.state === 'running') { try { actx.suspend().catch(() => {}); } catch (e) {} } }
+  else { if (actx && (state.snd || state.music)) audio(); if (state.music) startMusic(); }   // 回來時先試著恢復；不行的話點一下畫面就會恢復
 });
 sndBtn.addEventListener('click', () => { state.snd = !state.snd; sndBtn.textContent = '🔊 音效：' + (state.snd ? '開' : '關'); try { localStorage.setItem(SND_KEY, state.snd ? 'on' : 'off'); } catch (e) {} if (state.snd) SFX.hook(); });
 function tone(f0, f1, dur, vol = .3, type = 'sine', delay = 0) {
@@ -1783,7 +1786,7 @@ function frame(now) {
 load(); applyGear(); applyLook(); updateHud(); drawMini(); setInterval(save, 10000); addEventListener('pagehide', save);
 toast('歡迎來到漁港鎮！走到碼頭盡頭「上船」出海，或在水邊直接「拋竿」', 3200);
 if (params.get('demo') === 'boat') { state.onBoat = true; }
-window.__game = { state, fish, FISH, docks, BUILDINGS, prog, ACH, save, applyGear, openBuilding, checkAch, openDex }; window.__walk = walkable; window.__pick = pickFish; window.__drifts = drifts; window.__regionAt = regionAt; window.__boatable = boatable; window.__islands = ISLANDS; window.__openFishDetail = openFishDetail; window.__aq = () => aq; window.__tile = at; window.__contest = { nextContestKey, contestAt, runContest, openGuild, contestTable, startCeremony, get cut() { return cut; } };   // 給測試用
+window.__game = { state, fish, FISH, docks, BUILDINGS, prog, ACH, save, applyGear, openBuilding, checkAch, openDex }; window.__walk = walkable; window.__pick = pickFish; window.__drifts = drifts; window.__regionAt = regionAt; window.__boatable = boatable; window.__islands = ISLANDS; window.__openFishDetail = openFishDetail; window.__aq = () => aq; window.__tile = at; window.__actx = () => actx; window.__contest = { nextContestKey, contestAt, runContest, openGuild, contestTable, startCeremony, get cut() { return cut; } };   // 給測試用
 requestAnimationFrame(frame);
 </script>
 </body>

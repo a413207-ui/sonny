@@ -109,7 +109,7 @@
   }
   BGM.start = function (getCtx) {
     const a = getCtx(); if (!a) return;
-    if (ctx !== a) { ctx = a; build(a); nextT = 0; step = 0; loop = 0; }
+    if (ctx !== a) { ctx = a; build(a); nextT = 0; step = 0; loop = 0; playing = false; }   // 換了新的聲音環境（例如 iPhone 把舊的關掉）就重新淡入
     if (playing) return;
     playing = true; nextT = ctx.currentTime + .15;
     out.gain.cancelScheduledValues(ctx.currentTime); out.gain.setValueAtTime(.0001, ctx.currentTime); out.gain.exponentialRampToValueAtTime(BGM.volume, ctx.currentTime + 1.5);
@@ -128,6 +128,7 @@
   BGM.next = function () { ti = (ti + 1) % TRACKS.length; step = 0; loop = 0; if (ctx) nextT = ctx.currentTime + .2; };
   BGM.current = () => TRACKS[ti].name;
   BGM.isPlaying = () => playing;
-  BGM._tick = schedule;   // 測試用：離線試聽時手動排程
+  BGM._tick = schedule;
+  window.__musicGain = () => out ? +out.gain.value.toFixed(3) : null;   // 測試用   // 測試用：離線試聽時手動排程
   window.BGM = BGM;
 })();
