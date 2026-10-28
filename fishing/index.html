@@ -146,6 +146,7 @@
   #aqEmpty { position: absolute; left: 0; right: 0; top: 42%; text-align: center; color: #d8f0ff; font-weight: 800; font-size: 15px; text-shadow: 0 2px 0 #000; pointer-events: none; }
   #cut canvas { position: absolute; inset: 0; width: 100%; height: 100%; image-rendering: pixelated; }
   #cut .t { position: absolute; left: 0; right: 0; text-align: center; color: #fff6dd; font-weight: 900; text-shadow: 0 2px 0 #3a2a18, 0 0 8px #000; pointer-events: none; transition: opacity .4s; padding: 0 12px; }
+  #updBar { position: fixed; left: 50%; top: calc(8px + env(safe-area-inset-top)); transform: translateX(-50%); z-index: 45; display: none; background: #3a78c0; color: #fff; border: 3px solid #1e3f6a; border-radius: 20px; padding: 6px 14px; font-weight: 900; font-size: 14px; box-shadow: 0 3px 0 #1e3f6a; cursor: pointer; white-space: nowrap; animation: pulse .8s ease-in-out infinite alternate; }
   #statusChip.sick { background: #d8f0b0; border-color: #4a7a2a; box-shadow: 0 2px 0 #4a7a2a; color: #2a4a14; }
 </style>
 </head>
@@ -170,6 +171,7 @@
 <div class="btn" id="btnB">上船</div>
 <div class="btn" id="btnA">拋竿</div>
 <div id="toast"></div>
+<div id="updBar">🆕 有新版本，點我更新</div>
 <div id="bars"><div class="bar" id="tension"><div></div><span>張力</span></div><div class="bar" id="dist"><div></div><span>距離</span></div></div>
 <div class="overlay" id="catch"><div class="card" id="catchCard"></div></div>
 <div class="overlay" id="bigmap"><div class="card">
@@ -192,11 +194,13 @@
 <div class="overlay" id="fishDetail"><div class="card" id="fishDetailCard"></div></div>
 <div class="overlay" id="badgePop"><div class="card" id="badgeCard"></div></div>
 
-<script src="data/fish.js"></script>
-<script src="art.js"></script>
-<script src="music.js"></script>
+<script src="data/fish.js?v=2026.10.28-69"></script>
+<script src="art.js?v=2026.10.28-69"></script>
+<script src="music.js?v=2026.10.28-69"></script>
 <script>
 'use strict';
+// 版本號：每次更新都要改（也要改上面三個 script 的 ?v=），遊戲會用它檢查網站上有沒有新版
+const BUILD = '2026.10.28-69';
 // ════════════════ 基本設定 ════════════════
 const FISH = window.FISH_DATA || [];
 const N = 120, TW = 32, TH = 16, LH = 4;         // 地圖格數、等角格寬高、陸地高度
@@ -713,13 +717,23 @@ function landingSpot() {
   for (let r = 1; r <= 1.6; r += .3) for (let a = 0; a < 16; a++) { const x = b.x + Math.cos(a * Math.PI / 8) * r, y = b.y + Math.sin(a * Math.PI / 8) * r; if (walkable(x, y)) return { x: Math.floor(x) + .5, y: Math.floor(y) + .5 }; }
   return null;
 }
+// ── 叫船：在水邊找一格能停船、又夠近可以上船的位置 ──
+function boatSpotNear(x, y) {
+  for (let r = 1; r <= 1.6; r += .3) for (let a = 0; a < 16; a++) { const bx = x + Math.cos(a * Math.PI / 8) * r, by = y + Math.sin(a * Math.PI / 8) * r; if (boatable(bx, by) && boatable(bx + .3, by) && boatable(bx - .3, by) && boatable(bx, by + .3) && boatable(bx, by - .3)) return { x: bx, y: by }; }
+  return null;
+}
+function callBoat(spot) {
+  const b = state.boat; b.x = spot.x; b.y = spot.y; b.vx = b.vy = 0;
+  SFX.pickup(); buzz(30); toast('⛵ 船開過來了！按「上船」出海'); save(); updateHud();
+}
 function contextB() {
   if (fish.state === 'wait' || fish.state === 'cast') return { label: '收竿', fn: () => endFishing('收竿了') };
   if (fish.state) return null;
-  if (state.onBoat) { const s = landingSpot(); return s ? { label: '下船', fn: () => { state.onBoat = false; Object.assign(state.player, s); toast('上岸了'); } } : null; }
+  if (state.onBoat) { const s = landingSpot(); return s ? { label: '下船', fn: () => { state.onBoat = false; state.boat.vx = state.boat.vy = 0; Object.assign(state.player, s); toast('上岸了'); } } : null; }   // 下船時船停住，不會滑走
   const p = state.player;
   if (Math.hypot(state.boat.x - p.x, state.boat.y - p.y) < 1.8) return { label: '上船', fn: () => { state.onBoat = true; toast('⛵ 用搖桿開船，到不同海域釣不同的魚'); } };
   const b = nearBuilding(); if (b) return { label: '進入', fn: () => openBuilding(b) };
+  const spot = boatSpotNear(p.x, p.y); if (spot) return { label: '叫船', fn: () => callBoat(spot) };   // 船跑遠了：站在水邊就能把船叫過來
   return null;
 }
 function contextA() {
@@ -1846,10 +1860,25 @@ function frame(now) {
   if ((hudTick += dt) > .12) { hudTick = 0; updateHud(); }
   requestAnimationFrame(frame);
 }
+// ── 版本更新檢查：每 5 分鐘、或回到遊戲時，偷偷看網站上的 index.html 版本號 ──
+let newBuild = null;
+async function checkUpdate() {
+  if (location.protocol === 'file:' || newBuild) return;
+  try {
+    const r = await fetch('index.html?check=' + Date.now(), { cache: 'no-store' }); if (!r.ok) return;
+    const m = /const BUILD = '([^']+)'/.exec(await r.text());
+    if (m && m[1] !== BUILD) { newBuild = m[1]; document.getElementById('updBar').style.display = 'block'; toast('🆕 遊戲有新版本了！點上方藍色按鈕更新', 3500); }
+  } catch (e) {}
+}
+document.getElementById('updBar').addEventListener('click', () => {
+  save(); const q = new URLSearchParams(location.search); q.set('v', newBuild || Date.now()); location.replace(location.pathname + '?' + q.toString());
+});
+setTimeout(checkUpdate, 8000); setInterval(checkUpdate, 5 * 60 * 1000);
+document.addEventListener('visibilitychange', () => { if (!document.hidden) checkUpdate(); });
 load(); applyGear(); applyLook(); updateHud(); drawMini(); setInterval(save, 10000); addEventListener('pagehide', save);
 toast('歡迎來到漁港鎮！走到碼頭盡頭「上船」出海，或在水邊直接「拋竿」', 3200);
 if (params.get('demo') === 'boat') { state.onBoat = true; }
-window.__game = { state, fish, FISH, docks, BUILDINGS, prog, ACH, save, applyGear, openBuilding, checkAch, openDex }; window.__walk = walkable; window.__pick = pickFish; window.__drifts = drifts; window.__regionAt = regionAt; window.__boatable = boatable; window.__islands = ISLANDS; window.__openFishDetail = openFishDetail; window.__aq = () => aq; window.__drawAq = drawAquarium; window.__tile = at; window.__actx = () => actx; window.__contest = { nextContestKey, contestAt, runContest, openGuild, contestTable, startCeremony, get cut() { return cut; } };   // 給測試用
+window.__game = { state, fish, FISH, docks, BUILDINGS, prog, ACH, save, applyGear, openBuilding, checkAch, openDex }; window.__walk = walkable; window.__pick = pickFish; window.__drifts = drifts; window.__regionAt = regionAt; window.__boatable = boatable; window.__islands = ISLANDS; window.__openFishDetail = openFishDetail; window.__aq = () => aq; window.__drawAq = drawAquarium; window.__tile = at; window.__contextB = contextB; window.__checkUpdate = checkUpdate; window.__actx = () => actx; window.__contest = { nextContestKey, contestAt, runContest, openGuild, contestTable, startCeremony, get cut() { return cut; } };   // 給測試用
 requestAnimationFrame(frame);
 </script>
 </body>
