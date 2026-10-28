@@ -170,6 +170,24 @@ FISH = [
     ("ice_ghost", "冰窟幽靈魚", "U", "frozen", "any", (0.2, 1.5), (20, 45), "slim", "#e8f4ff", "#8ac8ff", "在冰縫下面像鬼魂一樣飄過。"),
     ("glacier_halibut", "冰川比目魚", "R", "frozen", "day,night", (5.0, 60.0), (60, 150), "flat", "#7a90a8", "#e0f0ff", "趴在冰下的海床，一動也不動。"),
     ("frost_leviathan", "冰封巨鯨魚", "L", "frozen", "any", (800.0, 3000.0), (800, 1600), "myth", "#3a6aa0", "#c0f0ff", "被封在冰下千年的巨獸，終於醒來了。"),
+    # ── 大河（地圖左邊的大河平原，可以開船進去）──
+    # 下游 bigriver
+    ("silver_bleak", "銀飄魚", "C", "bigriver", "any", (0.02, 0.1), (10, 18), "slim", "#b8c4cc", "#e8f0f4", "成群在水面附近閃著銀光。"),
+    ("stone_moroko", "麥穗魚", "C", "bigriver", "dawn,day,dusk", (0.01, 0.05), (6, 11), "slim", "#9a8a6a", "#5a4a30", "小小的身體上有一排像麥穗的黑點。"),
+    ("tall_crucian", "高身鯽", "C", "bigriver", "any", (0.2, 1.0), (15, 30), "round", "#a89a6a", "#e0d8b0", "身體比一般鯽魚高，上鉤後很會拉。"),
+    ("longnose_catfish", "長吻鮠", "U", "bigriver", "dusk,night", (1.0, 6.0), (40, 80), "slim", "#c8a8a0", "#6a5a50", "長長的吻，夜裡在河底找蝦吃。"),
+    ("yellowtail_dace", "黃尾鯝", "U", "bigriver", "day", (0.3, 1.5), (20, 40), "slim", "#9aa8b0", "#f0c040", "尾鰭是漂亮的金黃色。"),
+    ("river_giant_catfish", "河川巨鯰", "R", "bigriver", "night", (10.0, 60.0), (100, 200), "slim", "#4a4a3a", "#a0a080", "大河深潭的主人，一口能吞下鴨子。"),
+    ("river_tiger", "大河虎魚", "E", "bigriver", "day,dusk", (5.0, 30.0), (60, 120), "slim", "#d8a040", "#2a2a2a", "身上有老虎條紋的兇猛掠食者。"),
+    ("great_river_mother", "大河之母", "L", "bigriver", "night", (100.0, 400.0), (250, 400), "myth", "#3a6a5a", "#f0e0a0", "傳說整條大河的魚都是牠的孩子。"),
+    # 上游 upriver（越往裡面開，水越清、越涼）
+    ("clear_dace", "清溪小鱲", "C", "upriver", "any", (0.01, 0.06), (6, 12), "slim", "#8ab0c0", "#ff8a6a", "在清澈的上游溪水裡游得飛快。"),
+    ("mountain_loach", "山澗鰍", "C", "upriver", "any", (0.01, 0.05), (8, 15), "eel", "#8a7a5a", "#4a3a20", "吸附在石頭上，一點也不怕急流。"),
+    ("mist_trout", "霧谷鱒", "U", "upriver", "dawn,day", (0.3, 2.0), (25, 50), "slim", "#7a8a7a", "#e0a0a0", "清晨起霧的時候最容易上鉤。"),
+    ("fall_goby", "瀑布鰕虎", "U", "upriver", "day,dusk", (0.01, 0.05), (5, 10), "slim", "#6a7a8a", "#ffd040", "會用嘴巴吸著岩壁爬上瀑布。"),
+    ("cloud_salmon", "雲霧櫻鱒", "R", "upriver", "dawn", (1.0, 4.0), (35, 60), "slim", "#9a8aa0", "#ff9ab0", "只在高山雲霧裡出現的鱒魚。"),
+    ("jade_carp", "青玉山鯉", "E", "upriver", "day", (3.0, 12.0), (50, 90), "round", "#4aa08a", "#c0f0d0", "鱗片像青玉一樣透亮。"),
+    ("source_trout", "源流神鱒", "L", "upriver", "dawn", (15.0, 50.0), (100, 160), "myth", "#5a8aa8", "#fff0c0", "住在大河源頭的神祕大鱒魚。"),
 ]
 
 # 只在某些時段才進得去的地點（不用每個時段都有普通魚）
@@ -189,7 +207,7 @@ WEATHER_FISH = [
 ]
 WEATHERS = ["sunny", "cloudy", "rain", "storm", "waves", "typhoon"]
 
-REGIONS = ["harbor", "lake", "river", "reef", "deep", "cold", "mangrove", "volcano", "wreck", "cave", "lagoon", "frozen"]
+REGIONS = ["harbor", "lake", "river", "reef", "deep", "cold", "mangrove", "volcano", "wreck", "cave", "lagoon", "frozen", "bigriver", "upriver"]
 TIMES = ["dawn", "day", "dusk", "night"]
 
 

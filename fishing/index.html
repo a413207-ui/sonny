@@ -182,7 +182,7 @@
   <div class="legend">
     <span><i style="background:#3f8fd0"></i>港灣（近岸）</span><span><i style="background:#26508f"></i>深海</span>
     <span><i style="background:#3fc3c0"></i>珊瑚礁</span><span><i style="background:#4aa88a"></i>翠湖</span>
-    <span><i style="background:#4fb0b8"></i>溪谷</span><span><i style="background:#4a7aa8"></i>冰川</span><span><i style="background:#4a7a5a"></i>紅樹林</span><span><i style="background:#4a3a56"></i>火山</span><span><i style="background:#4ad0c8"></i>潟湖</span><span><i style="background:#141c2a"></i>沒去過</span><span><i style="background:#ff5040"></i>你</span><span><i style="background:#ffd040"></i>船</span>
+    <span><i style="background:#4fb0b8"></i>溪谷</span><span><i style="background:#4a7aa8"></i>冰川</span><span><i style="background:#4a7a5a"></i>紅樹林</span><span><i style="background:#4a3a56"></i>火山</span><span><i style="background:#4ad0c8"></i>潟湖</span><span><i style="background:#4a98a8"></i>大河</span><span><i style="background:#141c2a"></i>沒去過</span><span><i style="background:#ff5040"></i>你</span><span><i style="background:#ffd040"></i>船</span>
   </div>
   <button id="closeMap">關閉</button>
 </div></div>
@@ -196,23 +196,24 @@
 <div class="overlay" id="fishDetail"><div class="card" id="fishDetailCard"></div></div>
 <div class="overlay" id="badgePop"><div class="card" id="badgeCard"></div></div>
 
-<script src="data/fish.js?v=2026.10.29-70"></script>
-<script src="art.js?v=2026.10.29-70"></script>
-<script src="music.js?v=2026.10.29-70"></script>
+<script src="data/fish.js?v=2026.10.29-71"></script>
+<script src="art.js?v=2026.10.29-71"></script>
+<script src="music.js?v=2026.10.29-71"></script>
 <script>
 'use strict';
 // 版本號：每次更新都要改（也要改上面三個 script 的 ?v=），遊戲會用它檢查網站上有沒有新版
-const BUILD = '2026.10.29-70';
+const BUILD = '2026.10.29-71';
 // ════════════════ 基本設定 ════════════════
 const FISH = window.FISH_DATA || [];
-const N = 120, TW = 32, TH = 16, LH = 4;         // 地圖格數、等角格寬高、陸地高度
+const N = 160, TW = 32, TH = 16, LH = 4;         // 地圖格數、等角格寬高、陸地高度
 const OFS = 20;                                  // 地圖從 80 格擴大到 120 格：原本的島整個往中間移 20 格
+const SX = 40;                                   // 再從 120 擴大到 160：原本的海和島往右（+x）移 40 格，左邊空出來給大河平原
 const OX = N * TW / 2, OY = 24;
-const T = { DEEP: 0, SEA: 1, REEF: 2, LAKE: 3, RIVER: 4, SAND: 5, GRASS: 6, STONE: 7, DOCK: 8, SNOW: 9, ROCK: 10, ICE: 11, COLD: 12, MANGROVE: 13, VOLCANO: 14, LAGOON: 15 };
-const WATER = new Set([T.DEEP, T.SEA, T.REEF, T.LAKE, T.RIVER, T.COLD, T.MANGROVE, T.VOLCANO, T.LAGOON]);
-const BOATABLE = new Set([T.DEEP, T.SEA, T.REEF, T.COLD, T.MANGROVE, T.VOLCANO, T.LAGOON]);
-const REGION_OF = { [T.SEA]: 'harbor', [T.DEEP]: 'deep', [T.REEF]: 'reef', [T.LAKE]: 'lake', [T.RIVER]: 'river', [T.COLD]: 'cold', [T.MANGROVE]: 'mangrove', [T.VOLCANO]: 'volcano', [T.LAGOON]: 'lagoon' };
-const REGION_NAME = { harbor: '港灣', deep: '深海', reef: '珊瑚礁', lake: '翠湖', river: '溪谷', cold: '冰川海域', mangrove: '紅樹林河口', volcano: '火山海域', wreck: '沉船', cave: '海蝕洞', lagoon: '無人島潟湖', frozen: '冰封秘境' };
+const T = { DEEP: 0, SEA: 1, REEF: 2, LAKE: 3, RIVER: 4, SAND: 5, GRASS: 6, STONE: 7, DOCK: 8, SNOW: 9, ROCK: 10, ICE: 11, COLD: 12, MANGROVE: 13, VOLCANO: 14, LAGOON: 15, BIGRIVER: 16, UPRIVER: 17 };
+const WATER = new Set([T.DEEP, T.SEA, T.REEF, T.LAKE, T.RIVER, T.COLD, T.MANGROVE, T.VOLCANO, T.LAGOON, T.BIGRIVER, T.UPRIVER]);
+const BOATABLE = new Set([T.DEEP, T.SEA, T.REEF, T.COLD, T.MANGROVE, T.VOLCANO, T.LAGOON, T.BIGRIVER, T.UPRIVER]);
+const REGION_OF = { [T.SEA]: 'harbor', [T.DEEP]: 'deep', [T.REEF]: 'reef', [T.LAKE]: 'lake', [T.RIVER]: 'river', [T.COLD]: 'cold', [T.MANGROVE]: 'mangrove', [T.VOLCANO]: 'volcano', [T.LAGOON]: 'lagoon', [T.BIGRIVER]: 'bigriver', [T.UPRIVER]: 'upriver' };
+const REGION_NAME = { harbor: '港灣', deep: '深海', reef: '珊瑚礁', lake: '翠湖', river: '溪谷', cold: '冰川海域', mangrove: '紅樹林河口', volcano: '火山海域', wreck: '沉船', cave: '海蝕洞', lagoon: '無人島潟湖', frozen: '冰封秘境', bigriver: '大河下游', upriver: '大河上游' };
 const RAR = {
   common: { name: '普通', color: '#8a9a7a', w: 60, pow: .55 },
   uncommon: { name: '少見', color: '#4a9a5a', w: 25, pow: .75 },
@@ -220,7 +221,7 @@ const RAR = {
   epic: { name: '史詩', color: '#9a4ad0', w: 4, pow: 1.25 },
   legendary: { name: '傳說', color: '#e0902a', w: 1, pow: 1.55 },
 };
-const TILE_COLOR = { [T.DEEP]: '#26508f', [T.SEA]: '#3f8fd0', [T.REEF]: '#3fc3c0', [T.LAKE]: '#4aa88a', [T.RIVER]: '#4fb0b8', [T.SAND]: '#e8d49a', [T.GRASS]: '#7cc04f', [T.STONE]: '#cdbda2', [T.DOCK]: '#a8784a', [T.SNOW]: '#eef4fa', [T.ROCK]: '#4a4448', [T.ICE]: '#dff2ff', [T.COLD]: '#4a7aa8', [T.MANGROVE]: '#4a7a5a', [T.VOLCANO]: '#4a3a56', [T.LAGOON]: '#4ad0c8' };
+const TILE_COLOR = { [T.DEEP]: '#26508f', [T.SEA]: '#3f8fd0', [T.REEF]: '#3fc3c0', [T.LAKE]: '#4aa88a', [T.RIVER]: '#4fb0b8', [T.SAND]: '#e8d49a', [T.GRASS]: '#7cc04f', [T.STONE]: '#cdbda2', [T.DOCK]: '#a8784a', [T.SNOW]: '#eef4fa', [T.ROCK]: '#4a4448', [T.ICE]: '#dff2ff', [T.COLD]: '#4a7aa8', [T.MANGROVE]: '#4a7a5a', [T.VOLCANO]: '#4a3a56', [T.LAGOON]: '#4ad0c8', [T.BIGRIVER]: '#4a98a8', [T.UPRIVER]: '#5ab4c4' };
 const params = new URLSearchParams(location.search);
 
 // 可重現的雜訊
@@ -236,23 +237,25 @@ const landOf = new Uint8Array(N * N);        // 屬於哪座島（ISLANDS 索引
 const at = (x, y) => (x < 0 || y < 0 || x >= N || y >= N) ? T.DEEP : tile[y * N + x];
 const set = (x, y, v) => { if (x >= 0 && y >= 0 && x < N && y < N) tile[y * N + x] = v; };
 const ISLANDS = [
-  { name: '漁港鎮', cx: 60, cy: 65, rx: 12.5, ry: 12.5, trees: .06, dock: [64, 66, 0, 1, 4] },   // 島放大、碼頭移到小屋和圖鑑館中間，讓房子之間有空間
-  { name: '翠湖森林島', cx: 37, cy: 37, rx: 11, ry: 10, trees: .2, dock: [37, 42, 0, 1, 3] },
-  { name: '溪谷山島', cx: 83, cy: 36, rx: 10, ry: 9, trees: .14, dock: [82, 40, 0, 1, 3] },
-  { name: '珊瑚小島', cx: 80, cy: 84, rx: 3.2, ry: 2.6, trees: .1, dock: [80, 84, -1, 0, 3] },
-  { name: '西南孤島', cx: 35, cy: 82, rx: 4, ry: 3.2, trees: .15, dock: [35, 82, 1, 0, 3] },
-  { name: '金鱗島', cx: 60, cy: 36, rx: 6.5, ry: 5, trees: .08, dock: [60, 37, 0, 1, 3] },   // 釣魚協會所在（北方，從漁港鎮往上開船）
+  { name: '漁港鎮', cx: 100, cy: 65, rx: 12.5, ry: 12.5, trees: .06, dock: [104, 66, 0, 1, 4] },   // 島放大、碼頭移到小屋和圖鑑館中間，讓房子之間有空間
+  { name: '翠湖森林島', cx: 77, cy: 37, rx: 11, ry: 10, trees: .2, dock: [77, 42, 0, 1, 3] },
+  { name: '溪谷山島', cx: 123, cy: 36, rx: 10, ry: 9, trees: .14, dock: [122, 40, 0, 1, 3] },
+  { name: '珊瑚小島', cx: 120, cy: 84, rx: 3.2, ry: 2.6, trees: .1, dock: [120, 84, -1, 0, 3] },
+  { name: '西南孤島', cx: 75, cy: 82, rx: 4, ry: 3.2, trees: .15, dock: [75, 82, 1, 0, 3] },
+  { name: '金鱗島', cx: 100, cy: 36, rx: 6.5, ry: 5, trees: .08, dock: [100, 37, 0, 1, 3] },   // 釣魚協會所在（北方，從漁港鎮往上開船）
   // ── 地圖擴大後新增的三座島與海域 ──
-  { name: '冰晶島', cx: 60, cy: 9, rx: 6, ry: 3.6, trees: .1, land: 'snow', dock: [60, 10, 0, 1, 3], fresh: true },        // 最北邊，冰川海域
-  { name: '紅樹林島', cx: 9, cy: 62, rx: 4.5, ry: 6.5, trees: .3, mangrove: true, dock: [9, 62, 1, 0, 3], fresh: true },  // 最西邊，紅樹林河口
-  { name: '火山島', cx: 109, cy: 58, rx: 5.5, ry: 5, trees: .02, land: 'rock', dock: [109, 58, -1, 0, 3], fresh: true },  // 最東邊，火山海域
-  { name: '無人島', cx: 100, cy: 104, rx: 4, ry: 3.5, trees: .22, palm: true, hidden: true, dock: [100, 104, -1, 0, 3], fresh: true },   // 隱藏地點：東南外海，四周是潟湖
+  { name: '冰晶島', cx: 100, cy: 9, rx: 6, ry: 3.6, trees: .1, land: 'snow', dock: [100, 10, 0, 1, 3], fresh: true },        // 最北邊，冰川海域
+  { name: '紅樹林島', cx: 49, cy: 62, rx: 4.5, ry: 6.5, trees: .3, mangrove: true, dock: [49, 62, 1, 0, 3], fresh: true },  // 最西邊，紅樹林河口
+  { name: '火山島', cx: 149, cy: 58, rx: 5.5, ry: 5, trees: .02, land: 'rock', dock: [149, 58, -1, 0, 3], fresh: true },  // 最東邊，火山海域
+  { name: '無人島', cx: 140, cy: 104, rx: 4, ry: 3.5, trees: .22, palm: true, hidden: true, dock: [140, 104, -1, 0, 3], fresh: true },   // 隱藏地點：東南外海，四周是潟湖
+  { name: '大河平原', cx: 22, cy: 108, rx: 0, ry: 0, trees: .15, custom: true, dock: [27, 52, 1, 0, 3], fresh: true },   // 地圖左邊的新大陸（形狀在下面另外畫），碼頭在河口北邊的海岸
 ];
 const ISLAND_IDX = name => ISLANDS.findIndex(is => is.name === name);
 // 原本那幾座島用舊座標算雜訊，形狀和擴大前一模一樣
-const nz = (is, x, y, s) => is.fresh ? hash(x, y, s) : hash(x - OFS, y - OFS, s);
+const nz = (is, x, y, s) => is.fresh ? hash(x - SX, y, s) : hash(x - SX - OFS, y - OFS, s);   // 用移動前的座標算雜訊，島的形狀和以前一樣
 const ell = (x, y, cx, cy, rx, ry) => ((x + .5 - cx) / rx) ** 2 + ((y + .5 - cy) / ry) ** 2;
 ISLANDS.forEach((is, i) => {
+  if (is.custom) return;
   for (let y = 0; y < N; y++) for (let x = 0; x < N; x++) {
     const e = ell(x, y, is.cx, is.cy, is.rx, is.ry) + (nz(is, x, y, 7) - .5) * .28;
     const inner = is.land === 'snow' ? T.SNOW : is.land === 'rock' ? T.ROCK : T.GRASS, edge = is.land === 'snow' ? T.SNOW : is.land === 'rock' ? T.ROCK : T.SAND;
@@ -261,18 +264,45 @@ ISLANDS.forEach((is, i) => {
   }
 });
 // 海蝕洞的岩礁（西北外海，不能上岸）；冰封秘境（北方冰層裡的一池水）
-const CAVE = { x: 13.5, y: 28.5 }, FROZEN = { x: 100.5, y: 2.5 };
-for (let y = 24; y < 34; y++) for (let x = 8; x < 20; x++) if (ell(x, y, CAVE.x, CAVE.y, 2.6, 2) + (hash(x, y, 51) - .5) * .3 < 1) { set(x, y, T.ROCK); block[y * N + x] = 1; }
+const CAVE = { x: 53.5, y: 28.5 }, FROZEN = { x: 140.5, y: 2.5 };
+for (let y = 24; y < 34; y++) for (let x = 48; x < 60; x++) if (ell(x, y, CAVE.x, CAVE.y, 2.6, 2) + (hash(x - SX, y, 51) - .5) * .3 < 1) { set(x, y, T.ROCK); block[y * N + x] = 1; }
 // 翠湖（森林島中間的湖）
-for (let y = 0; y < N; y++) for (let x = 0; x < N; x++) if (ell(x, y, 37, 35.5, 5, 4) + (hash(x - OFS, y - OFS, 3) - .5) * .2 < 1) set(x, y, T.LAKE);
+for (let y = 0; y < N; y++) for (let x = 0; x < N; x++) if (ell(x, y, 77, 35.5, 5, 4) + (hash(x - SX - OFS, y - OFS, 3) - .5) * .2 < 1) set(x, y, T.LAKE);
 // 溪谷（山島上由西往東流入海的溪）
-const bridgeX = 84;
-for (let x = 75; x < 96; x++) {
-  const yy = Math.round(33 + Math.sin((x - OFS) / 2.6) * 1.6);
+const bridgeX = 124;
+for (let x = 115; x < 136; x++) {
+  const yy = Math.round(33 + Math.sin((x - SX - OFS) / 2.6) * 1.6);
   for (const y of [yy, yy + 1]) if (at(x, y) !== T.DEEP && at(x, y) !== T.SEA) set(x, y, x === bridgeX ? T.DOCK : T.RIVER);
 }
 // 小鎮石板地
-for (let y = 0; y < N; y++) for (let x = 0; x < N; x++) if (at(x, y) === T.GRASS && ell(x, y, 60.5, 65, 10, 9.5) < 1) set(x, y, T.STONE);
+for (let y = 0; y < N; y++) for (let x = 0; x < N; x++) if (at(x, y) === T.GRASS && ell(x, y, 100.5, 65, 10, 9.5) < 1) set(x, y, T.STONE);
+// ── 大河平原：地圖左邊的新大陸，中間有一條從海口一路彎進內陸、可以開船的大河 ──
+const CONT = ISLAND_IDX('大河平原');
+const RIVER_PTS = [[41, 64], [33, 66], [27, 72], [24, 82], [17, 92], [14, 102], [19, 112], [15, 122], [22, 132], [14, 142], [9, 150]];
+const RIVER_UP = 5, SOURCE = { x: 8.5, y: 152.5 };   // 第 5 段以後是上游；最上游是源頭湖
+const coastX = y => 34.5 + Math.sin(y * .13) * 1.6 + (hash(0, y, 61) - .5) * 1.5;
+const coastY = x => 124.5 + Math.sin(x * .11) * 1.6 + (hash(x, 0, 62) - .5) * 1.5;
+for (let y = 0; y < N; y++) for (let x = 0; x < N; x++) if (x < coastX(y) || y > coastY(x)) { set(x, y, y < 18 + (hash(x, y, 63) - .5) * 4 ? T.SNOW : T.GRASS); landOf[y * N + x] = CONT + 1; }
+function riverAt(x, y) {   // 到河道中心線最近的距離與段落
+  let best = 1e9, seg = 0;
+  for (let k = 0; k < RIVER_PTS.length - 1; k++) {
+    const [ax, ay] = RIVER_PTS[k], [bx, by] = RIVER_PTS[k + 1], dx = bx - ax, dy = by - ay, L2 = dx * dx + dy * dy;
+    const u = clamp(((x - ax) * dx + (y - ay) * dy) / L2, 0, 1), d = Math.hypot(x - ax - u * dx, y - ay - u * dy);
+    if (d < best) { best = d; seg = k; }
+  }
+  return { d: best, seg };
+}
+for (let y = 40; y < N; y++) for (let x = 0; x < 50; x++) {
+  const i = y * N + x; if (landOf[i] !== CONT + 1) continue;
+  const r = riverAt(x + .5, y + .5), up = r.seg >= RIVER_UP, hw = (up ? 1.45 : 1.9) + Math.sin(y * .7 + x * .3) * .2;
+  if (r.d < hw || ell(x, y, SOURCE.x, SOURCE.y, 4.5, 3.5) + (hash(x, y, 64) - .5) * .3 < 1) { set(x, y, up || r.d >= hw ? T.UPRIVER : T.BIGRIVER); landOf[i] = 0; }
+}
+for (let y = 0; y < N; y++) for (let x = 0; x < N; x++) {   // 海岸與河岸的沙灘
+  const i = y * N + x; if (landOf[i] !== CONT + 1 || at(x, y) !== T.GRASS) continue;
+  let sea = false, riv = false;
+  for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) { const t = at(x + dx, y + dy); if (t === T.DEEP && x + dx >= 0 && y + dy >= 0 && x + dx < N && y + dy < N) sea = true; if (t === T.BIGRIVER || t === T.UPRIVER) riv = true; }
+  if (sea || (riv && hash(x, y, 65) < .35)) set(x, y, T.SAND);
+}
 // 碼頭：從島上某點往指定方向走到水邊，再往外鋪木棧道
 const docks = [];
 for (const is of ISLANDS) {
@@ -285,7 +315,7 @@ for (const is of ISLANDS) {
 // 海水分類：離陸地 >5 格是深海；東南角是珊瑚礁
 (function classifySea() {
   const dist = new Int16Array(N * N).fill(999), src = new Uint8Array(N * N), q = [];
-  for (let i = 0; i < N * N; i++) if (!WATER.has(tile[i]) || tile[i] === T.LAKE || tile[i] === T.RIVER) { dist[i] = 0; src[i] = landOf[i]; q.push(i); }
+  for (let i = 0; i < N * N; i++) if (!WATER.has(tile[i]) || tile[i] === T.LAKE || tile[i] === T.RIVER || tile[i] === T.BIGRIVER || tile[i] === T.UPRIVER) { dist[i] = 0; src[i] = landOf[i]; q.push(i); }
   for (let h = 0; h < q.length; h++) {
     const i = q[h], x = i % N, y = (i / N) | 0;
     for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
@@ -299,26 +329,26 @@ for (const is of ISLANDS) {
     if (isl === ISLAND_IDX('無人島') && d <= 4) tile[i] = T.LAGOON;
     else if (isl === ISLAND_IDX('紅樹林島') && d <= 6) tile[i] = T.MANGROVE;
     else if (isl === ISLAND_IDX('火山島') && d <= 7) tile[i] = T.VOLCANO;
-    else if (y < 24 + (hash(x, y, 19) - .5) * 4) tile[i] = T.COLD;
-    else if (ell(x, y, 80, 84, 11, 9) + (hash(x - OFS, y - OFS, 9) - .5) * .25 < 1) tile[i] = T.REEF;
+    else if (y < 24 + (hash(x - SX, y, 19) - .5) * 4) tile[i] = T.COLD;
+    else if (ell(x, y, 120, 84, 11, 9) + (hash(x - SX - OFS, y - OFS, 9) - .5) * .25 < 1) tile[i] = T.REEF;
     else if (d <= 5) tile[i] = T.SEA;
   }
   // 冰川海域的浮冰（擋船，也可以站上去）
-  for (let y = 1; y < N - 1; y++) for (let x = 1; x < N - 1; x++) { const i = y * N + x; if (tile[i] === T.COLD && dist[i] >= 3 && hash(x, y, 31) < .02) { tile[i] = T.ICE; if (hash(x, y, 32) < .5 && tile[i + 1] === T.COLD) tile[i + 1] = T.ICE; } }
+  for (let y = 1; y < N - 1; y++) for (let x = 1; x < N - 1; x++) { const i = y * N + x; if (tile[i] === T.COLD && dist[i] >= 3 && hash(x - SX, y, 31) < .02) { tile[i] = T.ICE; if (hash(x - SX, y, 32) < .5 && tile[i + 1] === T.COLD) tile[i + 1] = T.ICE; } }
   // 北方的厚冰層（要破冰船頭才開得進去），冰晶島旁邊留一圈水；冰層深處藏著冰封秘境
   const ice = ISLAND_IDX('冰晶島');
-  for (let y = 0; y < 10; y++) for (let x = 0; x < N; x++) { const i = y * N + x; if ((tile[i] === T.COLD || tile[i] === T.DEEP) && y <= 8 + (hash(x, y, 41) - .5) * 2 && !(src[i] - 1 === ice && dist[i] <= 3)) tile[i] = T.ICE; }
-  for (let y = 0; y < 7; y++) for (let x = 94; x < 108; x++) if (Math.hypot(x + .5 - FROZEN.x, y + .5 - FROZEN.y) < 2.4) tile[y * N + x] = T.COLD;
+  for (let y = 0; y < 10; y++) for (let x = 0; x < N; x++) { const i = y * N + x; if ((tile[i] === T.COLD || tile[i] === T.DEEP) && y <= 8 + (hash(x - SX, y, 41) - .5) * 2 && !(src[i] - 1 === ice && dist[i] <= 3)) tile[i] = T.ICE; }
+  for (let y = 0; y < 7; y++) for (let x = 134; x < 148; x++) if (Math.hypot(x + .5 - FROZEN.x, y + .5 - FROZEN.y) < 2.4) tile[y * N + x] = T.COLD;
 })();
 // 建築（小鎮）
 const BUILDINGS = [
   // 小鎮配置（畫面上）：水族館在廣場後方中間，釣具店往左、魚市往右，小屋在左前、圖鑑館在右前，彼此留 3～5 格空地
-  { id: 'shop', name: '釣具店', x: 55, y: 69, w: 3, h: 2, hgt: 16, wall: '#f0dfbf', roof: '#c8503a', sign: '🎣' },
-  { id: 'market', name: '魚市', x: 64, y: 60, w: 3, h: 2, hgt: 14, wall: '#e8e2d0', roof: '#3a78c0', sign: '🐟' },
-  { id: 'home', name: '我的小屋', x: 60, y: 71, w: 2, h: 2, hgt: 14, wall: '#f4e6c8', roof: '#4a9a5a', sign: '🏠' },
-  { id: 'board', name: '圖鑑館', x: 66, y: 65, w: 2, h: 2, hgt: 15, wall: '#efe0d0', roof: '#9a5ab0', sign: '📖' },
-  { id: 'aquarium', name: '水族館', x: 58, y: 62, w: 3, h: 2, hgt: 18, wall: '#e4f2fa', roof: '#2a78b0', sign: '🐠' },
-  { id: 'quests', name: '委託板', x: 57, y: 58, w: 1, h: 1, hgt: 12, wall: '#c8a070', roof: '#8a5a30', sign: '📋' },
+  { id: 'shop', name: '釣具店', x: 95, y: 69, w: 3, h: 2, hgt: 16, wall: '#f0dfbf', roof: '#c8503a', sign: '🎣' },
+  { id: 'market', name: '魚市', x: 104, y: 60, w: 3, h: 2, hgt: 14, wall: '#e8e2d0', roof: '#3a78c0', sign: '🐟' },
+  { id: 'home', name: '我的小屋', x: 100, y: 71, w: 2, h: 2, hgt: 14, wall: '#f4e6c8', roof: '#4a9a5a', sign: '🏠' },
+  { id: 'board', name: '圖鑑館', x: 106, y: 65, w: 2, h: 2, hgt: 15, wall: '#efe0d0', roof: '#9a5ab0', sign: '📖' },
+  { id: 'aquarium', name: '水族館', x: 98, y: 62, w: 3, h: 2, hgt: 18, wall: '#e4f2fa', roof: '#2a78b0', sign: '🐠' },
+  { id: 'quests', name: '委託板', x: 97, y: 58, w: 1, h: 1, hgt: 12, wall: '#c8a070', roof: '#8a5a30', sign: '📋' },
 ];
 // 服飾店：放在其他島的碼頭附近（翠湖森林島、溪谷山島），並鋪一條石板路接到碼頭
 function placeShop(dock, w, h) {
@@ -345,7 +375,7 @@ for (const b of BUILDINGS) {
   b.door = [b.x + b.w / 2, b.y + b.h + .5];   // 門在建築的左前方（＋y 那一面）
 }
 // 燈塔：從小鎮往 +x 走到最後一格陸地
-const lighthouse = (() => { let x = 60, y = 64; while (!WATER.has(at(x + 1, y))) x++; block[y * N + x] = 1; return { x, y }; })();
+const lighthouse = (() => { let x = 100, y = 64; while (!WATER.has(at(x + 1, y))) x++; block[y * N + x] = 1; return { x, y }; })();
 // 火山（火山島中間）
 const volcano = (() => { const is = ISLANDS[ISLAND_IDX('火山島')]; const x = Math.floor(is.cx), y = Math.floor(is.cy); for (let dy = -1; dy <= 1; dy++) for (let dx = -1; dx <= 1; dx++) block[(y + dy) * N + x + dx] = 1; return { x: x + .5, y: y + .5 }; })();
 // 樹與岩石、路燈
@@ -360,20 +390,30 @@ for (let y = 1; y < N - 1; y++) for (let x = 1; x < N - 1; x++) {
     if (!dockNear) { block[i] = 1; trees.push({ x: x + .5, y: y + .5, k: nz(is, x, y, 12), snow: tt === T.SNOW, mangrove: !!is.mangrove, palm: !!is.palm }); }
   } else if (tt === T.GRASS && is && is.name === '溪谷山島' && !nearWater && nz(is, x, y, 13) < .07) { block[i] = 1; rocks.push({ x: x + .5, y: y + .5 }); }
 }
-for (const [x, y] of [[57, 66], [62, 59], [63, 68], [53, 67], [69, 62], [58, 74]]) if (at(x, y) === T.STONE && !block[y * N + x]) { block[y * N + x] = 1; lamps.push({ x: x + .5, y: y + .5 }); }
+for (const [x, y] of [[97, 66], [102, 59], [103, 68], [93, 67], [109, 62], [98, 74]]) if (at(x, y) === T.STONE && !block[y * N + x]) { block[y * N + x] = 1; lamps.push({ x: x + .5, y: y + .5 }); }
 const walkable = (x, y) => { const xi = Math.floor(x), yi = Math.floor(y); if (xi < 0 || yi < 0 || xi >= N || yi >= N) return false; const t = tile[yi * N + xi]; return !WATER.has(t) && !block[yi * N + xi]; };
 let ICEBREAK = false;   // 有破冰船頭：船可以開過浮冰和冰層
 const boatable = (x, y) => { const xi = Math.floor(x), yi = Math.floor(y); if (xi < 1 || yi < 1 || xi >= N - 1 || yi >= N - 1) return false; const t = tile[yi * N + xi]; return BOATABLE.has(t) || (ICEBREAK && t === T.ICE); };
 const iso = (x, y) => ({ x: (x - y) * TW / 2 + OX, y: (x + y) * TH / 2 + OY });
 
 // ════════════════ 預先畫好地面 ════════════════
-const ground = document.createElement('canvas'); ground.width = N * TW; ground.height = N * TH + OY + 40;
-(function drawGround() {
-  const g = ground.getContext('2d');
-  g.fillStyle = TILE_COLOR[T.DEEP]; g.fillRect(0, 0, ground.width, ground.height);
+// 地圖很大，整張畫成一張圖手機會吃不消：切成 512×512 的小塊，畫面需要時才畫，最多留 24 塊
+const CS = 512, chunks = new Map();
+function groundChunk(cx, cy) {
+  const key = cx + ',' + cy; let c = chunks.get(key);
+  if (c) { chunks.delete(key); chunks.set(key, c); return c; }
+  c = document.createElement('canvas'); c.width = CS; c.height = CS;
+  const g = c.getContext('2d'); g.fillStyle = TILE_COLOR[T.DEEP]; g.fillRect(0, 0, CS, CS); g.translate(-cx * CS, -cy * CS);
+  paintGround(g, cx * CS, cy * CS);
+  chunks.set(key, c); if (chunks.size > 24) chunks.delete(chunks.keys().next().value);
+  return c;
+}
+function paintGround(g, X0, Y0) {
+  const dMin = Math.floor((X0 - OX - 28) / (TW / 2)), dMax = Math.ceil((X0 + CS - OX + 28) / (TW / 2));
+  const sMin = Math.max(0, Math.floor((Y0 - OY - 28) / (TH / 2))), sMax = Math.min(2 * N - 2, Math.ceil((Y0 + CS - OY + 28) / (TH / 2)));
   const dia = (x, y, fill) => { g.fillStyle = fill; g.beginPath(); g.moveTo(x, y); g.lineTo(x + TW / 2, y + TH / 2); g.lineTo(x, y + TH); g.lineTo(x - TW / 2, y + TH / 2); g.closePath(); g.fill(); };
-  for (let s = 0; s < 2 * N; s++) for (let x = 0; x < N; x++) {
-    const y = s - x; if (y < 0 || y >= N) continue;
+  for (let s = sMin; s <= sMax; s++) for (let x = 0; x < N; x++) {
+    const y = s - x; if (y < 0 || y >= N || x - y < dMin || x - y > dMax) continue;
     const t = tile[y * N + x], p = iso(x, y), v = (hash(x, y, 1) - .5) * .12;
     if (WATER.has(t)) {
       dia(p.x, p.y, shade(TILE_COLOR[t], v * .6));
@@ -422,7 +462,7 @@ const ground = document.createElement('canvas'); ground.width = N * TW; ground.h
       }
     }
   }
-})();
+}
 
 // ════════════════ 小地圖（菱形，與畫面方向一致）════════════════
 const mapImg = document.createElement('canvas'); mapImg.width = N * 4; mapImg.height = N * 2 + 4;
@@ -439,8 +479,8 @@ const mapPos = (x, y, sc) => ({ x: ((x - y) * 2 + N * 2) * sc, y: (x + y) * sc }
 // ════════════════ 🧭 探險：隱藏地點、地圖迷霧 ════════════════
 // 隱藏地點：沒發現前不會標在地圖上；靠近（find 格內）就會「發現」
 const SPOTS = [
-  { id: 'lagoon', name: '無人島', icon: '🏝️', x: 100, y: 104, find: 8, desc: '東南外海的小島，四周是清澈見底的潟湖。' },
-  { id: 'wreck', name: '沉船', icon: '⚓', x: 20.5, y: 100.5, r: 3.5, region: 'wreck', find: 6, draw: true, desc: '西南深海裡半沉的老船，船艙成了魚的家。' },
+  { id: 'lagoon', name: '無人島', icon: '🏝️', x: 140, y: 104, find: 8, desc: '東南外海的小島，四周是清澈見底的潟湖。' },
+  { id: 'wreck', name: '沉船', icon: '⚓', x: 60.5, y: 100.5, r: 3.5, region: 'wreck', find: 6, draw: true, desc: '西南深海裡半沉的老船，船艙成了魚的家。' },
   { id: 'cave', name: '海蝕洞', icon: '🕳️', x: CAVE.x, y: CAVE.y, r: 4, region: 'cave', cond: () => phase === 'dawn', find: 6, draw: true, desc: '西北岩礁的洞穴，只有清晨退潮時才進得去。' },
   { id: 'frozen', name: '冰封秘境', icon: '🧊', x: FROZEN.x, y: FROZEN.y, r: 2.8, region: 'frozen', find: 4.5, draw: true, desc: '北方冰層深處的一池海水，要破冰船頭才到得了。' },
 ];
@@ -462,12 +502,15 @@ function revealAt(cx, cy, r) {
 const isRevealed = (x, y) => !!fog[clamp(Math.floor(y), 0, N - 1) * N + clamp(Math.floor(x), 0, N - 1)];
 const fogPct = () => Math.floor(fogCount / (N * N) * 1000) / 10;
 function fogPack() { const b = new Uint8Array(Math.ceil(N * N / 8)); for (let i = 0; i < N * N; i++) if (fog[i]) b[i >> 3] |= 1 << (i & 7); let s = ''; for (let i = 0; i < b.length; i += 4096) s += String.fromCharCode.apply(null, b.subarray(i, i + 4096)); return btoa(s); }
-function fogUnpack(str) { const bin = atob(str); fogCount = 0; for (let i = 0; i < N * N; i++) { fog[i] = (bin.charCodeAt(i >> 3) >> (i & 7)) & 1; fogCount += fog[i]; } }
+function fogUnpack(str, n = N, dx = 0) {   // n／dx：舊地圖的大小和要往右移幾格（地圖擴大前的存檔）
+  const bin = atob(str); fog.fill(0); fogCount = 0;
+  for (let i = 0; i < n * n; i++) if ((bin.charCodeAt(i >> 3) >> (i & 7)) & 1) { const x = i % n + dx, y = (i / n) | 0; if (x < N && y < N) { fog[y * N + x] = 1; fogCount++; } }
+}
 function initFog() {
   let ok = false;
-  if (prog.fog) try { fogUnpack(prog.fog); ok = true; } catch (e) {}
+  if (prog.fog) try { const n = prog.fogN || 120; fogUnpack(prog.fog, n, n === N ? 0 : SX); ok = true; } catch (e) {}
   if (!ok) {   // 第一次（或更新前的存檔）：先打開漁港鎮，以前釣過魚的海域附近也打開
-    fog.fill(0); fogCount = 0; revealAt(60, 65, 17);
+    fog.fill(0); fogCount = 0; revealAt(100, 65, 17);
     const REG_ISL = { lake: '翠湖森林島', river: '溪谷山島', reef: '珊瑚小島', cold: '冰晶島', mangrove: '紅樹林島', volcano: '火山島' };
     for (const [r, name] of Object.entries(REG_ISL)) if (prog.region && prog.region[r]) { const is = ISLANDS[ISLAND_IDX(name)]; revealAt(is.cx, is.cy, 13); }
     if ((prog.contestN || 0) > 0 || Object.keys(prog.contest || {}).length) { const is = ISLANDS[ISLAND_IDX('金鱗島')]; revealAt(is.cx, is.cy, 11); }
@@ -752,7 +795,7 @@ function updateSick(dt) {
   let d;
   if (state.onBoat) {
     const reg = REGION_OF[at(Math.floor(state.boat.x), Math.floor(state.boat.y))];
-    const base = { deep: 1.1, reef: .45, cold: .9, volcano: .95, mangrove: .3 }[reg] || .55;
+    const base = { deep: 1.1, reef: .45, cold: .9, volcano: .95, mangrove: .3, bigriver: .15, upriver: .1, lake: .1, river: .1 }[reg] || .55;
     const sp = Math.hypot(state.boat.vx, state.boat.vy) / (state.boatSpeed || 6);
     d = (base + sp * 1.2) * (phase === 'night' ? 1.2 : 1) * (1 + wx.wave * 1.5);
   } else d = -8;
@@ -956,6 +999,8 @@ const ACH = [
   ['r_cold', '❄️ 冰川釣手', '在冰川海域釣到魚', s => s.region.cold > 0],
   ['r_mangrove', '🌿 紅樹林釣手', '在紅樹林河口釣到魚', s => s.region.mangrove > 0],
   ['r_volcano', '🌋 火山釣手', '在火山海域釣到魚', s => s.region.volcano > 0],
+  ['r_bigriver', '🛶 大河釣手', '開船進大河釣到魚', s => (s.region.bigriver || 0) > 0],
+  ['r_upriver', '⛰️ 源流探險家', '開到大河上游釣到魚', s => (s.region.upriver || 0) > 0],
   ['t_dawn', '🌅 早起的釣客', '清晨釣到魚', s => s.time.dawn > 0],
   ['t_dusk', '🌇 夕陽下的收穫', '黃昏釣到魚', s => s.time.dusk > 0],
   ['t_night', '🌙 夜釣高手', '夜晚釣到魚', s => s.time.night > 0],
@@ -996,7 +1041,7 @@ const ACH = [
 // 徽章等級：bronze 銅、silver 銀、gold 金、rainbow 彩虹（最難）
 const TIER = { first: 'bronze', c10: 'bronze', c50: 'silver', c200: 'gold', d10: 'bronze', d30: 'silver', d60: 'gold', dall: 'rainbow',
   r_harbor: 'bronze', r_lake: 'bronze', r_river: 'bronze', r_reef: 'silver', r_deep: 'silver', t_dawn: 'bronze', t_dusk: 'bronze', t_night: 'silver',
-  rare: 'silver', epic: 'gold', legend: 'gold', legend_all: 'rainbow', w10: 'silver', w100: 'gold', m1000: 'bronze', m10000: 'gold', rod: 'bronze', boat: 'bronze', style1: 'bronze', style10: 'gold', wx_rain: 'bronze', wx_typhoon: 'gold', wx_special: 'silver', drift10: 'silver', contest1: 'bronze', podium: 'silver', champion: 'gold', r_cold: 'silver', r_mangrove: 'bronze', r_volcano: 'silver', aq1: 'bronze', aqleg: 'silver', aq20: 'gold', explore50: 'silver', explore85: 'gold', spot1: 'bronze', spotall: 'rainbow', dig1: 'bronze', dig5: 'gold', boss1: 'silver', boss5: 'gold', quest1: 'bronze', quest10: 'gold', gearall: 'silver' };
+  rare: 'silver', epic: 'gold', legend: 'gold', legend_all: 'rainbow', w10: 'silver', w100: 'gold', m1000: 'bronze', m10000: 'gold', rod: 'bronze', boat: 'bronze', style1: 'bronze', style10: 'gold', wx_rain: 'bronze', wx_typhoon: 'gold', wx_special: 'silver', drift10: 'silver', contest1: 'bronze', podium: 'silver', champion: 'gold', r_cold: 'silver', r_mangrove: 'bronze', r_volcano: 'silver', r_bigriver: 'bronze', r_upriver: 'silver', aq1: 'bronze', aqleg: 'silver', aq20: 'gold', explore50: 'silver', explore85: 'gold', spot1: 'bronze', spotall: 'rainbow', dig1: 'bronze', dig5: 'gold', boss1: 'silver', boss5: 'gold', quest1: 'bronze', quest10: 'gold', gearall: 'silver' };
 const TIER_NAME = { bronze: '銅', silver: '銀', gold: '金', rainbow: '彩虹' };
 const achParts = a => { const i = a[1].indexOf(' '); return { id: a[0], icon: a[1].slice(0, i), title: a[1].slice(i + 1), desc: a[2], tier: TIER[a[0]] || 'bronze' }; };
 const medalHtml = (b, got) => `<div class="medal ${got ? b.tier : 'lock'}"><i>${got ? b.icon : '？'}</i></div>`;
@@ -1020,13 +1065,15 @@ function showNextBadge() {
 const SAVE_KEY = 'bay-fishing-save-v1';
 const prog = { dex: {}, ach: {}, catches: 0, region: {}, time: {}, rar: {}, maxW: 0, earned: 0, rodIdx: 0, boatLv: 0, bait: 0, pills: 0, look: null, closet: [], wxc: {}, drift: 0, contest: {}, contestN: 0, contestBest: 0, contestWins: 0, aquarium: [], found: {}, maps: [], dug: 0, boss: 0, quests: [], questDone: 0, rep: 0, gear: {}, explore: 0, fog: null };
 function save() {
-  try { prog.fog = fogPack(); localStorage.setItem(SAVE_KEY, JSON.stringify({ v: 1, mapV: 2, coins: state.coins, bag: state.bag, prog, pos: { x: state.player.x, y: state.player.y, bx: state.boat.x, by: state.boat.y, onBoat: state.onBoat } })); } catch (e) {}
+  try { prog.fog = fogPack(); prog.fogN = N; localStorage.setItem(SAVE_KEY, JSON.stringify({ v: 1, mapV: 3, coins: state.coins, bag: state.bag, prog, pos: { x: state.player.x, y: state.player.y, bx: state.boat.x, by: state.boat.y, onBoat: state.onBoat } })); } catch (e) {}
 }
 function load() {
   try {
     const d = JSON.parse(localStorage.getItem(SAVE_KEY) || 'null'); if (!d || d.v !== 1) return false;
     state.coins = d.coins || 0; state.bag = d.bag || []; Object.assign(prog, d.prog || {});
-    if (d.pos && d.mapV !== 2) { d.pos.x += OFS; d.pos.y += OFS; d.pos.bx += OFS; d.pos.by += OFS; }   // 擴大地圖前的存檔：位置跟著移
+    const mv = d.mapV || 1;
+    if (d.pos && mv < 2) { d.pos.x += OFS; d.pos.y += OFS; d.pos.bx += OFS; d.pos.by += OFS; }   // 80 格時代的存檔：位置跟著移
+    if (mv < 3) { if (d.pos) { d.pos.x += SX; d.pos.bx += SX; } for (const m of prog.maps || []) m.x += SX; }   // 120 格時代：往右移 40 格
     if (d.pos && walkable(d.pos.x, d.pos.y)) { state.player.x = d.pos.x; state.player.y = d.pos.y; }
     if (d.pos && boatable(d.pos.bx, d.pos.by)) { state.boat.x = d.pos.bx; state.boat.y = d.pos.by; }
     if (d.pos && d.pos.onBoat && boatable(d.pos.bx, d.pos.by)) { state.onBoat = true; state.player.x = state.boat.x; state.player.y = state.boat.y; }
@@ -1341,6 +1388,7 @@ function reachableFromDock(i, tx, ty) {   // 從那座島的碼頭走得到嗎�
 function newTreasureMap() {
   for (let tries = 0; tries < 300; tries++) {
     const i = 1 + Math.floor(Math.random() * (ISLANDS.length - 1)), is = ISLANDS[i];   // 漁港鎮以外的島
+    if (is.custom) continue;
     const x = Math.floor(is.cx + rand(-1, 1) * is.rx * .8), y = Math.floor(is.cy + rand(-1, 1) * is.ry * .8);
     if (x < 1 || y < 1 || x >= N - 1 || y >= N - 1 || landOf[y * N + x] !== i + 1 || !walkable(x + .5, y + .5)) continue;
     if (docks.some(d => Math.hypot(d.x0 - x, d.y0 - y) < 3) || BUILDINGS.some(b => Math.hypot(b.door[0] - x - .5, b.door[1] - y - .5) < 3)) continue;
@@ -1764,7 +1812,7 @@ function toggleMap() {
   g.font = 'bold 13px sans-serif'; g.textAlign = 'center'; g.lineWidth = 3;
   const label = (t, x, y, col = '#fff') => { const p = mapPos(x, y, sc); g.strokeStyle = '#000a'; g.strokeText(t, p.x, p.y + oy); g.fillStyle = col; g.fillText(t, p.x, p.y + oy); };
   for (const is of ISLANDS) if (isRevealed(is.cx, is.cy) && (!is.hidden || prog.found.lagoon)) label(is.name, is.cx, is.cy + 1, '#fff3c0');
-  for (const [t2, x2, y2, c2] of [['深海', 96, 70, '#a8c8ff'], ['深海', 22, 92, '#a8c8ff'], ['❄️冰川海域', 82, 12, '#e0f4ff']]) if (isRevealed(x2, y2)) label(t2, x2, y2, c2);
+  for (const [t2, x2, y2, c2] of [['深海', 136, 70, '#a8c8ff'], ['深海', 62, 92, '#a8c8ff'], ['❄️冰川海域', 122, 12, '#e0f4ff'], ['🛶大河', 22, 84, '#c8f0ff'], ['⛰️上游', 18, 128, '#c8f0ff']]) if (isRevealed(x2, y2)) label(t2, x2, y2, c2);
   for (const s of SPOTS) if (s.id !== 'lagoon' && prog.found[s.id]) label(s.icon + s.name, s.x, s.y + 1, '#ffe680');
   sonarMarks(g, (x2, y2) => { const q = mapPos(x2, y2, sc); return { x: q.x, y: q.y + oy }; }, 1.6);
   const pl = state.onBoat ? state.boat : state.player, p = mapPos(pl.x, pl.y, sc);
@@ -1865,15 +1913,16 @@ function drawIso(g, gf, t) {
   const vx = Math.floor(camX), vy = Math.floor(camY);
   cam.vx = vx; cam.vy = vy; cam.fx = camX - vx; cam.fy = camY - vy;
   g.fillStyle = TILE_COLOR[T.DEEP]; g.fillRect(0, 0, lw, lh);
-  const sx = Math.max(0, vx), sy = Math.max(0, vy), ex = Math.min(ground.width, vx + lw), ey = Math.min(ground.height, vy + lh);
-  if (ex > sx && ey > sy) g.drawImage(ground, sx, sy, ex - sx, ey - sy, sx - vx, sy - vy, ex - sx, ey - sy);
+  for (let cy = Math.floor(vy / CS); cy <= Math.floor((vy + lh) / CS); cy++) for (let cx = Math.floor(vx / CS); cx <= Math.floor((vx + lw) / CS); cx++) g.drawImage(groundChunk(cx, cy), cx * CS - vx, cy * CS - vy);
+  // 先把旁邊快要看到的地塊畫好（每格畫面最多一塊，開船時不會卡一下）
+  pre: for (let cy = Math.floor((vy - 256) / CS); cy <= Math.floor((vy + lh + 256) / CS); cy++) for (let cx = Math.floor((vx - 256) / CS); cx <= Math.floor((vx + lw + 256) / CS); cx++) if (!chunks.has(cx + ',' + cy)) { groundChunk(cx, cy); break pre; }
   // 水面波光
   const R = Math.ceil(Math.max(lw / TW, lh / TH)) + 2, px = Math.floor(pl.x), py = Math.floor(pl.y), fr = Math.floor(t * 1.6);
   g.fillStyle = 'rgba(255,255,255,.55)';
   for (let y = py - R; y <= py + R; y++) for (let x = px - R; x <= px + R; x++) {
     const tt = at(x, y); if (!WATER.has(tt)) continue;
     if (hash(x, y, fr) < .07 + wx.wave * .1) { const p = iso(x + hash(x, y, fr + 1), y + .5); g.fillRect(Math.round(p.x - vx), Math.round(p.y - vy), 3 + Math.round(wx.wave * 3), 1); }
-    if (tt === T.RIVER && hash(x, y, 30) < .4) { const p = iso(x + ((t * .6 + hash(x, y, 31)) % 1), y + .5); g.fillRect(Math.round(p.x - vx), Math.round(p.y - vy), 2, 1); }
+    if ((tt === T.RIVER || tt === T.BIGRIVER || tt === T.UPRIVER) && hash(x, y, 30) < .4) { const p = iso(x + ((t * .6 + hash(x, y, 31)) % 1), y + .5); g.fillRect(Math.round(p.x - vx), Math.round(p.y - vy), 2, 1); }
   }
   drawBossShadow(g, vx, vy, t);
   // 依深度排序的物件
@@ -2013,20 +2062,33 @@ function drawThird(g, t) {
   if (skyDark > .02) { g.fillStyle = `rgba(80,88,104,${Math.min(.85, skyDark * 1.5)})`; g.fillRect(0, 0, lw, hz);
     g.fillStyle = `rgba(60,66,80,${Math.min(.8, skyDark * 1.3)})`; for (let i = 0; i < 7; i++) { const cx = ((hash(i, 17) * lw + t * (4 + wx.wind * 18) * (1 + i * .2)) % (lw + 60)) - 30, cy = hash(i, 18) * hz * .7; g.fillRect(cx | 0, cy | 0, 40, 8); g.fillRect((cx | 0) + 6, (cy | 0) - 5, 26, 6); } }
   // 遠景：依區域
-  const far = { harbor: '#5a7a6a', deep: null, reef: '#e8d49a', lake: '#3a6a3a', river: '#5a6a5a', cold: '#e8f2fa', mangrove: '#2f5a3a', volcano: '#3a2e30', wreck: null, cave: '#2e2a30', lagoon: '#e8d49a', frozen: '#f0f8ff' }[reg];
+  const far = { harbor: '#5a7a6a', deep: null, reef: '#e8d49a', lake: '#3a6a3a', river: '#5a6a5a', cold: '#e8f2fa', mangrove: '#2f5a3a', volcano: '#3a2e30', wreck: null, cave: '#2e2a30', lagoon: '#e8d49a', frozen: '#f0f8ff', bigriver: null, upriver: null }[reg];
   if (far) { g.fillStyle = phase === 'night' ? shade(far, -.6) : far; for (let x = 0; x < lw; x += 2) { const h = (Math.sin(x * .03 + 1) * .5 + Math.sin(x * .011) * .8 + 1.4) * (reg === 'lake' || reg === 'river' ? 9 : 5); g.fillRect(x, hz - h | 0, 2, h + 1 | 0); } }
   if (reg === 'harbor') { g.fillStyle = phase === 'night' ? '#2a2a3a' : '#c8b8a0'; g.fillRect(lw * .15 | 0, hz - 12, 14, 12); g.fillRect(lw * .22 | 0, hz - 9, 10, 9); g.fillStyle = '#d0403a'; g.fillRect(lw * .3 | 0, hz - 22, 4, 22); }
   if (reg === 'cold') { g.fillStyle = phase === 'night' ? '#8a9aaa' : '#ffffff'; for (let i = 0; i < 5; i++) { const x = hash(i, 23) * lw | 0, w = 10 + hash(i, 24) * 22 | 0, h = 4 + hash(i, 25) * 8 | 0; g.fillRect(x, hz - h, w, h); g.fillRect(x + 3, hz - h - 3, w - 8, 3); } }
   if (reg === 'volcano') { const vx = lw * .7 | 0, c = phase === 'night' ? '#1a1416' : '#2a2224'; g.fillStyle = c; for (let k = 0; k < 30; k++) g.fillRect(vx - 34 + k, hz - k, 68 - k * 2, 1); g.fillStyle = '#ff7a2a'; g.fillRect(vx - 4, hz - 30, 8, 2);
     g.fillStyle = 'rgba(120,110,110,.5)'; for (let i = 0; i < 6; i++) { const ph = (t * .12 + i / 6) % 1; g.fillRect(vx - 4 + Math.sin(ph * 6 + i) * 6 | 0, hz - 34 - ph * 40 | 0, 8 + ph * 10 | 0, 4); } }
   if (reg === 'mangrove') { g.fillStyle = phase === 'night' ? '#14241a' : '#24482c'; for (let i = 0; i < 12; i++) { const x = hash(i, 26) * lw | 0; g.fillRect(x, hz - 14, 8, 8); for (let r = 0; r < 3; r++) g.fillRect(x + 1 + r * 3, hz - 6, 1, 6); } }
+  if (reg === 'upriver') {   // 上游：遠方的山和源頭的瀑布
+    g.fillStyle = phase === 'night' ? '#1a2230' : '#6a7a9a'; for (let x = 0; x < lw; x += 2) { const h = 22 + Math.sin(x * .05) * 10 + Math.sin(x * .13 + 2) * 6; g.fillRect(x, hz - h | 0, 2, h | 0); }
+    g.fillStyle = phase === 'night' ? '#e0e8f0' : '#ffffff'; for (let x = 0; x < lw; x += 2) { const h = 22 + Math.sin(x * .05) * 10 + Math.sin(x * .13 + 2) * 6; if (h > 28) g.fillRect(x, hz - h | 0, 2, 3); }
+    const fx2 = lw * .5 | 0; g.fillStyle = phase === 'night' ? '#8ab0c8' : '#d8f4ff'; g.fillRect(fx2 - 3, hz - 26, 6, 26); g.fillStyle = 'rgba(255,255,255,.7)'; for (let k = 0; k < 6; k++) g.fillRect(fx2 - 3 + (k % 3) * 2, (hz - 26 + ((t * 30 + k * 7) % 26)) | 0, 1, 3);
+  }
+  if (reg === 'bigriver' || reg === 'upriver') {   // 河的兩岸：左右都是陸地和樹林
+    const bank = phase === 'night' ? '#1a2a1a' : reg === 'upriver' ? '#3a6a3a' : '#4a7a3a', dark = phase === 'night' ? '#101a10' : '#2a5a2a';
+    for (const side of [-1, 1]) {
+      g.fillStyle = bank; g.beginPath(); g.moveTo(side < 0 ? 0 : lw, hz - 2);
+      g.lineTo(side < 0 ? lw * .38 : lw * .62, hz - 2); g.lineTo(side < 0 ? lw * .12 : lw * .88, lh); g.lineTo(side < 0 ? 0 : lw, lh); g.fill();
+      g.fillStyle = dark; for (let i = 0; i < 8; i++) { const k = i / 8, x = side < 0 ? lw * (.36 - k * .3) : lw * (.64 + k * .3), y = hz - 2 + k * k * 30, w = 6 + k * 14; g.fillRect(x - w / 2 | 0, y - w * 1.6 | 0, w | 0, w * 1.4 | 0); g.fillStyle = phase === 'night' ? '#2a1e14' : '#6a4224'; g.fillRect(x - 1 | 0, y - w * .3 | 0, 2, w * .4 | 0); g.fillStyle = dark; }
+    }
+  }
   if (reg === 'wreck') { g.fillStyle = phase === 'night' ? '#0e1620' : '#2a2a32'; const wx2 = lw * .62 | 0; g.fillRect(wx2, hz - 44, 3, 44); g.fillRect(wx2 - 10, hz - 34, 24, 2); for (let k = 0; k < 8; k++) g.fillRect(wx2 - 26 + k * 2, hz - 8 + (k >> 1), 52 - k * 3, 2); g.fillStyle = '#c8c0a8'; g.fillRect(wx2 + 3, hz - 40, 8, 6); }
   if (reg === 'cave') { g.fillStyle = phase === 'night' ? '#121014' : '#2e2a30'; for (let k = 0; k < 50; k++) g.fillRect(lw * .2 + k * .3 | 0, hz - k, lw * .6 - k * .6 | 0, 1); g.fillStyle = '#060508'; g.fillRect(lw * .4 | 0, hz - 30, lw * .2 | 0, 30); g.fillRect(lw * .43 | 0, hz - 34, lw * .14 | 0, 4); }
   if (reg === 'lagoon') { for (let i = 0; i < 5; i++) { const x = (hash(i, 27) * lw * .8 + lw * .1) | 0; g.fillStyle = phase === 'night' ? '#2a2418' : '#8a6a3a'; for (let k = 0; k < 14; k++) g.fillRect(x + (k * k * .03 | 0), hz - k * 1.4 - 6 | 0, 2, 2); g.fillStyle = phase === 'night' ? '#14241a' : '#2f8a3a'; g.fillRect(x - 6, hz - 28, 18, 3); g.fillRect(x - 3, hz - 31, 12, 3); } }
   if (reg === 'frozen') { g.fillStyle = phase === 'night' ? '#8a9aaa' : '#ffffff'; for (let i = 0; i < 7; i++) { const x = hash(i, 33) * lw | 0, w = 14 + hash(i, 34) * 30 | 0, h = 14 + hash(i, 35) * 22 | 0; g.fillRect(x, hz - h, w, h); g.fillStyle = phase === 'night' ? '#6a7a8a' : '#d8eefa'; g.fillRect(x + w - 4, hz - h, 4, h); g.fillStyle = phase === 'night' ? '#8a9aaa' : '#ffffff'; } }
   if (reg === 'lake' || reg === 'river') { g.fillStyle = phase === 'night' ? '#1a2a1a' : '#2f6a2f'; for (let i = 0; i < 9; i++) { const x = hash(i, 20) * lw | 0; g.fillRect(x, hz - 16, 6, 10); g.fillRect(x + 2, hz - 20, 2, 6); } }
   // 水面
-  const wc = { harbor: '#3f8fd0', deep: '#1e3f7a', reef: '#3fc3c0', lake: '#3a9a7a', river: '#4fb0b8', cold: '#4a7aa8', mangrove: '#4a7a5a', volcano: '#4a3a56', wreck: '#1e3a5a', cave: '#2a4a5a', lagoon: '#3ad0c8', frozen: '#6a9ac8' }[reg];
+  const wc = { harbor: '#3f8fd0', deep: '#1e3f7a', reef: '#3fc3c0', lake: '#3a9a7a', river: '#4fb0b8', cold: '#4a7aa8', mangrove: '#4a7a5a', volcano: '#4a3a56', wreck: '#1e3a5a', cave: '#2a4a5a', lagoon: '#3ad0c8', frozen: '#6a9ac8', bigriver: '#4a98a8', upriver: '#5ab4c4' }[reg];
   const top = phase === 'day' ? shade(wc, .25) : shade(ph.sea, .1);
   gr = g.createLinearGradient(0, hz, 0, lh); gr.addColorStop(0, top); gr.addColorStop(1, phase === 'night' ? shade(wc, -.65) : shade(wc, -.2)); g.fillStyle = gr; g.fillRect(0, hz, lw, lh - hz);
   if (phase !== 'day') { g.fillStyle = phase === 'night' ? 'rgba(255,240,200,.25)' : 'rgba(255,200,120,.35)'; for (let k = 0; k < 10; k++) { const yy = hz + 2 + k * k * 1.2; g.fillRect(lw * .78 - 6 + Math.sin(t * 2 + k) * 3 | 0, yy | 0, 12 + k, 1); } }
