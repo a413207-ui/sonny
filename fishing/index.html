@@ -222,7 +222,7 @@ const landOf = new Uint8Array(N * N);        // 屬於哪座島（ISLANDS 索引
 const at = (x, y) => (x < 0 || y < 0 || x >= N || y >= N) ? T.DEEP : tile[y * N + x];
 const set = (x, y, v) => { if (x >= 0 && y >= 0 && x < N && y < N) tile[y * N + x] = v; };
 const ISLANDS = [
-  { name: '漁港鎮', cx: 60, cy: 65, rx: 8.5, ry: 7.5, trees: .06, dock: [60, 66, 0, 1, 4] },
+  { name: '漁港鎮', cx: 60, cy: 65, rx: 12.5, ry: 12.5, trees: .06, dock: [64, 66, 0, 1, 4] },   // 島放大、碼頭移到小屋和圖鑑館中間，讓房子之間有空間
   { name: '翠湖森林島', cx: 37, cy: 37, rx: 11, ry: 10, trees: .2, dock: [37, 42, 0, 1, 3] },
   { name: '溪谷山島', cx: 83, cy: 36, rx: 10, ry: 9, trees: .14, dock: [82, 40, 0, 1, 3] },
   { name: '珊瑚小島', cx: 80, cy: 84, rx: 3.2, ry: 2.6, trees: .1, dock: [80, 84, -1, 0, 3] },
@@ -254,7 +254,7 @@ for (let x = 75; x < 96; x++) {
   for (const y of [yy, yy + 1]) if (at(x, y) !== T.DEEP && at(x, y) !== T.SEA) set(x, y, x === bridgeX ? T.DOCK : T.RIVER);
 }
 // 小鎮石板地
-for (let y = 0; y < N; y++) for (let x = 0; x < N; x++) if (at(x, y) === T.GRASS && ell(x, y, 60, 65, 6, 5) < 1) set(x, y, T.STONE);
+for (let y = 0; y < N; y++) for (let x = 0; x < N; x++) if (at(x, y) === T.GRASS && ell(x, y, 60.5, 65, 10, 9.5) < 1) set(x, y, T.STONE);
 // 碼頭：從島上某點往指定方向走到水邊，再往外鋪木棧道
 const docks = [];
 for (const is of ISLANDS) {
@@ -289,11 +289,12 @@ for (const is of ISLANDS) {
 })();
 // 建築（小鎮）
 const BUILDINGS = [
-  { id: 'shop', name: '釣具店', x: 56, y: 61, w: 3, h: 2, hgt: 16, wall: '#f0dfbf', roof: '#c8503a', sign: '🎣' },
-  { id: 'market', name: '魚市', x: 62, y: 61, w: 3, h: 2, hgt: 14, wall: '#e8e2d0', roof: '#3a78c0', sign: '🐟' },
-  { id: 'home', name: '我的小屋', x: 56, y: 66, w: 2, h: 2, hgt: 14, wall: '#f4e6c8', roof: '#4a9a5a', sign: '🏠' },
-  { id: 'board', name: '圖鑑館', x: 63, y: 67, w: 2, h: 2, hgt: 15, wall: '#efe0d0', roof: '#9a5ab0', sign: '📖' },
-  { id: 'aquarium', name: '水族館', x: 60, y: 63, w: 3, h: 2, hgt: 18, wall: '#e4f2fa', roof: '#2a78b0', sign: '🐠' },   // 小鎮廣場正中間
+  // 小鎮配置（畫面上）：水族館在廣場後方中間，釣具店往左、魚市往右，小屋在左前、圖鑑館在右前，彼此留 3～5 格空地
+  { id: 'shop', name: '釣具店', x: 55, y: 69, w: 3, h: 2, hgt: 16, wall: '#f0dfbf', roof: '#c8503a', sign: '🎣' },
+  { id: 'market', name: '魚市', x: 64, y: 60, w: 3, h: 2, hgt: 14, wall: '#e8e2d0', roof: '#3a78c0', sign: '🐟' },
+  { id: 'home', name: '我的小屋', x: 60, y: 71, w: 2, h: 2, hgt: 14, wall: '#f4e6c8', roof: '#4a9a5a', sign: '🏠' },
+  { id: 'board', name: '圖鑑館', x: 66, y: 65, w: 2, h: 2, hgt: 15, wall: '#efe0d0', roof: '#9a5ab0', sign: '📖' },
+  { id: 'aquarium', name: '水族館', x: 58, y: 62, w: 3, h: 2, hgt: 18, wall: '#e4f2fa', roof: '#2a78b0', sign: '🐠' },
 ];
 // 服飾店：放在其他島的碼頭附近（翠湖森林島、溪谷山島），並鋪一條石板路接到碼頭
 function placeShop(dock, w, h) {
@@ -335,7 +336,7 @@ for (let y = 1; y < N - 1; y++) for (let x = 1; x < N - 1; x++) {
     if (!dockNear) { block[i] = 1; trees.push({ x: x + .5, y: y + .5, k: nz(is, x, y, 12), snow: tt === T.SNOW, mangrove: !!is.mangrove }); }
   } else if (tt === T.GRASS && is && is.name === '溪谷山島' && !nearWater && nz(is, x, y, 13) < .07) { block[i] = 1; rocks.push({ x: x + .5, y: y + .5 }); }
 }
-for (const [x, y] of [[59, 63], [61, 68], [55, 64], [65, 64], [60, 70]]) if (at(x, y) === T.STONE && !block[y * N + x]) { block[y * N + x] = 1; lamps.push({ x: x + .5, y: y + .5 }); }
+for (const [x, y] of [[57, 66], [62, 59], [63, 68], [53, 67], [69, 62], [58, 74]]) if (at(x, y) === T.STONE && !block[y * N + x]) { block[y * N + x] = 1; lamps.push({ x: x + .5, y: y + .5 }); }
 const walkable = (x, y) => { const xi = Math.floor(x), yi = Math.floor(y); if (xi < 0 || yi < 0 || xi >= N || yi >= N) return false; const t = tile[yi * N + xi]; return !WATER.has(t) && !block[yi * N + xi]; };
 const boatable = (x, y) => { const xi = Math.floor(x), yi = Math.floor(y); if (xi < 1 || yi < 1 || xi >= N - 1 || yi >= N - 1) return false; return BOATABLE.has(tile[yi * N + xi]); };
 const iso = (x, y) => ({ x: (x - y) * TW / 2 + OX, y: (x + y) * TH / 2 + OY });
