@@ -376,6 +376,122 @@ const PHASE = {
 };
 let phase = phaseNow();
 
+// ════════════════ 天氣與海象（照現實時間，每 15 分鐘換一次；網址加 ?weather=typhoon 可測試）════════════════
+// rain 雨量、wave 浪高、dark 天色、wind 風、bolt 打雷、drift 每秒漂來漂流物的機率、bite 等魚咬鉤的時間倍率
+const WEATHER = {
+  sunny: { name: '☀️ 晴天', rain: 0, wave: 0, dark: 0, drift: .02 },
+  cloudy: { name: '☁️ 多雲', rain: 0, wave: .2, dark: .15, drift: .03 },
+  rain: { name: '🌧️ 下雨', rain: .5, wave: .3, dark: .25, drift: .05, bite: .85 },
+  storm: { name: '⛈️ 暴雨', rain: 1, wave: .6, dark: .42, bolt: true, drift: .07, bite: .75 },
+  waves: { name: '🌊 大浪', rain: 0, wave: 1, dark: .12, wind: .4, drift: .08 },
+  typhoon: { name: '🌀 颱風', rain: 1, wave: 1.4, dark: .55, bolt: true, wind: 1, drift: .12, bite: .8 },
+};
+const WX_ODDS = [['sunny', 38], ['cloudy', 22], ['rain', 15], ['storm', 8], ['waves', 11], ['typhoon', 6]];
+const WX_BLOCK = 15 * 60 * 1000;
+function weatherAt(ms) {
+  const q = params.get('weather'); if (q && WEATHER[q]) return q;
+  let u = hash(Math.floor(ms / WX_BLOCK), 77, 3) * 100;
+  for (const [id, w] of WX_ODDS) if ((u -= w) < 0) return id;
+  return 'sunny';
+}
+let weather = weatherAt(Date.now()), wxWarned = 0;
+const wx = { rain: 0, wave: 0, dark: 0, wind: 0, flash: 0 };    // 平滑過渡後的數值
+Object.assign(wx, WEATHER[weather], { flash: 0 });
+function forecast() {
+  const now = Date.now(), left = Math.ceil((WX_BLOCK - now % WX_BLOCK) / 60000), next = weatherAt(now + WX_BLOCK);
+  return `現在 ${WEATHER[weather].name}（還有約 ${left} 分鐘）→ 接下來 ${WEATHER[next].name}`;
+}
+let rainNode = null, boltT = 3;
+function updateWeather(dt) {
+  const now = Date.now(), w = weatherAt(now);
+  if (w !== weather) {
+    weather = w; const W = WEATHER[w];
+    toast(w === 'typhoon' ? '🌀 颱風來了！浪很大，小心暈船——但聽說會有特別的魚…' : w === 'storm' ? '⛈️ 下起暴雨了！魚咬得比較快' : w === 'waves' ? '🌊 起大浪了，船會被浪推著走' : w === 'rain' ? '🌧️ 開始下雨了，魚比較活躍' : '天氣變成 ' + W.name, 3000);
+    if (w === 'typhoon') { buzz([300, 100, 300]); SFX.thunder(); }
+  }
+  // 颱風前 3 分鐘預告
+  const next = weatherAt(now + WX_BLOCK), left = WX_BLOCK - now % WX_BLOCK;
+  if (next === 'typhoon' && weather !== 'typhoon' && left < 180000 && wxWarned !== Math.floor(now / WX_BLOCK)) { wxWarned = Math.floor(now / WX_BLOCK); toast('📢 颱風警報：再過約 3 分鐘颱風就要來了！', 3200); }
+  const W = WEATHER[weather], k = Math.min(1, dt * .4);
+  for (const key of ['rain', 'wave', 'dark', 'wind']) wx[key] += ((W[key] || 0) - wx[key]) * k;
+  // 閃電與雷聲
+  wx.flash = Math.max(0, wx.flash - dt * 2.5);
+  if (W.bolt && (boltT -= dt) <= 0) { boltT = rand(4, 12) / (weather === 'typhoon' ? 1.6 : 1); wx.flash = 1; setTimeout(() => SFX.thunder(), rand(250, 1200)); }
+  // 雨聲（點過畫面、音效開著才有）
+  if (actx && state.snd && !rainNode) {
+    const a = actx, buf = a.createBuffer(1, a.sampleRate * 2, a.sampleRate), d = buf.getChannelData(0);
+    for (let i = 0; i < d.length; i++) d[i] = Math.random() * 2 - 1;
+    const src = a.createBufferSource(), bp = a.createBiquadFilter(), g = a.createGain();
+    src.buffer = buf; src.loop = true; bp.type = 'bandpass'; bp.frequency.value = 1400; bp.Q.value = .6; g.gain.value = 0;
+    src.connect(bp); bp.connect(g); g.connect(a.destination); src.start(); rainNode = g;
+  }
+  if (rainNode) rainNode.gain.setTargetAtTime(state.snd && !document.hidden ? wx.rain * .09 + wx.wave * .02 : 0, actx.currentTime, .5);
+}
+// 雨、天色、閃電：畫在整個畫面最上層（高解析度）
+function drawWeatherFx(t) {
+  const cw = cv.width, ch = cv.height;
+  ctx.setTransform(1, 0, 0, 1, 0, 0);
+  if (wx.dark > .02) { ctx.fillStyle = `rgba(30,38,56,${wx.dark * .45})`; ctx.fillRect(0, 0, cw, ch); }
+  if (wx.rain > .02) {
+    const n = Math.round(170 * wx.rain), slant = .18 + wx.wind * .45, len = (12 + wx.rain * 10) * DPR;
+    ctx.strokeStyle = `rgba(200,220,255,${.35 + wx.rain * .25})`; ctx.lineWidth = Math.max(1, DPR * .8); ctx.beginPath();
+    for (let i = 0; i < n; i++) {
+      const sp = 1.4 + hash(i, 2) * .8, y = ((hash(i, 3) + t * sp) % 1.2 - .1) * ch, x = ((hash(i, 1) * 1.4 - (y / ch) * slant + t * slant * .3) % 1 + 1) % 1 * cw;
+      ctx.moveTo(x, y); ctx.lineTo(x - len * slant, y + len);
+    }
+    ctx.stroke();
+  }
+  if (wx.flash > 0) { ctx.fillStyle = `rgba(235,240,255,${wx.flash * .55})`; ctx.fillRect(0, 0, cw, ch); }
+}
+
+// ════════════════ 漂流物：開船經過就會撈起來 ════════════════
+const DRIFT = {
+  wood: { name: '漂流木' }, crate: { name: '漂流木箱' }, bottle: { name: '漂流瓶' }, chest: { name: '颱風寶箱' },
+};
+const BOTTLE_NOTES = ['「今天的海好藍，希望撿到的人也開心。」', '「我在西南孤島藏了一句話：要常常看海。」', '「聽說颱風天，深海會有龍翻身…」', '「給未來的釣客：耐心等浮標整個沉下去喔！」', '「媽媽說吃魚會變聰明，所以我每天都來釣。」', '「如果你撿到這個，請替我跟燈塔說聲晚安。」'];
+const drifts = []; let driftT = 2;
+function updateDrift(dt) {
+  const W = WEATHER[weather], o = state.onBoat ? state.boat : state.player, tt = performance.now() / 1000;
+  if ((driftT -= dt) <= 0) {
+    driftT = 1;
+    if (drifts.length < 6 && Math.random() < W.drift) {
+      for (let tries = 0; tries < 12; tries++) {
+        const a = Math.random() * 6.28, r = rand(5, 12), x = o.x + Math.cos(a) * r, y = o.y + Math.sin(a) * r;
+        if (!boatable(x, y)) continue;
+        const u = Math.random();
+        const kind = weather === 'typhoon' ? (u < .12 ? 'chest' : u < .3 ? 'bottle' : u < .6 ? 'crate' : 'wood') : (u < .1 ? 'bottle' : u < .35 ? 'crate' : 'wood');
+        drifts.push({ x, y, kind, seed: Math.random() * 10 }); break;
+      }
+    }
+  }
+  for (let i = drifts.length - 1; i >= 0; i--) {
+    const d = drifts[i];
+    const nx = d.x + (Math.sin(d.seed + tt * .2) * .12 + wx.wind * .25) * dt, ny = d.y + (Math.cos(d.seed + tt * .17) * .12 + wx.wind * .1) * dt;
+    if (boatable(nx, ny)) { d.x = nx; d.y = ny; }
+    if (Math.hypot(d.x - o.x, d.y - o.y) > 24) { drifts.splice(i, 1); continue; }
+    if (state.onBoat && !fish.state && Math.hypot(d.x - state.boat.x, d.y - state.boat.y) < .9) { drifts.splice(i, 1); collectDrift(d); }
+  }
+}
+function collectDrift(d) {
+  let msg;
+  const coins = (a, b) => { const c = Math.round(rand(a, b)); state.coins += c; return c; };
+  if (d.kind === 'wood') { if (Math.random() < .3) { prog.bait += 2; msg = '🪵 撈到漂流木，上面卡著 2 個魚餌！'; } else msg = `🪵 撈到漂流木，拿去賣了 🪙${coins(15, 50)}`; }
+  else if (d.kind === 'crate') { const u = Math.random(); if (u < .35) { prog.bait += 5; msg = '📦 撈到木箱，裡面有 5 個魚餌！'; } else if (u < .55) { prog.pills = (prog.pills || 0) + 1; msg = '📦 撈到木箱，裡面有 1 顆暈船藥！'; } else msg = `📦 撈到木箱，裡面有 🪙${coins(80, 150)}`; }
+  else if (d.kind === 'bottle') { msg = `🍾 撈到漂流瓶！紙條寫著：${BOTTLE_NOTES[Math.floor(Math.random() * BOTTLE_NOTES.length)]}（瓶子裡還有 🪙${coins(100, 250)}）`; }
+  else { prog.bait += 5; msg = `🧰 撈到颱風寶箱！🪙${coins(300, 800)} 和 5 個魚餌！`; }
+  prog.drift = (prog.drift || 0) + 1;
+  toast(msg, 3400); buzz([30, 30, 60]); SFX.pickup(); applyGear(); checkAch(); save(); updateHud();
+}
+function drawDrift(g, d, vx, vy, t) {
+  const p = iso(d.x, d.y), x = Math.round(p.x - vx), y = Math.round(p.y - vy + Math.sin(t * 2 + d.seed) * (1 + wx.wave * 1.5));
+  const px = (a, b, w, h, c) => { g.fillStyle = c; g.fillRect(x + a, y + b, w, h); };
+  px(-6, 2, 12, 1, 'rgba(255,255,255,.45)');
+  if (d.kind === 'wood') { px(-6, -2, 12, 4, '#2a1e14'); px(-5, -1, 10, 2, '#9a6a3a'); px(-5, -1, 10, 1, '#b8885a'); px(4, -1, 1, 2, '#d8b088'); }
+  else if (d.kind === 'crate') { px(-4, -6, 9, 8, '#2a1e14'); px(-3, -5, 7, 6, '#b07a46'); px(-3, -3, 7, 1, '#8a5a30'); px(0, -5, 1, 6, '#8a5a30'); }
+  else if (d.kind === 'bottle') { px(-2, -6, 4, 7, '#2a1e14'); px(-1, -5, 2, 5, '#5ab08a'); px(-1, -7, 2, 1, '#b08a5a'); px(-1, -3, 2, 2, '#fff6dd'); }
+  else { px(-5, -7, 11, 9, '#2a1e14'); px(-4, -6, 9, 7, '#8a5a30'); px(-4, -4, 9, 1, '#ffd040'); px(0, -5, 1, 3, '#ffd040'); if (Math.sin(t * 6 + d.seed) > .5) { px(5, -10, 1, 3, '#fff6b0'); px(4, -9, 3, 1, '#fff6b0'); } }
+}
+
 // ════════════════ 畫布 ════════════════
 const cv = document.getElementById('c'), ctx = cv.getContext('2d');
 const low = document.createElement('canvas'), lx = low.getContext('2d');
@@ -467,6 +583,8 @@ const SFX = {
     horn(523, .46, .26); horn(659, .78, .75, .26);                 // 登～登～
     tone(262, 262, 1, .1, 'triangle', .78); tone(330, 330, 1, .08, 'triangle', .78);
   },
+  thunder: () => { tone(80, 38, 1.4, .35, 'sawtooth'); tone(55, 30, 1.6, .3, 'triangle', .05); },
+  pickup: () => [660, 880, 1320].forEach((f, i) => tone(f, f, .14, .14, 'triangle', i * .06)),
   badge: () => { if (window.BGM) BGM.duck(1.4); [784, 988, 1175, 1568].forEach((f, i) => tone(f, f, .3, .14, 'triangle', i * .08)); tone(1568, 1568, .9, .1, 'sine', .4); },
   fail: () => tone(300, 110, .4, .2, 'sawtooth'),
   sick: () => { tone(220, 160, .5, .18, 'sine'); tone(230, 150, .5, .18, 'sine', .3); },
@@ -484,7 +602,7 @@ function updateSick(dt) {
     const reg = REGION_OF[at(Math.floor(state.boat.x), Math.floor(state.boat.y))];
     const base = reg === 'deep' ? 1.1 : reg === 'reef' ? .45 : .55;
     const sp = Math.hypot(state.boat.vx, state.boat.vy) / (state.boatSpeed || 6);
-    d = (base + sp * 1.2) * (phase === 'night' ? 1.2 : 1);
+    d = (base + sp * 1.2) * (phase === 'night' ? 1.2 : 1) * (1 + wx.wave * 1.5);
   } else d = -8;
   if (state.pillT > 0) { state.pillT = Math.max(0, state.pillT - dt); d = Math.min(d, -6); }
   state.sick = clamp(state.sick + d * dt, 0, 100);
@@ -501,6 +619,7 @@ function takePill() {
   toast(`💊 吃了暈船藥，${PILL.secs / 60} 分鐘內不會暈`); save(); updateHud();
 }
 document.getElementById('statusChip').addEventListener('click', takePill);
+document.getElementById('timeChip').addEventListener('click', () => toast('🔭 天氣預報：' + forecast(), 3200));
 let toastT = 0;
 function toast(t, ms = 1800) { const el = document.getElementById('toast'); el.textContent = t; el.classList.add('show'); clearTimeout(toastT); toastT = setTimeout(() => el.classList.remove('show'), ms); }
 
@@ -556,13 +675,15 @@ function startCast() {
   if (!w) return toast('前面沒有水，換個方向試試');
   state.player.fx = w.fx; state.player.fy = w.fy;
   Object.assign(fish, { state: 'cast', t: 0, region: regionAt(w.x, w.y), fx: w.x, fy: w.y, nibbles: [], d: 100, tension: 0, struggle: false, swap: 0 });
-  const wait = rand(2.2, 6.5) / (1 + state.rod.luck * .2);
+  const wait = rand(2.2, 6.5) / (1 + state.rod.luck * .2) * (WEATHER[weather].bite || 1);
   fish.biteAt = .7 + wait;
   for (let k = 0, n = Math.floor(rand(0, 3)); k < n; k++) fish.nibbles.push(rand(1.2, fish.biteAt - .3));
   toast(`🎣 拋竿！（${REGION_NAME[fish.region]}）浮標沉下去再拉竿`);
 }
 function pickFish(region) {
-  const pool = FISH.filter(f => f.regions.includes(region) && f.times.includes(phase));
+  let pool = FISH.filter(f => f.regions.includes(region) && f.times.includes(phase) && (!f.weather || f.weather.includes(weather)));
+  // 有天氣限定魚可以釣時，35% 機會從牠們裡面挑
+  const special = pool.filter(f => f.weather); if (special.length && Math.random() < .35) pool = special;
   const byR = {}; for (const f of pool) (byR[f.rarity] = byR[f.rarity] || []).push(f);
   const rs = Object.keys(byR); let tot = 0; const wts = rs.map(r => { const w = RAR[r].w * (r === 'common' ? 1 : 1 + state.rod.luck * .3); tot += w; return w; });
   let u = Math.random() * tot, r = rs[0]; for (let i = 0; i < rs.length; i++) { u -= wts[i]; if (u <= 0) { r = rs[i]; break; } }
@@ -600,7 +721,7 @@ function showCatchCard() {
     <canvas id="fishPic" width="64" height="32"></canvas>
     <h2 style="margin:2px 0">${c.def.name}</h2>
     <div class="stats"><span>⚖️ ${fmtW(c.weight)}</span><span>📏 ${c.length.toFixed(1)} cm</span><span>🪙 ${c.price}</span></div>
-    <p>${c.def.desc}<br><small>出沒：${c.def.regions.map(r => REGION_NAME[r]).join('、')}</small></p>
+    <p>${c.def.desc}<br><small>出沒：${c.def.regions.map(r => REGION_NAME[r]).join('、')}</small>${c.def.weather ? `<br><b style="color:#3a5ad0">⚡ 天氣限定：${c.def.weather.map(w => WEATHER[w].name).join('、')}</b>` : ''}</p>
     <button id="keepBtn">放進魚簍</button>`;
   drawFishTo(document.getElementById('fishPic'), c.def);
   document.getElementById('catch').classList.add('show');
@@ -621,7 +742,7 @@ function updateFishing(dt) {
     fish.swap -= dt;
     if (fish.swap <= 0) { fish.struggle = !fish.struggle; fish.swap = fish.struggle ? rand(.5, 1.3) * fish.power : rand(.6, 1.6) / fish.power; if (fish.struggle) buzz(35); }
     const rp = state.rod.power;
-    if (holding) { fish.d -= (fish.struggle ? 6 : 19) * rp * dt; fish.tension += (fish.struggle ? 62 * fish.power : 16 * fish.power) * dt / rp; }
+    if (holding) { fish.d -= (fish.struggle ? 6 : 19) * rp * dt; fish.tension += (fish.struggle ? 62 * fish.power : 16 * fish.power) * dt / rp * (1 + wx.wave * .15); }
     else { fish.tension -= 45 * dt; fish.d += (fish.struggle ? 9 : 3) * fish.power * dt; }
     fish.tension = clamp(fish.tension, 0, 100); fish.d = clamp(fish.d, 0, 110);
     if (fish.tension >= 100) fail('啪！線斷了…');
@@ -673,11 +794,15 @@ const ACH = [
   ['boat', '🚤 加速前進', '升級你的船', s => s.boatLv > 0],
   ['style1', '👒 第一件新衣', '在服飾店買一件服飾', s => (s.closet || []).length >= 1],
   ['style10', '🕶️ 時尚達人', '收集 10 件服飾', s => (s.closet || []).length >= 10],
+  ['wx_rain', '🌧️ 雨中垂釣', '下雨或暴雨時釣到魚', s => (s.wxc.rain || 0) + (s.wxc.storm || 0) > 0],
+  ['wx_typhoon', '🌀 颱風勇者', '颱風天釣到魚', s => (s.wxc.typhoon || 0) > 0],
+  ['wx_special', '⚡ 天氣限定', '釣到天氣限定的魚', s => FISH.some(f => f.weather && s.dex[f.id])],
+  ['drift10', '🪵 海上撿寶', '開船撈到 10 個漂流物', s => (s.drift || 0) >= 10],
 ];
 // 徽章等級：bronze 銅、silver 銀、gold 金、rainbow 彩虹（最難）
 const TIER = { first: 'bronze', c10: 'bronze', c50: 'silver', c200: 'gold', d10: 'bronze', d30: 'silver', d60: 'gold', dall: 'rainbow',
   r_harbor: 'bronze', r_lake: 'bronze', r_river: 'bronze', r_reef: 'silver', r_deep: 'silver', t_dawn: 'bronze', t_dusk: 'bronze', t_night: 'silver',
-  rare: 'silver', epic: 'gold', legend: 'gold', legend_all: 'rainbow', w10: 'silver', w100: 'gold', m1000: 'bronze', m10000: 'gold', rod: 'bronze', boat: 'bronze', style1: 'bronze', style10: 'gold' };
+  rare: 'silver', epic: 'gold', legend: 'gold', legend_all: 'rainbow', w10: 'silver', w100: 'gold', m1000: 'bronze', m10000: 'gold', rod: 'bronze', boat: 'bronze', style1: 'bronze', style10: 'gold', wx_rain: 'bronze', wx_typhoon: 'gold', wx_special: 'silver', drift10: 'silver' };
 const TIER_NAME = { bronze: '銅', silver: '銀', gold: '金', rainbow: '彩虹' };
 const achParts = a => { const i = a[1].indexOf(' '); return { id: a[0], icon: a[1].slice(0, i), title: a[1].slice(i + 1), desc: a[2], tier: TIER[a[0]] || 'bronze' }; };
 const medalHtml = (b, got) => `<div class="medal ${got ? b.tier : 'lock'}"><i>${got ? b.icon : '？'}</i></div>`;
@@ -699,7 +824,7 @@ function showNextBadge() {
   document.getElementById('badgeBook').onclick = () => { badgeQueue.length = 0; pop.classList.remove('show'); openDex('ach'); };
 }
 const SAVE_KEY = 'bay-fishing-save-v1';
-const prog = { dex: {}, ach: {}, catches: 0, region: {}, time: {}, rar: {}, maxW: 0, earned: 0, rodIdx: 0, boatLv: 0, bait: 0, pills: 0, look: null, closet: [] };
+const prog = { dex: {}, ach: {}, catches: 0, region: {}, time: {}, rar: {}, maxW: 0, earned: 0, rodIdx: 0, boatLv: 0, bait: 0, pills: 0, look: null, closet: [], wxc: {}, drift: 0 };
 function save() {
   try { localStorage.setItem(SAVE_KEY, JSON.stringify({ v: 1, coins: state.coins, bag: state.bag, prog, pos: { x: state.player.x, y: state.player.y, bx: state.boat.x, by: state.boat.y, onBoat: state.onBoat } })); } catch (e) {}
 }
@@ -736,6 +861,7 @@ function recordCatch(c) {
   d.n++; d.maxW = Math.max(d.maxW, +c.weight.toFixed(2)); d.maxL = Math.max(d.maxL, +c.length.toFixed(1));
   prog.region[fish.region] = (prog.region[fish.region] || 0) + 1;
   prog.time[phase] = (prog.time[phase] || 0) + 1;
+  prog.wxc[weather] = (prog.wxc[weather] || 0) + 1;
   prog.rar[c.def.rarity] = (prog.rar[c.def.rarity] || 0) + 1;
   prog.maxW = Math.max(prog.maxW, c.weight);
   checkAch(); save();
@@ -850,7 +976,7 @@ function openDex(tab = 'dex') {
   document.getElementById('tDex').onclick = () => openDex('dex'); document.getElementById('tAch').onclick = () => openDex('ach');
   document.querySelectorAll('[data-pic]').forEach(c => { const f = FISH_BY_ID[c.dataset.pic]; drawFishTo(c, f); if (!prog.dex[f.id]) { const g = c.getContext('2d'); g.globalCompositeOperation = 'source-in'; g.fillStyle = '#5a5048'; g.fillRect(0, 0, 64, 32); } });
   document.querySelectorAll('[data-badge]').forEach(el => el.onclick = () => { const b = achParts(ACH.find(a => a[0] === el.dataset.badge)), got = prog.ach[b.id]; document.getElementById('dexInfo').innerHTML = got ? `${b.icon} <b>${b.title}</b>（${TIER_NAME[b.tier]}徽章）：${b.desc}<br><small>${fmtDate(got)} 獲得</small>` : `🔒 還沒拿到的${TIER_NAME[b.tier]}徽章。條件：${b.desc}`; });
-  document.querySelectorAll('[data-fish]').forEach(el => el.onclick = () => { const f = FISH_BY_ID[el.dataset.fish], d = prog.dex[f.id]; document.getElementById('dexInfo').innerHTML = d ? `<b>${f.name}</b>：${f.desc}<br>釣到 ${d.n} 次・最重 ${fmtW(d.maxW)}・最長 ${d.maxL} cm・出沒：${f.regions.map(r => REGION_NAME[r]).join('、')}` : `還沒釣到。提示：出沒在${f.regions.map(r => REGION_NAME[r]).join('、')}，${f.times.length === 4 ? '任何時間' : f.times.map(t => PHASE[t].name.slice(3)).join('、')}。`; });
+  document.querySelectorAll('[data-fish]').forEach(el => el.onclick = () => { const f = FISH_BY_ID[el.dataset.fish], d = prog.dex[f.id]; document.getElementById('dexInfo').innerHTML = d ? `<b>${f.name}</b>：${f.desc}<br>釣到 ${d.n} 次・最重 ${fmtW(d.maxW)}・最長 ${d.maxL} cm・出沒：${f.regions.map(r => REGION_NAME[r]).join('、')}` : `還沒釣到。提示：出沒在${f.regions.map(r => REGION_NAME[r]).join('、')}，${f.times.length === 4 ? '任何時間' : f.times.map(t => PHASE[t].name.slice(3)).join('、')}${f.weather ? '，只在' + f.weather.map(w => WEATHER[w].name).join('、') + '出現' : ''}。`; });
 }
 
 // ════════════════ 地圖 ════════════════
@@ -879,6 +1005,7 @@ function drawMini() {
   mg.drawImage(mapImg, 64 - p.x, 48 - p.y, mapImg.width * sc / 2, mapImg.height * sc / 2);
   const bp = mapPos(state.boat.x, state.boat.y, sc / 2);
   mg.fillStyle = '#ffd040'; mg.fillRect(64 - p.x + bp.x - 2, 48 - p.y + bp.y - 2, 4, 4);
+  mg.fillStyle = '#ffe680'; for (const d of drifts) { const q = mapPos(d.x, d.y, sc / 2); mg.fillRect(64 - p.x + q.x - 1, 48 - p.y + q.y - 1, 2, 2); }
   mg.fillStyle = '#ff5040'; mg.beginPath(); mg.arc(64, 48, 3.5, 0, 7); mg.fill(); mg.strokeStyle = '#fff'; mg.lineWidth = 1.5; mg.stroke();
 }
 
@@ -917,6 +1044,10 @@ function update(dt) {
     if (sp > .3) { const s = iso(b.vx, b.vy); b.ang = Math.atan2(s.y - OY, s.x - OX); }
     if (state.onBoat) { p.x = b.x; p.y = b.y; }
   }
+  // 大浪會把船推來推去
+  if (state.onBoat && wx.wave > .3) { const tt = performance.now() / 1000; b.vx += Math.sin(tt * .37) * wx.wave * .9 * dt; b.vy += Math.cos(tt * .29) * wx.wave * .9 * dt; }
+  updateWeather(dt);
+  updateDrift(dt);
   updateSick(dt);
   updateFishing(dt);
   const target = fish.state && fish.state !== 'cast' ? 1 : fish.state === 'cast' ? Math.min(1, fish.t / .5) : 0;
@@ -927,7 +1058,7 @@ let hudTick = 0;
 function updateHud() {
   phase = phaseNow();
   const d = new Date();
-  document.getElementById('timeChip').textContent = `${PHASE[phase].name} ${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
+  document.getElementById('timeChip').textContent = `${PHASE[phase].name} ${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}・${WEATHER[weather].name}`;
   document.getElementById('areaChip').textContent = '📍 ' + areaName();
   document.getElementById('coinChip').textContent = '🪙 ' + state.coins;
   document.getElementById('bagChip').textContent = '🐟 ' + state.bag.length;
@@ -958,7 +1089,7 @@ function drawIso(g, gf, t) {
   g.fillStyle = 'rgba(255,255,255,.55)';
   for (let y = py - R; y <= py + R; y++) for (let x = px - R; x <= px + R; x++) {
     const tt = at(x, y); if (!WATER.has(tt)) continue;
-    if (hash(x, y, fr) < .07) { const p = iso(x + hash(x, y, fr + 1), y + .5); g.fillRect(Math.round(p.x - vx), Math.round(p.y - vy), 3, 1); }
+    if (hash(x, y, fr) < .07 + wx.wave * .1) { const p = iso(x + hash(x, y, fr + 1), y + .5); g.fillRect(Math.round(p.x - vx), Math.round(p.y - vy), 3 + Math.round(wx.wave * 3), 1); }
     if (tt === T.RIVER && hash(x, y, 30) < .4) { const p = iso(x + ((t * .6 + hash(x, y, 31)) % 1), y + .5); g.fillRect(Math.round(p.x - vx), Math.round(p.y - vy), 2, 1); }
   }
   // 依深度排序的物件
@@ -969,6 +1100,7 @@ function drawIso(g, gf, t) {
   for (const l of lamps) if (near(l)) objs.push({ k: l.x + l.y, f: G => drawLamp(G, l, vx, vy) });
   for (const b of BUILDINGS) if (near(b)) objs.push({ k: b.x + b.w + b.y + b.h - 1, f: G => drawBuilding(G, b, vx, vy) });
   objs.push({ k: lighthouse.x + lighthouse.y + 1, f: G => drawLighthouse(G, vx, vy, t) });
+  for (const d of drifts) if (near(d)) objs.push({ k: d.x + d.y, f: G => drawDrift(G, d, vx, vy, t) });
   if (!state.onBoat) objs.push({ k: state.boat.x + state.boat.y, f: G => drawBoat(G, vx, vy, t) });
   // 主角（在船上就是整艘船）不貼齊像素格，畫在自己的圖層，鏡頭跟著它平滑移動
   const focusK = state.onBoat ? state.boat.x + state.boat.y : state.player.x + state.player.y + .01;
@@ -1037,7 +1169,7 @@ function drawLighthouse(g, vx, vy, t) {
   g.fillStyle = '#d0403a'; g.fillRect(cx - 4, cy - 46, 8, 2); g.fillRect(cx - 2, cy - 48, 4, 2);
 }
 function drawBoat(g, vx, vy, t) {
-  const b = state.boat, p = iso(b.x, b.y), x = Math.round(p.x - vx), y = Math.round(p.y - vy + Math.sin(t * 2.4) * 1);
+  const b = state.boat, p = iso(b.x, b.y), x = Math.round(p.x - vx), y = Math.round(p.y - vy + Math.sin(t * 2.4) * (1 + wx.wave * 2.5));
   if (window.ART) { ART.drawBoat(g, x, y, b.ang, prog.boatLv || 0, t, state.onBoat && Math.hypot(b.vx, b.vy) > .5); if (state.onBoat) drawPerson(g, x - 1, y - 2, t, true); return; }
   const ca = Math.cos(b.ang), sa = Math.sin(b.ang);
   const R = (u, v) => [x + u * ca - v * sa * .6, y + u * sa * .5 + v * ca * .6];
@@ -1074,10 +1206,13 @@ function drawThird(g, t) {
   const lw = low.width, lh = low.height, ph = PHASE[phase], reg = fish.region || 'harbor';
   const hz = Math.round(lh * .36);
   let gr = g.createLinearGradient(0, 0, 0, hz); gr.addColorStop(0, ph.sky[0]); gr.addColorStop(1, ph.sky[1]); g.fillStyle = gr; g.fillRect(0, 0, lw, hz);
+  const skyDark = wx.dark;   // 烏雲（畫在太陽月亮之後，見下方）
   if (phase === 'night') { for (let i = 0; i < 40; i++) { g.fillStyle = `rgba(255,255,255,${.4 + hash(i, 1) * .6 * (Math.sin(t * 2 + i) * .3 + .7)})`; g.fillRect(hash(i, 2) * lw | 0, hash(i, 3) * hz * .9 | 0, 1, 1); } g.fillStyle = '#fff6d0'; g.fillRect(lw * .78 | 0, hz * .25 | 0, 8, 8); g.fillStyle = ph.sky[0]; g.fillRect((lw * .78 | 0) + 3, (hz * .25 | 0) - 1, 6, 6); }
   else { g.fillStyle = phase === 'day' ? '#fff8d0' : '#ffd890'; const sy = phase === 'day' ? hz * .2 : hz * .7; g.fillRect(lw * .75 | 0, sy | 0, 10, 10); g.fillRect((lw * .75 | 0) - 2, (sy | 0) + 2, 14, 6); }
   // 雲
   if (phase !== 'night') { g.fillStyle = 'rgba(255,255,255,.75)'; for (let i = 0; i < 4; i++) { const cx = ((hash(i, 7) * lw + t * 3 * (1 + i * .3)) % (lw + 40)) - 20, cy = hash(i, 8) * hz * .6 + 6; g.fillRect(cx | 0, cy | 0, 22, 4); g.fillRect((cx | 0) + 4, (cy | 0) - 3, 12, 4); } }
+  if (skyDark > .02) { g.fillStyle = `rgba(80,88,104,${Math.min(.85, skyDark * 1.5)})`; g.fillRect(0, 0, lw, hz);
+    g.fillStyle = `rgba(60,66,80,${Math.min(.8, skyDark * 1.3)})`; for (let i = 0; i < 7; i++) { const cx = ((hash(i, 17) * lw + t * (4 + wx.wind * 18) * (1 + i * .2)) % (lw + 60)) - 30, cy = hash(i, 18) * hz * .7; g.fillRect(cx | 0, cy | 0, 40, 8); g.fillRect((cx | 0) + 6, (cy | 0) - 5, 26, 6); } }
   // 遠景：依區域
   const far = { harbor: '#5a7a6a', deep: null, reef: '#e8d49a', lake: '#3a6a3a', river: '#5a6a5a' }[reg];
   if (far) { g.fillStyle = phase === 'night' ? shade(far, -.6) : far; for (let x = 0; x < lw; x += 2) { const h = (Math.sin(x * .03 + 1) * .5 + Math.sin(x * .011) * .8 + 1.4) * (reg === 'lake' || reg === 'river' ? 9 : 5); g.fillRect(x, hz - h | 0, 2, h + 1 | 0); } }
@@ -1095,10 +1230,12 @@ function drawThird(g, t) {
     const z = k / 26, y = hz + (lh - hz) * z * z; const n = 5 + k;
     for (let i = 0; i < n; i++) { const x = ((hash(k, i) * lw + t * (6 + k * 2) * (reg === 'river' ? 3 : 1)) % (lw + 20)) - 10; g.fillRect(x | 0, y | 0, 2 + k * .4 | 0, 1); }
   }
+  // 大浪的白色浪頭
+  if (wx.wave > .05) { g.fillStyle = `rgba(255,255,255,${.25 + wx.wave * .3})`; for (let i = 0; i < 40 * wx.wave; i++) { const z = hash(i, 61), y = hz + (lh - hz) * z * z + Math.sin(t * 2 + i) * 2, x = ((hash(i, 62) * lw + t * (10 + 25 * z) * (1 + wx.wind)) % (lw + 30)) - 15; g.fillRect(x | 0, y | 0, 4 + z * 12 | 0, 1 + (z * 2 | 0)); } }
   // 浮標（越收線越靠近）
   const near = fish.state === 'reel' ? 1 - fish.d / 110 : 0;
   const fy0 = hz + (lh - hz) * (.28 + near * .45), fx0 = lw * (.56 - near * .1);
-  let bob = Math.sin(t * 3) * 1.2, sink = 0;
+  let bob = Math.sin(t * 3) * 1.2 * (1 + wx.wave * 2.5), sink = 0;
   if (fish.state === 'cast') { const k = Math.min(1, fish.t / .7); bob = -Math.sin(k * Math.PI) * 30; }
   if (fish.nib > 0) sink = 2;
   if (fish.state === 'bite') sink = 6 + Math.sin(t * 30) * 1;
@@ -1207,7 +1344,8 @@ function frame(now) {
   // 暈船：整個畫面跟著搖晃（釣魚視角晃得更明顯），再蓋一層淡綠色
   const sk = sickAmount(), cw = cv.width, ch = cv.height;
   const amp = sk * (.45 + .55 * viewMix);
-  const sway = sk > 0 ? { ang: Math.sin(t * 1.3) * .05 * amp, dx: Math.sin(t * .7) * cw * .015 * amp, dy: Math.sin(t * .9 + 1) * ch * .02 * amp, z: 1 + .18 * amp } : null;
+  const roll = state.onBoat ? wx.wave * .7 : 0;   // 在船上時畫面跟著浪輕輕搖
+  const sway = sk > 0 || roll > .02 ? { ang: Math.sin(t * 1.3) * .05 * amp + Math.sin(t * 1.1) * .02 * roll, dx: Math.sin(t * .7) * cw * .015 * amp, dy: Math.sin(t * .9 + 1) * ch * .02 * amp + Math.sin(t * 1.5) * ch * .008 * roll, z: 1 + .18 * amp + .06 * roll } : null;
   const base = () => { ctx.setTransform(1, 0, 0, 1, 0, 0); if (sway) { ctx.translate(cw / 2 + sway.dx, ch / 2 + sway.dy); ctx.rotate(sway.ang); ctx.scale(sway.z, sway.z); ctx.translate(-cw / 2, -ch / 2); } };
   if (sway) { ctx.fillStyle = '#1b2a44'; ctx.fillRect(0, 0, cw, ch); }
   if (isoOn) {   // 背景 → 主角 → 擋在主角前面的物件 → 時段光線，全部用同一個小數位移
@@ -1216,6 +1354,7 @@ function frame(now) {
   }
   if (thirdOn) { base(); ctx.scale(S, S); ctx.globalAlpha = isoOn ? viewMix : 1; ctx.drawImage(low3, 0, 0); ctx.globalAlpha = 1; }
   if (sk > 0) { ctx.setTransform(1, 0, 0, 1, 0, 0); ctx.fillStyle = `rgba(110,170,60,${.16 * sk})`; ctx.fillRect(0, 0, cv.width, cv.height); }
+  drawWeatherFx(t);
   // 建築名稱（高解析度文字）
   if (viewMix < .5 && !state.onBoat) {
     const pl = state.player, vx = cam.vx + cam.fx, vy = cam.vy + cam.fy;
@@ -1229,7 +1368,7 @@ function frame(now) {
 load(); applyGear(); applyLook(); updateHud(); drawMini(); setInterval(save, 10000); addEventListener('pagehide', save);
 toast('歡迎來到漁港鎮！走到碼頭盡頭「上船」出海，或在水邊直接「拋竿」', 3200);
 if (params.get('demo') === 'boat') { state.onBoat = true; }
-window.__game = { state, fish, FISH, docks, BUILDINGS, prog, ACH, save, applyGear, openBuilding, checkAch, openDex }; window.__walk = walkable;   // 給測試用
+window.__game = { state, fish, FISH, docks, BUILDINGS, prog, ACH, save, applyGear, openBuilding, checkAch, openDex }; window.__walk = walkable; window.__pick = pickFish; window.__drifts = drifts;   // 給測試用
 requestAnimationFrame(frame);
 </script>
 </body>

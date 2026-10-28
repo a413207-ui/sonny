@@ -1,6 +1,6 @@
 # 🐟 釣魚遊戲魚種資料庫
 
-`fish.json` 共 **97 種**原創設定的魚（任務中心 `tasks/tmvrn8znr-data`，Issue #40）。
+`fish.json` 共 **105 種**（含 8 種天氣限定魚）原創設定的魚（任務中心 `tasks/tmvrn8znr-data`，Issue #40）。
 
 | 稀有度 | 數量 | 基本售價 |
 |---|---|---|
@@ -17,7 +17,7 @@
 ## 欄位
 `id`、`name`、`rarity`、`regions[]`、`times[]`、`weightKg[最小,最大]`、`lengthCm[最小,最大]`、
 `price`（平均大小的售價，遊戲依實際重量調整）、`shape`（外形，畫圖用）、`palette`（body／belly／fin／accent 配色）、
-`desc`（圖鑑說明）、`image`（像素圖檔名，放 `../assets/fish/`）。
+`desc`（圖鑑說明）、`image`（像素圖檔名，放 `../assets/fish/`）、`weather[]`（選填：只在這些天氣出現，`WEATHER_FISH` 表）。
 
 ## 怎麼改
 改 `build_fish.py` 裡的 `FISH` 表後執行 `python games/fishing/data/build_fish.py`，它會檢查（≥90 種、id／名稱不重複、

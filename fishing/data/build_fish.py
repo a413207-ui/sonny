@@ -122,6 +122,20 @@ FISH = [
     ("abyss_king", "深淵海王", "L", "deep", "night", (500.0, 2000.0), (800, 2000), "myth", "#2a1e4a", "#c070ff", "傳說中沉睡在最深處的海之王。"),
 ]
 
+# 天氣限定魚：只有在指定天氣才會上鉤（最後一欄＝天氣，逗號分隔）
+# 天氣：sunny 晴天、cloudy 多雲、rain 下雨、storm 暴雨、waves 大浪、typhoon 颱風
+WEATHER_FISH = [
+    ("kelp_drifter", "漂流藻魚", "C", "harbor,reef", "any", (0.05, 0.2), (6, 14), "flat", "#8a8a3a", "#d8d870", "躲在漂流海藻下面，跟著浪一起漂來。", "rain,storm,waves,typhoon"),
+    ("rain_ayu", "雨香魚", "U", "river", "any", (0.1, 0.4), (15, 30), "slim", "#7a9aa8", "#a0e0ff", "下雨溪水變涼時成群出現。", "rain,storm,typhoon"),
+    ("wave_rider", "浪尖飛魚", "U", "harbor,deep", "dawn,day,dusk", (0.2, 0.8), (20, 40), "slim", "#3a7ad0", "#c0f0ff", "大浪時會從浪頭飛過船邊。", "waves,typhoon"),
+    ("rain_carp", "雨紋鯉", "R", "lake", "any", (2.0, 8.0), (40, 80), "round", "#6a8a9a", "#d0e8f0", "鱗片上有雨滴般的花紋，只在雨天浮上來。", "rain,storm"),
+    ("whirl_bream", "漩渦鯛", "R", "harbor,reef", "any", (2.0, 10.0), (40, 80), "flat", "#4a6aa0", "#e0f0ff", "被颱風漩渦捲到岸邊的稀客。", "typhoon"),
+    ("thunder_eel", "雷光鰻", "E", "harbor,deep", "any", (2.0, 15.0), (80, 200), "eel", "#2a2a5a", "#fff070", "身上閃著雷光，暴風雨越大越活躍。", "storm,typhoon"),
+    ("storm_marlin", "颱風旗魚", "E", "deep", "any", (60.0, 300.0), (200, 420), "long", "#3a3a6a", "#ffd040", "只在颱風天的巨浪裡現身的旗魚。", "typhoon"),
+    ("typhoon_dragon", "颱風海龍", "L", "deep", "any", (300.0, 1200.0), (500, 1200), "myth", "#1e3a5a", "#9af0ff", "傳說颱風就是牠在海底翻身捲起來的。", "typhoon"),
+]
+WEATHERS = ["sunny", "cloudy", "rain", "storm", "waves", "typhoon"]
+
 REGIONS = ["harbor", "lake", "river", "reef", "deep"]
 TIMES = ["dawn", "day", "dusk", "night"]
 
@@ -138,8 +152,9 @@ def shade(hex_color, k):
 
 def build():
     out = []
-    for (fid, name, rar, region, times, w, l, shape, body, accent, desc) in FISH:
-        out.append({
+    for row in FISH + WEATHER_FISH:
+        (fid, name, rar, region, times, w, l, shape, body, accent, desc) = row[:11]
+        f = {
             "id": fid,
             "name": name,
             "rarity": RARITY[rar],
@@ -152,7 +167,10 @@ def build():
             "palette": {"body": body, "belly": shade(body, 0.55), "fin": shade(body, -0.35), "accent": accent},
             "desc": desc,
             "image": f"{fid}.png",
-        })
+        }
+        if len(row) > 11:
+            f["weather"] = row[11].split(",")
+        out.append(f)
     return out
 
 
@@ -166,9 +184,10 @@ def check(data):
     for f in data:
         assert f["weightKg"][0] < f["weightKg"][1] and f["lengthCm"][0] < f["lengthCm"][1], f["id"]
         assert all(r in REGIONS for r in f["regions"]) and all(t in TIMES for t in f["times"]), f["id"]
+        assert all(w in WEATHERS for w in f.get("weather", [])), f["id"]
     for r in REGIONS:
         for t in TIMES:
-            assert any(r in f["regions"] and t in f["times"] and f["rarity"] == "common" for f in data), \
+            assert any(r in f["regions"] and t in f["times"] and f["rarity"] == "common" and "weather" not in f for f in data), \
                 f"{r}/{t} 沒有普通魚可釣"
     prices = [BASE_PRICE[k] for k in "CUREL"]
     assert prices == sorted(prices)
