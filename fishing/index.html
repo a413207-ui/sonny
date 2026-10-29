@@ -123,6 +123,10 @@
   .items button.lock { opacity: .55; }
   .hint { font-size: 12px; color: #8a6a4a; margin: 6px 0 0; text-align: left; }
   .bagRow { display: flex; align-items: center; gap: 8px; padding: 5px 4px; border-bottom: 1px dashed #c8b08a; font-size: 13px; text-align: left; }
+  .sortBar { display: flex; flex-wrap: wrap; gap: 4px; justify-content: center; margin: 2px 0 6px; }
+  .sortBar button { font-size: 12px; padding: 3px 8px; border: 2px solid #8a6a3a; border-radius: 12px; background: #fff8e6; box-shadow: none; font-weight: 700; color: #4a2e12; }
+  .sortBar button.on { background: #ffb840; }
+  .grpHead { text-align: left; font-size: 12px; font-weight: 800; color: #6b5034; background: #f3e6c8; border-radius: 6px; padding: 2px 8px; margin-top: 6px; }
   .bagRow canvas { width: 48px; height: 24px; image-rendering: pixelated; flex: none; }
   .bagRow .r { margin-left: auto; text-align: right; white-space: nowrap; font-size: 12px; color: #6b5034; }
   .bagRow.pick { cursor: pointer; } .bagRow.pick:hover, .bagRow.sel { background: #ffe7b0; }
@@ -196,13 +200,13 @@
 <div class="overlay" id="fishDetail"><div class="card" id="fishDetailCard"></div></div>
 <div class="overlay" id="badgePop"><div class="card" id="badgeCard"></div></div>
 
-<script src="data/fish.js?v=2026.10.29-71"></script>
-<script src="art.js?v=2026.10.29-71"></script>
-<script src="music.js?v=2026.10.29-71"></script>
+<script src="data/fish.js?v=2026.10.29-72"></script>
+<script src="art.js?v=2026.10.29-72"></script>
+<script src="music.js?v=2026.10.29-72"></script>
 <script>
 'use strict';
 // 版本號：每次更新都要改（也要改上面三個 script 的 ?v=），遊戲會用它檢查網站上有沒有新版
-const BUILD = '2026.10.29-71';
+const BUILD = '2026.10.29-72';
 // ════════════════ 基本設定 ════════════════
 const FISH = window.FISH_DATA || [];
 const N = 160, TW = 32, TH = 16, LH = 4;         // 地圖格數、等角格寬高、陸地高度
@@ -1121,10 +1125,11 @@ const FISH_BY_ID = Object.fromEntries(FISH.map(f => [f.id, f]));
 function openBuilding(b) { ({ shop: openShop, market: openMarket, home: openHome, board: openDex, tailorA: () => openTailor(b), tailorB: () => openTailor(b), guild: () => openGuild(), aquarium: () => openAquarium(), quests: () => openQuests() })[b.id](); }
 function openMarket() {
   const total = state.bag.reduce((a, f) => a + f.price, 0);
-  const rows = state.bag.map((f, i) => { const d = FISH_BY_ID[f.id]; return `<div class="row"><span><b style="color:${RAR[d.rarity].color}">${d.name}</b> ${fmtW(f.w)}・${f.l} cm</span><button data-sell="${i}">賣 🪙${f.price}</button></div>`; }).join('');
+  const rows = bagListHtml((f, i) => { const d = FISH_BY_ID[f.id]; return `<div class="row"><span><b style="color:${RAR[d.rarity].color}">${d.name}</b> ${fmtW(f.w)}・${f.l} cm</span><button data-sell="${i}">賣 🪙${f.price}</button></div>`; });
   showPanel(`<h2>🐟 魚市</h2><p>魚簍裡有 ${state.bag.length} 條魚，全部可賣 🪙${total}</p>
-    <div class="list">${rows || '<p>魚簍是空的，先去釣魚吧！</p>'}</div>
+    ${state.bag.length > 1 ? sortBarHtml() : ''}<div class="list">${rows || '<p>魚簍是空的，先去釣魚吧！</p>'}</div>
     ${state.bag.length ? '<button id="sellAll">全部賣出</button>' : ''}`);
+  wireSortBar(openMarket);
   const sell = idx => { const sold = idx === 'all' ? state.bag.splice(0) : state.bag.splice(idx, 1); const g = sold.reduce((a, f) => a + f.price, 0); state.coins += g; prog.earned += g; buzz(30); toast(`賣出 ${sold.length} 條魚，得到 🪙${g}`); checkAch(); save(); updateHud(); openMarket(); };
   document.querySelectorAll('[data-sell]').forEach(el => el.onclick = () => sell(+el.dataset.sell));
   const all = document.getElementById('sellAll'); if (all) all.onclick = () => sell('all');
@@ -1180,12 +1185,39 @@ function openHome(tab = homeTab) {
 const fishCanvas = (def, cls = '') => `<canvas width="64" height="32" data-fpic="${def.id}" class="${cls}"></canvas>`;
 const paintFishCanvases = () => document.querySelectorAll('[data-fpic]').forEach(c => drawFishTo(c, FISH_BY_ID[c.dataset.fpic]));
 const fishRow = (f, i, pick) => { const d = FISH_BY_ID[f.id]; return `<div class="bagRow ${pick ? 'pick' : ''}" ${pick ? `data-pick="${i}"` : ''}>${fishCanvas(d)}<span><b style="color:${RAR[d.rarity].color}">${d.name}</b><br><small>${RAR[d.rarity].name}${d.weather ? '・⚡天氣限定' : ''}</small></span><span class="r">⚖️ ${fmtW(f.w)}<br>📏 ${f.l} cm・🪙${f.price}</span></div>`; };
+// ── 魚簍整理：決定魚簍、魚市、評比報名、水族館放魚這些清單的排列方式（會記住）──
+const BAG_SORTS = [['time', '🕒 最新'], ['species', '🐟 種類'], ['rarity', '💎 稀有度'], ['weight', '⚖️ 重量'], ['price', '🪙 價錢']];
+const RAR_RANK = { common: 0, uncommon: 1, rare: 2, epic: 3, legendary: 4 };
+const FISH_IDX = Object.fromEntries(FISH.map((f, i) => [f.id, i]));
+function bagView() {   // 回傳排好的 [魚, 在魚簍裡的位置]
+  const mode = prog.bagSort || 'time', L = state.bag.map((f, i) => [f, i]);
+  const cmp = {
+    time: (a, b) => (b[0].at || 0) - (a[0].at || 0) || b[1] - a[1],
+    species: (a, b) => FISH_IDX[a[0].id] - FISH_IDX[b[0].id] || b[0].w - a[0].w,
+    rarity: (a, b) => RAR_RANK[FISH_BY_ID[b[0].id].rarity] - RAR_RANK[FISH_BY_ID[a[0].id].rarity] || b[0].price - a[0].price,
+    weight: (a, b) => b[0].w - a[0].w,
+    price: (a, b) => b[0].price - a[0].price,
+  }[mode] || ((a, b) => b[1] - a[1]);
+  return L.sort(cmp);
+}
+// 依種類排時，每一種魚前面加一個小標題（幾條、最重多少）
+function bagListHtml(rowFn) {
+  const v = bagView(); if (prog.bagSort !== 'species') return v.map(([f, i]) => rowFn(f, i)).join('');
+  let out = '', last = null;
+  for (const [f, i] of v) {
+    if (f.id !== last) { last = f.id; const same = state.bag.filter(x => x.id === f.id); out += `<div class="grpHead">${FISH_BY_ID[f.id].name} ×${same.length}・最重 ${fmtW(Math.max(...same.map(x => x.w)))}</div>`; }
+    out += rowFn(f, i);
+  }
+  return out;
+}
+const sortBarHtml = () => `<div class="sortBar">${BAG_SORTS.map(([k, t]) => `<button data-bsort="${k}" class="${(prog.bagSort || 'time') === k ? 'on' : ''}">${t}</button>`).join('')}</div>`;
+function wireSortBar(reopen) { document.querySelectorAll('[data-bsort]').forEach(el => el.onclick = () => { prog.bagSort = el.dataset.bsort; save(); reopen(); }); }
 function openBag() {
   const total = state.bag.reduce((a, f) => a + f.price, 0), ck = nextContestKey(), entry = prog.contest[ck] && prog.contest[ck].entry;
-  const list = state.bag.map((f, i) => [f, i]).reverse().map(([f, i]) => fishRow(f, i)).join('');
+  const list = bagListHtml((f, i) => fishRow(f, i));
   const sickPct = Math.round(state.sick);
   showPanel(`<h2>🎒 背包</h2>
-    <h3>🐟 魚簍（${state.bag.length} 條・總值 🪙${total}）</h3><div class="list" style="max-height:34vh">${list || '<p>魚簍是空的，去釣魚吧！</p>'}</div>
+    <h3>🐟 魚簍（${state.bag.length} 條・總值 🪙${total}）</h3>${state.bag.length > 1 ? sortBarHtml() : ''}<div class="list" style="max-height:34vh">${list || '<p>魚簍是空的，去釣魚吧！</p>'}</div>
     <h3>🧭 探險</h3><div style="text-align:left;font-size:13px;line-height:1.7">地圖探索度 <b>${fogPct()}%</b>・隱藏地點 ${Object.keys(prog.found).length} / ${SPOTS.length}${Object.keys(prog.found).length ? '（' + SPOTS.filter(s => prog.found[s.id]).map(s => s.icon + s.name).join('、') + '）' : ''}<br>探險裝備：${GEAR.filter(g => prog.gear[g.id]).map(g => g.icon + g.name).join('、') || '還沒有（釣具店有賣）'}</div>
     <h3>🗺️ 藏寶圖（${prog.maps.length} / ${TMAP_MAX}）</h3><div>${prog.maps.map((m, i) => `<canvas class="tmap" width="128" height="80" data-tmap="${i}"></canvas>`).join('') || '<p style="font-size:13px">還沒有藏寶圖。開船撈漂流瓶、木箱，有機會撿到！</p>'}</div>
     <h3>🧰 道具</h3><div style="text-align:left;font-size:13px;line-height:1.8">🪙 金幣 ${state.coins}　🪱 魚餌 ${prog.bait}　💊 暈船藥 ${prog.pills || 0}<br>🎣 ${RODS[prog.rodIdx].name}　⛵ ${BOATS[prog.boatLv].name}</div>
@@ -1193,7 +1225,7 @@ function openBag() {
       ${state.pillT > 0 ? `💊 防暈中，還有 ${Math.ceil(state.pillT)} 秒` : `${state.sickOn ? '🤢 暈船中' : sickPct >= SICK_WARN ? '😵 有點頭暈' : '😊 精神很好'}（暈眩 ${sickPct}%）<div class="meterS"><div style="width:${sickPct}%;background:${state.sickOn ? '#8ab04a' : '#7ac04a'}"></div></div>`}
       ${WEATHER[weather].name}・${PHASE[phase].name}<br>
       🏆 ${contestDayName(ck)} 20:00 評比大賽：${entry ? `已報名（${FISH_BY_ID[entry.id].name}）` : '還沒報名（到金鱗島的釣魚協會）'}</div>`);
-  paintFishCanvases();
+  paintFishCanvases(); wireSortBar(openBag);
   document.querySelectorAll('[data-tmap]').forEach(c => { drawTreasureMap(c, prog.maps[+c.dataset.tmap]); c.onclick = () => openTreasureMap(+c.dataset.tmap); });
 }
 document.getElementById('bagBtn').addEventListener('click', openBag);
@@ -1358,7 +1390,7 @@ function openGuild() {
   if (c && c.entry) { const d = FISH_BY_ID[c.entry.id]; body = `<p>✅ 你已經報名了：<b style="color:${RAR[d.rarity].color}">${d.name}</b>（${fmtW(c.entry.w)}・${c.entry.l} cm）<br>${hmText()} 開始評比，結果出來會通知你。</p>`; }
   else if (!state.bag.length) body = '<p>魚簍是空的，先去釣一條得意的魚再來報名吧！</p>';
   else {
-    body = `<h3>選一條魚報名（每場只能交一條）</h3><div class="list" style="max-height:30vh">${state.bag.map((f, i) => [f, i]).reverse().map(([f, i]) => fishRow(f, i, true).replace('class="bagRow pick"', `class="bagRow pick ${guildPick === i ? 'sel' : ''}"`)).join('')}</div>
+    body = `<h3>選一條魚報名（每場只能交一條）</h3>${state.bag.length > 1 ? sortBarHtml() : ''}<div class="list" style="max-height:30vh">${bagListHtml((f, i) => fishRow(f, i, true).replace('class="bagRow pick"', `class="bagRow pick ${guildPick === i ? 'sel' : ''}"`))}</div>
       <div style="margin-top:8px;min-height:44px">${guildPick !== null ? `<button id="submitFish" style="${guildConfirm ? 'background:#ff9a6a' : ''}">${guildConfirm ? '確定交出？協會會收走，不會還給你' : '交出這條魚報名'}</button>` : '<p class="hint" style="text-align:center">點一條魚選擇</p>'}</div>`;
   }
   showPanel(`<h2>🏆 釣魚協會</h2>
@@ -1367,6 +1399,7 @@ function openGuild() {
     <div style="margin-top:6px"><button id="lastResult" style="background:#bfe6ff">看上一場排名</button></div>
     <p class="hint" style="text-align:center">參賽 ${prog.contestN || 0} 次・最佳第 ${prog.contestBest || '－'} 名・冠軍 ${prog.contestWins || 0} 次</p>`);
   paintFishCanvases();
+  wireSortBar(openGuild);
   document.querySelectorAll('[data-pick]').forEach(el => el.onclick = () => { guildPick = +el.dataset.pick; guildConfirm = false; openGuild(); });
   const sub = document.getElementById('submitFish');
   if (sub) sub.onclick = () => {
@@ -1636,9 +1669,9 @@ function aqHud() {
 }
 function aqSync() { if (!aq) return; const keep = new Set(prog.aquarium); aq.fish = aq.fish.filter(o => keep.has(o.f)); for (const f of prog.aquarium) if (!aq.fish.some(o => o.f === f)) { const o = aqFish(f); o.x = wrapX(aq.cam + rand(.2, .8) * aq.W, aq.WW); o.y = aq.H * .1; aqTarget(o); aq.fish.push(o); } aqHud(); }
 function aqAddPanel() {
-  const rows = state.bag.map((f, i) => [f, i]).reverse().map(([f, i]) => fishRow(f, i, true)).join('');
-  showPanel(`<h2>＋ 放魚進水族箱</h2><p>水族箱 ${prog.aquarium.length} / ${AQ_CAP}・點一條魚放進去<br><small>放進去的魚不能賣，但隨時可以在「管理」放回魚簍。</small></p><div class="list" style="max-height:52vh">${rows || '<p>魚簍是空的，先去釣魚吧！</p>'}</div>`);
-  paintFishCanvases();
+  const rows = bagListHtml((f, i) => fishRow(f, i, true));
+  showPanel(`<h2>＋ 放魚進水族箱</h2><p>水族箱 ${prog.aquarium.length} / ${AQ_CAP}・點一條魚放進去<br><small>放進去的魚不能賣，但隨時可以在「管理」放回魚簍。</small></p>${state.bag.length > 1 ? sortBarHtml() : ''}<div class="list" style="max-height:52vh">${rows || '<p>魚簍是空的，先去釣魚吧！</p>'}</div>`);
+  paintFishCanvases(); wireSortBar(aqAddPanel);
   document.querySelectorAll('[data-pick]').forEach(el => el.onclick = () => {
     if (prog.aquarium.length >= AQ_CAP) { toast(`水族箱滿了（${AQ_CAP} 條），先放回幾條再放新的`); buzz(120); return; }
     const f = state.bag.splice(+el.dataset.pick, 1)[0]; prog.aquarium.push(f); aqSync(); SFX.pickup(); buzz(30);
