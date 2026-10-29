@@ -28,7 +28,7 @@ window.ART = (() => {
   }
 
   // ════════ 外型與換裝（帽子、髮型、眼鏡、鬍子、衣服、褲子）════════
-  // shop：在哪間店買（tailorA＝翠湖森林島「森林服飾店」、tailorB＝溪谷山島「山谷造型屋」）；price 0＝一開始就有
+  // shop：在哪間店買（tailorA＝翠湖森林島「森林服飾店」、tailorB＝溪谷山島「山谷造型屋」，C～F 見下面新地點）；price 0＝一開始就有
   const WARDROBE = {
     hat: {
       fisher_green: { name: '漁夫帽（綠）', price: 0, style: 'fisher', h: '#2a7a5a', H: '#3fa078' },
@@ -79,6 +79,53 @@ window.ART = (() => {
       shorts_red: { name: '紅色短褲', price: 100, shop: 'tailorB', b: '#c04a3a', B: '#8a2a20', style: 'shorts' },
     },
   };
+  // ── 新地點的四間服飾店（2026-10-29）──
+  // tailorC＝冰晶島「雪國毛帽店」、tailorD＝火山島「熔岩龐克屋」、tailorE＝紅樹林島「叢林探險屋」、tailorF＝大河平原「河畔和風屋」
+  Object.assign(WARDROBE.hat, {
+    ushanka: { name: '飛行毛帽', price: 260, shop: 'tailorC', style: 'ushanka', h: '#7a5034', H: '#efe6d6' },
+    earmuff: { name: '毛毛耳罩', price: 180, shop: 'tailorC', style: 'earmuff', h: '#c8c8d0', H: '#ff8aa8' },
+    beanie_white: { name: '毛線帽（白）', price: 120, shop: 'tailorC', style: 'beanie', h: '#e8eef4', H: '#ffffff' },
+    safari: { name: '探險帽', price: 220, shop: 'tailorE', style: 'safari', h: '#c8b080', H: '#e8d4a0' },
+    bandana_green: { name: '綠色頭巾', price: 140, shop: 'tailorE', style: 'bandana', h: '#3a8a3a', H: '#6ac06a' },
+    bandana_red: { name: '紅色頭巾', price: 140, shop: 'tailorD', style: 'bandana', h: '#c83a2a', H: '#f06a5a' },
+    kasa: { name: '斗笠', price: 200, shop: 'tailorF', style: 'kasa', h: '#c8a860', H: '#e8cc88' },
+    headband: { name: '必勝頭帶', price: 120, shop: 'tailorF', style: 'headband', h: '#f4f0e8', H: '#e03a2a' },
+  });
+  Object.assign(WARDROBE.hair, {
+    long_silver: { name: '銀白長髮', price: 220, shop: 'tailorC', style: 'long', d: '#e8eef4', D: '#a8b4c4' },
+    mohawk_red: { name: '紅色龐克頭', price: 300, shop: 'tailorD', style: 'mohawk', d: '#e03a2a', D: '#a0201a' },
+    spiky_orange: { name: '火焰刺蝟頭', price: 260, shop: 'tailorD', style: 'spiky', d: '#ff8a2a', D: '#c85a14' },
+    spiky_black: { name: '刺蝟頭（黑）', price: 200, shop: 'tailorD', style: 'spiky', d: '#2a2a30', D: '#16161a' },
+    short_teal: { name: '短髮（藍綠）', price: 160, shop: 'tailorE', style: 'short', d: '#2a9a8a', D: '#1a6a5e' },
+    bun_brown: { name: '包包頭（棕）', price: 200, shop: 'tailorE', style: 'bun', d: '#6a4224', D: '#4a2a14' },
+    topknot: { name: '武士髻', price: 240, shop: 'tailorF', style: 'topknot', d: '#2a2a30', D: '#16161a' },
+    bun_pink: { name: '包包頭（粉）', price: 220, shop: 'tailorF', style: 'bun', d: '#f0a0c0', D: '#c87090' },
+  });
+  Object.assign(WARDROBE.glasses, {
+    goggles: { name: '雪地護目鏡', price: 240, shop: 'tailorC', style: 'goggles', G: '#ff9a3a' },
+    shades_red: { name: '紅色墨鏡', price: 220, shop: 'tailorD', style: 'sunc', G: '#c8202a' },
+    shades_green: { name: '叢林墨鏡', price: 180, shop: 'tailorE', style: 'sunc', G: '#2a6a3a' },
+  });
+  Object.assign(WARDROBE.beard, {
+    goatee: { name: '山羊鬍', price: 160, shop: 'tailorD', style: 'goatee' },
+    stubble: { name: '鬍渣', price: 100, shop: 'tailorE', style: 'stubble' },
+  });
+  Object.assign(WARDROBE.top, {
+    parka_blue: { name: '羽絨外套（藍）', price: 320, shop: 'tailorC', y: '#3a6ac0', Y: '#244a8a', L: '#6a9ae0', w: '#f4f0e8' },
+    sweater_snow: { name: '雪花毛衣', price: 280, shop: 'tailorC', y: '#c03a3a', Y: '#8a2424', L: '#e06a6a', w: '#f4f0e8', z: '#ffffff', pattern: 'dots' },
+    leather: { name: '龐克皮衣', price: 360, shop: 'tailorD', y: '#2a2226', Y: '#161214', L: '#4a3a3e', w: '#e03a2a' },
+    flame_tee: { name: '火焰T恤', price: 300, shop: 'tailorD', y: '#2a2a30', Y: '#16161a', L: '#44444e', w: '#ffd040', z: '#ff6a2a', pattern: 'flame' },
+    vest_explorer: { name: '探險背心', price: 240, shop: 'tailorE', y: '#a8946a', Y: '#7a6a48', L: '#c8b48a', w: '#4a3a20' },
+    camo: { name: '迷彩外套', price: 300, shop: 'tailorE', y: '#6a8a4a', Y: '#4a6a2a', L: '#8aa86a', w: '#2a3a1a', z: '#3a4a24', pattern: 'camo' },
+    yukata_blue: { name: '藍色浴衣', price: 320, shop: 'tailorF', y: '#3a5a9a', Y: '#24407a', L: '#5a7ac0', w: '#f4f0e8', z: '#f4f0e8', pattern: 'dots' },
+    happi: { name: '紅色法被', price: 280, shop: 'tailorF', y: '#c83a2a', Y: '#8a2418', L: '#e86a5a', w: '#ffd040', z: '#f4f0e8', pattern: 'stripe' },
+  });
+  Object.assign(WARDROBE.pants, {
+    snow_pants: { name: '雪褲（白）', price: 180, shop: 'tailorC', b: '#e8eef4', B: '#a8b4c4' },
+    skinny_black: { name: '龐克窄管褲', price: 200, shop: 'tailorD', b: '#1e1e24', B: '#0e0e12' },
+    cargo: { name: '工作短褲（綠）', price: 160, shop: 'tailorE', b: '#5a6a3a', B: '#3a4a24', style: 'shorts' },
+    hakama: { name: '深藍袴', price: 240, shop: 'tailorF', b: '#2a2a4a', B: '#16162e' },
+  });
   const SLOT_NAME = { hat: '帽子', hair: '髮型', glasses: '眼鏡', beard: '鬍子', top: '衣服', pants: '褲子' };
   const DEFAULT_LOOK = { hat: 'fisher_green', hair: 'short_brown', glasses: 'none', beard: 'none', top: 'raincoat_yellow', pants: 'jeans' };
 
@@ -94,6 +141,16 @@ window.ART = (() => {
     hair: ['............', '............', '...kkkkkk...', '..kddddddk..', '.kddddddddk.'],
     bald: ['............', '............', '...kkkkkk...', '..kssssssk..', '.kssssssssk.'],
     pirate: ['............', '.kk......kk.', 'khhkkkkkkhhk', 'khhhhxxhhhhk', '.kkkkkkkkkk.'],
+    ushanka: ['...kkkkkk...', '..khhhhhhk..', '.kHHHHHHHHk.', 'kHHkkkkkkHHk', 'kHHddddddHHk'],
+    earmuff: ['............', '...kkkkkk...', '.kkhkkkkhkk.', 'kHHkddddkHHk', 'kHHddddddHHk'],
+    safari: ['....kkkk....', '...khhhhk...', '..khhhhhhk..', 'khhqqqqqqhhk', 'kkkkkkkkkkkk'],
+    bandana: ['............', '...kkkkkk...', '..khhHhhhk..', '.khhhhhhhhkk', '.kHHHHHHHHkh'],
+    kasa: ['.....kk.....', '...kkhhkk...', '.kkhhHhhhkk.', 'khhhhhhhhhhk', 'kkkkkkkkkkkk'],
+    headband: ['............', '............', '...kkkkkk...', '..kddddddk..', '.khhhhHhhhkk'],
+    mohawk: ['.....kk.....', '....kddk....', '....kddk....', '..kkkddkkk..', '.ksssddsssk.'],
+    spiky: ['............', '..k.k..k.k..', '.kdkdkkdkdk.', '.kddddddddk.', '.kddddddddk.'],
+    topknot: ['....kkkk....', '....kddk....', '...kkkkkk...', '..kddddddk..', '.kddddddddk.'],
+    bun: ['...kk..kk...', '..kddkkddk..', '...kkkkkk...', '..kddddddk..', '.kddddddddk.'],
   };
   const HAT16 = {
     fisher: ['....kkkkkkkk....', '...kHHHHHHHHk...', '..khhHHHHHHhhk..', '.khhhhhhhhhhhhk.', 'kkkkkkkkkkkkkkkk'],
@@ -104,17 +161,32 @@ window.ART = (() => {
     hair: ['................', '................', '....kkkkkkkk....', '...kddddddddk...', '..kddddddddddk..'],
     bald: ['................', '................', '....kkkkkkkk....', '...kssssssssk...', '..kssssssssssk..'],
     pirate: ['................', '.kk..........kk.', 'khhkkkkkkkkkkhhk', 'khhhhhhxxhhhhhhk', '.kkkkkkkkkkkkkk.'],
+    ushanka: ['....kkkkkkkk....', '...khhhhhhhhk...', '..kHHHHHHHHHHk..', '.kHHkkkkkkkkHHk.', '.kHHddddddddHHk.'],
+    earmuff: ['................', '....kkkkkkkk....', '..kkhkkkkkkhkk..', '.kHHkddddddkHHk.', '.kHHddddddddHHk.'],
+    safari: ['.....kkkkkk.....', '....khhhhhhk....', '...khhhhhhhhk...', 'khhhqqqqqqqqhhhk', 'kkkkkkkkkkkkkkkk'],
+    bandana: ['................', '....kkkkkkkk....', '...khhhHhhhhk...', '..khhhhhhhhhhkk.', '..kHHHHHHHHHHkhk'],
+    kasa: ['.......kk.......', '.....kkhhkk.....', '...kkhhhHhhhkk..', '.kkhhhhhhhhhhhk.', 'kkkkkkkkkkkkkkkk'],
+    headband: ['................', '................', '....kkkkkkkk....', '...kddddddddk...', '..khhhhhHhhhhkk.'],
+    mohawk: ['.......kk.......', '......kddk......', '......kddk......', '....kkkddkkk....', '..kssssddssssk..'],
+    spiky: ['................', '..k.k.k..k.k.k..', '.kdkdkdkkdkdkdk.', '..kddddddddddk..', '..kddddddddddk..'],
+    topknot: ['......kkkk......', '......kddk......', '....kkkkkkkk....', '...kddddddddk...', '..kddddddddddk..'],
+    bun: ['...kk......kk...', '..kddk....kddk..', '...kkkkkkkkkk...', '...kddddddddk...', '..kddddddddddk..'],
   };
-  const hatKey = P => P.hat.style !== 'none' ? P.hat.style : P.hair.style === 'bald' ? 'bald' : 'hair';
+  const HAIR_TOP = { mohawk: 1, spiky: 1, topknot: 1, bun: 1 };   // 這些髮型頭頂有自己的形狀
+  const hatKey = P => P.hat.style !== 'none' ? P.hat.style : P.hair.style === 'bald' ? 'bald' : HAIR_TOP[P.hair.style] ? P.hair.style : 'hair';
   const unBald = (rows, P) => P.hair.style === 'bald' ? rows.map(r => r.replace(/d/g, 's').replace(/D/g, 'S')) : rows;
   function face12(P) {   // 正面臉 4 列
     let r = ['.kssssssssk.', '.ksesssesSk.', '.ksrsssrsSk.', '..kssssSSk..'];
     if (P.hair.style === 'bangs') r[0] = '.kdddddddsk.';
     if (P.glasses.style === 'round') r[1] = set(r[1], { 2: 'G', 4: 'G', 5: 'G', 6: 'G', 8: 'G' });
     if (P.glasses.style === 'sun') r[1] = '.kqqqkqqqSk.';
+    if (P.glasses.style === 'sunc') r[1] = '.kGGGkGGGSk.';
+    if (P.glasses.style === 'goggles') r[1] = 'kkGGGGGGGGkk';
     if (P.glasses.style === 'patch') { r[1] = set(r[1], { 6: 'q', 7: 'q', 8: 'q' }); r[0] = set(r[0], { 4: 'q' }); }
     if (P.beard.style === 'mustache') r[2] = set(r[2], range(4, 6, 'M'));
     if (P.beard.style === 'full') { r[2] = '.kMMMMMMMMk.'; r[3] = '..kMMMMMMk..'; }
+    if (P.beard.style === 'goatee') r[3] = set(r[3], { 5: 'M', 6: 'M' });
+    if (P.beard.style === 'stubble') { r[2] = set(r[2], { 3: 'M', 8: 'M' }); r[3] = set(r[3], { 4: 'M', 6: 'M' }); }
     if (P.hair.style === 'long') r = r.map((x, i) => i < 3 ? 'kd' + x.slice(2, 10) + 'dk' : '.kd' + x.slice(3, 9) + 'dk.');
     return r;
   }
@@ -125,15 +197,21 @@ window.ART = (() => {
     if (P.hair.style === 'bangs') r[0] = '...kdddddddsk...';
     if (P.glasses.style === 'round') r[1] = '...kGeGGGGeGk...';
     if (P.glasses.style === 'sun') r[1] = '...kqqqkkqqqk...';
+    if (P.glasses.style === 'sunc') r[1] = '...kGGGkkGGGk...';
+    if (P.glasses.style === 'goggles') r[1] = '..kkGGGGGGGGkk..';
     if (P.glasses.style === 'patch') { r[1] = set(r[1], { 9: 'q', 10: 'q', 11: 'q' }); r[0] = set(r[0], { 6: 'q' }); }
     if (P.beard.style === 'mustache') r[2] = set(r[2], range(6, 9, 'M'));
     if (P.beard.style === 'full') { r[2] = f('MMMMMMMM'); r[3] = '....kMMMMMMk....'; }
+    if (P.beard.style === 'goatee') r[3] = set(r[3], { 7: 'M', 8: 'M' });
+    if (P.beard.style === 'stubble') { r[2] = set(r[2], { 5: 'M', 10: 'M' }); r[3] = set(r[3], { 6: 'M', 9: 'M' }); }
     if (P.hair.style === 'long') r = r.map((x, i) => i < 3 ? set(x, { 2: 'k', 3: 'd', 12: 'd', 13: 'k' }) : set(x, { 3: 'k', 4: 'd', 11: 'd', 12: 'k' }));
     return r;
   }
   const back16 = P => unBald(['...kddddddddk...', '...kddddddddk...', '...kdddddddDk...', '....kdddddDk....'], P);
   function pattern(rows, P, y0) {   // 衣服花紋：條紋、圓點
     if (P.top.pattern === 'stripe') return rows.map((r, i) => (i + y0) % 2 ? r.replace(/y/g, 'z') : r);
+    if (P.top.pattern === 'flame') return rows.map((r, i) => { const k = (i + 1) / rows.length; return r.split('').map((c, x) => c === 'y' && (k > .75 || (k > .5 && (x + i) % 2 === 0)) ? 'z' : c).join(''); });
+    if (P.top.pattern === 'camo') return rows.map((r, i) => r.split('').map((c, x) => c === 'y' && (((x >> 1) * 5 + ((i + y0) >> 1) * 3 + ((x >> 1) * ((i + y0) >> 1))) % 4) < 2 ? 'z' : c).join(''));
     if (P.top.pattern === 'dots') return rows.map((r, i) => r.split('').map((c, x) => c === 'y' && (x + (i + y0) * 2) % 4 === 0 ? 'z' : c).join(''));
     return rows;
   }
@@ -223,10 +301,10 @@ window.ART = (() => {
     // 釣竿在身體後面（背面時）或前面
     const drawRod = () => {
       if (!rod) return;
-      const hx = x + (flip ? -5 : 5), hy = top + 12;
-      g.fillStyle = '#6a4224';
-      for (let i = 0; i < 12; i++) g.fillRect(hx + (flip ? -i : i) * .55 | 0, hy - i | 0, 1, 1);
-      g.fillStyle = '#c8b090'; g.fillRect(hx + (flip ? -1 : 0), hy - 1, 2, 2);     // 捲線器
+      const R = ROD_LOOK[rod] || ROD_LOOK.bamboo, hx = x + (flip ? -5 : 5), hy = top + 12, len = R.len;
+      for (let i = 0; i < len; i++) { g.fillStyle = R.node && i % 4 === 3 ? R.node : i < 3 ? R.grip : R.body; g.fillRect(hx + (flip ? -i : i) * .55 | 0, hy - i | 0, 1, 1); }
+      if (R.tip) { g.fillStyle = R.tip; g.fillRect(hx + (flip ? -len : len) * .55 | 0, hy - len | 0, 1, 1); }
+      g.fillStyle = R.reel; g.fillRect(hx + (flip ? -1 : 0), hy - 1, 2, 2);     // 捲線器
     };
     if (back) drawRod();
     g.drawImage(img, x - 6, top);
@@ -359,6 +437,27 @@ window.ART = (() => {
       awning('#c85a8a', '#fff0f6');
       sign(x0 + .7, (sx, sy) => { px(sx, sy - 5, 1, 2, '#3a3a40'); px(sx - 4, sy - 3, 9, 1, '#3a3a40'); px(sx - 4, sy - 2, 1, 1, '#3a3a40'); px(sx + 4, sy - 2, 1, 1, '#3a3a40'); });
       const [mx, my] = P(xR + .3, yF + .3, 0); px(mx, my - 4, 1, 4, '#5a3a1e'); px(mx - 3, my - 12, 7, 8, '#3ab0c0'); px(mx - 1, my - 15, 3, 3, '#e8d8c0'); px(mx - 2, my - 9, 1, 1, '#ff8aa0'); px(mx + 1, my - 7, 1, 1, '#ff8aa0');
+    } else if (b.id === 'tailorC') {   // 雪國毛帽店：藍白雨遮、毛帽招牌、屋頂積雪、門口的雪人
+      awning('#3a6ac0', '#f4f8ff');
+      sign(x0 + .7, (sx, sy) => { px(sx - 3, sy - 4, 7, 3, '#7a5034'); px(sx - 4, sy - 2, 2, 3, '#efe6d6'); px(sx + 3, sy - 2, 2, 3, '#efe6d6'); px(sx - 2, sy - 5, 5, 1, '#efe6d6'); });
+      for (let i = 0; i < 5; i++) { const [sx, sy] = P(x0 + .2 + i * (w - .4) / 4, yF - h / 2, hgt + 8); px(sx - 3, sy - 1, 7, 2, '#ffffff'); }
+      const [mx, my] = P(xR + .35, yF + .35, 0); px(mx - 3, my - 6, 7, 6, '#ffffff'); px(mx - 2, my - 10, 5, 4, '#ffffff'); px(mx - 1, my - 9, 1, 1, '#2a1e14'); px(mx + 1, my - 9, 1, 1, '#2a1e14'); px(mx, my - 8, 2, 1, '#ff8a2a'); px(mx - 3, my - 7, 7, 1, '#c83a3a');
+    } else if (b.id === 'tailorD') {   // 熔岩龐克屋：黑紅雨遮、閃電招牌、門口的火盆
+      awning('#2a2226', '#e03a2a');
+      sign(x0 + .7, (sx, sy) => { px(sx, sy - 5, 2, 2, '#ffd040'); px(sx - 1, sy - 3, 2, 1, '#ffd040'); px(sx - 2, sy - 2, 4, 1, '#ffd040'); px(sx - 1, sy - 1, 1, 1, '#ffd040'); });
+      const [fx, fy] = P(xR + .35, yF + .35, 0); px(fx - 3, fy - 4, 7, 4, '#2a1e14'); px(fx - 2, fy - 3, 5, 2, '#5a4a48');
+      for (let i = 0; i < 3; i++) { const f = Math.sin(t * 9 + i * 2) * 1.5; px(fx - 2 + i * 2, fy - 7 - f, 1, 3 + f, i === 1 ? '#ffd040' : '#ff6a2a'); }
+    } else if (b.id === 'tailorE') {   // 叢林探險屋：綠褐雨遮、探險帽招牌、藤蔓、門口的木箱
+      awning('#4a6a2a', '#d8c898');
+      sign(x0 + .7, (sx, sy) => { px(sx - 4, sy - 2, 9, 1, '#a8946a'); px(sx - 2, sy - 4, 5, 2, '#c8b080'); px(sx - 2, sy - 3, 5, 1, '#4a3a20'); });
+      for (let i = 0; i < 6; i++) { const [vx, vy] = P(xR, yF - .3 - i * .25, hgt - 1 - i * 1.6); px(vx - 1, vy, 2, 2, i % 2 ? '#3a8a3a' : '#5ab05a'); }
+      const [cx, cy] = P(xR + .35, yF + .35, 0); px(cx - 4, cy - 6, 9, 6, '#2a1e14'); px(cx - 3, cy - 5, 7, 4, '#a8784a'); px(cx - 3, cy - 3, 7, 1, '#6a4224');
+    } else if (b.id === 'tailorF') {   // 河畔和風屋：紅色暖簾、燈籠、門口的竹子
+      const n = 4, a0 = x0 + .2, a1 = x0 + w * .6;
+      for (let i = 0; i < n; i++) { const u0 = a0 + (a1 - a0) * i / n, u1 = a0 + (a1 - a0) * (i + .85) / n; quad([P(u0, yF, hgt - 3), P(u1, yF, hgt - 3), P(u1, yF, hgt - 9), P(u0, yF, hgt - 9)], '#b8302a'); }
+      { const [cx, cy] = P((a0 + a1) / 2, yF, hgt - 6); px(cx - 1, cy - 1, 3, 2, '#f4f0e8'); }
+      const [lx, ly] = P(xR - .3, yF + .1, hgt - 2); px(lx, ly - 2, 1, 2, '#2a1e14'); px(lx - 2, ly, 5, 6, '#2a1e14'); px(lx - 1, ly + 1, 3, 4, '#ff6a4a'); px(lx - 1, ly + 2, 3, 1, '#ffd040');
+      const [bx, by] = P(xR + .35, yF + .35, 0); for (let i = 0; i < 3; i++) { px(bx - 3 + i * 3, by - 14 + i * 2, 1, 14 - i * 2, '#5a9a3a'); px(bx - 3 + i * 3, by - 9 + i, 1, 1, '#3a6a24'); px(bx - 2 + i * 3, by - 13 + i * 2, 2, 1, '#7cc04f'); }
     } else if (b.id === 'gyotaku') {   // 魚拓工坊：深色暖簾、掛在牆上的魚拓、門口的墨缸
       sign(x0 + .7, (sx, sy) => { px(sx - 4, sy - 4, 8, 4, '#f4ecd8'); px(sx - 3, sy - 3, 5, 2, '#1a1612'); px(sx + 2, sy - 4, 1, 4, '#1a1612'); });
       const n = 4, a0 = x0 + .2, a1 = x0 + w * .55;   // 暖簾（門口的布簾）
@@ -387,5 +486,38 @@ window.ART = (() => {
     }
   }
 
-  return { PAL, sprite, flipped, shade: shadeHex, drawPerson, drawThirdPerson, drawTrophy, drawBobber, drawBoat, decorateBuilding, WARDROBE, SLOT_NAME, DEFAULT_LOOK, setLook, previewFront };
+  // ════════ 釣竿造型（依 RODS 的 id）════════
+  // body 竿身、grip 握把、node 竹節／纏線、reel 捲線器、tip 竿尖、w 粗細、len 地圖小人竿長、glow 傳說光芒
+  const ROD_LOOK = {
+    bamboo: { name: '竹竿', body: '#c8a050', grip: '#8a6a2a', node: '#7a5a20', reel: '#c8b090', w: .8, len: 12 },
+    carbon: { name: '碳纖竿', body: '#2a2a32', grip: '#c8a070', node: '#e03a2a', reel: '#c0c4cc', tip: '#e03a2a', w: .8, len: 13, wrap: '#e03a2a' },
+    sea: { name: '遠洋海釣竿', body: '#f4f0e8', grip: '#2a3a5a', node: '#2a5aa0', reel: '#ffd040', tip: '#ff6a2a', w: 1.1, len: 13, wrap: '#2a5aa0', bigReel: true },
+    legend: { name: '傳說之竿', body: '#ffd040', grip: '#7a2a8a', node: '#fff6b0', reel: '#b06ad0', tip: '#7af0ff', w: 1.1, len: 14, wrap: '#b06ad0', bigReel: true, glow: true },
+  };
+  // 第三人稱的釣竿：從手 (hx,hy) 彎到竿尖 (tx,ty)，s＝像素倍率
+  function drawRod(g, id, hx, hy, tx, ty, s, t = 0) {
+    const R = ROD_LOOK[id] || ROD_LOOK.bamboo, cx = hx + (tx - hx) * .5, cy = hy + (ty - hy) * .3;
+    const pt = k => [(1 - k) * (1 - k) * hx + 2 * (1 - k) * k * cx + k * k * tx, (1 - k) * (1 - k) * hy + 2 * (1 - k) * k * cy + k * k * ty];
+    const seg = (a, b, col, w) => { g.strokeStyle = col; g.lineWidth = w; g.beginPath(); const [x0, y0] = pt(a); g.moveTo(x0, y0); for (let k = a; k <= b + 1e-6; k += .05) { const [x, y] = pt(Math.min(k, b)); g.lineTo(x, y); } g.stroke(); };
+    const W = Math.max(1, s * R.w);
+    if (R.glow) { g.globalAlpha = .25 + Math.sin(t * 3) * .1; seg(0, 1, '#fff2a0', W * 3.2); g.globalAlpha = 1; }
+    seg(0, 1, '#2a1e14', W + 2);                 // 描邊
+    seg(0, .55, R.body, W * 1.15); seg(.55, 1, R.body, Math.max(1, W * .8));   // 竿身（前段比較細）
+    seg(-.05, .14, R.grip, W * 1.7);             // 握把
+    if (R.node) for (let k = .25; k < .95; k += R.wrap ? .17 : .12) { const [x, y] = pt(k); g.fillStyle = R.node; g.fillRect(x - W * .9, y - W * .5, W * 1.8, Math.max(1, W)); }   // 竹節／導線環
+    if (R.tip) { const [x, y] = pt(1); g.fillStyle = R.tip; g.fillRect(x - W, y - W, W * 2, W * 2); }
+    const [rx, ry] = pt(.12), rr = W * (R.bigReel ? 2.4 : 1.8);   // 捲線器
+    g.fillStyle = '#2a1e14'; g.fillRect(rx - rr - 1, ry, rr * 2 + 2, rr * 1.6 + 1);
+    g.fillStyle = R.reel; g.fillRect(rx - rr, ry + 1, rr * 2, rr * 1.6 - 1);
+    g.fillStyle = 'rgba(255,255,255,.5)'; g.fillRect(rx - rr + 1, ry + 1, Math.max(1, rr * .5), Math.max(1, rr * .5));
+    if (R.glow) { g.fillStyle = '#fff6b0'; for (let i = 0; i < 3; i++) { const k = ((t * .4 + i / 3) % 1), [x, y] = pt(.2 + k * .8); if (Math.sin(t * 9 + i * 2) > 0) { g.fillRect(x - W, y, W * 3, Math.max(1, W * .6)); g.fillRect(x, y - W, Math.max(1, W * .6), W * 3); } } }
+    return pt(1);
+  }
+  // 商店用的小圖示：斜放一支竿
+  function drawRodIcon(cvs, id) {
+    const g = cvs.getContext('2d'); g.clearRect(0, 0, cvs.width, cvs.height);
+    drawRod(g, id, cvs.width * .15, cvs.height * .88, cvs.width * .9, cvs.height * .1, Math.max(1.5, cvs.height / 22), 1);
+  }
+
+  return { ROD_LOOK, drawRod, drawRodIcon, PAL, sprite, flipped, shade: shadeHex, drawPerson, drawThirdPerson, drawTrophy, drawBobber, drawBoat, decorateBuilding, WARDROBE, SLOT_NAME, DEFAULT_LOOK, setLook, previewFront };
 })();

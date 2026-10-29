@@ -29,6 +29,8 @@
   .card { background: #fff8e6; border: 4px solid #6b4a2a; border-radius: 14px; padding: 14px 16px; width: min(92vw, 380px); max-height: 86vh; overflow: auto; box-shadow: 0 6px 0 #6b4a2a; text-align: center; }
   .card h3 { margin: 10px 0 4px; font-size: 15px; text-align: left; }
   .list { max-height: 52vh; overflow: auto; text-align: left; }
+  .row canvas.rodIcon { width: 60px !important; height: 30px !important; flex: none; margin-right: -2px; }
+  .row canvas.rodIcon + span { flex: 1; }
   .row { display: flex; justify-content: space-between; align-items: center; gap: 8px; padding: 6px 4px; border-bottom: 1px dashed #c8b08a; font-size: 14px; }
   .row button, .tabs button { font-size: 13px; padding: 4px 10px; white-space: nowrap; }
   .row button:disabled { opacity: .4; }
@@ -202,13 +204,13 @@
 <div class="overlay" id="fishDetail"><div class="card" id="fishDetailCard"></div></div>
 <div class="overlay" id="badgePop"><div class="card" id="badgeCard"></div></div>
 
-<script src="data/fish.js?v=2026.10.29-75"></script>
-<script src="art.js?v=2026.10.29-75"></script>
-<script src="music.js?v=2026.10.29-75"></script>
+<script src="data/fish.js?v=2026.10.29-76"></script>
+<script src="art.js?v=2026.10.29-76"></script>
+<script src="music.js?v=2026.10.29-76"></script>
 <script>
 'use strict';
 // 版本號：每次更新都要改（也要改上面三個 script 的 ?v=），遊戲會用它檢查網站上有沒有新版
-const BUILD = '2026.10.29-75';
+const BUILD = '2026.10.29-76';
 // ════════════════ 基本設定 ════════════════
 const FISH = window.FISH_DATA || [];
 const N = 160, TW = 32, TH = 16, LH = 4;         // 地圖格數、等角格寬高、陸地高度
@@ -358,24 +360,28 @@ const BUILDINGS = [
   { id: 'gyotaku', name: '魚拓工坊', x: 93, y: 58, w: 2, h: 2, hgt: 15, wall: '#efe6d6', roof: '#4a3a30', sign: '🖌️' },   // 廣場左上，委託板旁邊
 ];
 // 服飾店：放在其他島的碼頭附近（翠湖森林島、溪谷山島），並鋪一條石板路接到碼頭
+const SHOP_LAND = new Set([T.GRASS, T.SAND, T.SNOW, T.ROCK]);
 function placeShop(dock, w, h) {
   let best = null, bd = 1e9;
   for (let y = dock.y0 - 7; y <= dock.y0 + 7; y++) for (let x = dock.x0 - 7; x <= dock.x0 + 7; x++) {
     let ok = true;
-    for (let yy = y - 1; yy < y + h + 2 && ok; yy++) for (let xx = x - 1; xx < x + w + 1 && ok; xx++) { const t = at(xx, yy); if (t !== T.GRASS && t !== T.SAND) ok = false; }
+    for (let yy = y - 1; yy < y + h + 2 && ok; yy++) for (let xx = x - 1; xx < x + w + 1 && ok; xx++) { const t = at(xx, yy); if (!SHOP_LAND.has(t) || Math.hypot(xx - 149.5, yy - 58.5) < 2.3) ok = false; }   // 火山口附近不蓋
     if (!ok) continue;
     const d = Math.hypot(x + w / 2 - dock.x0 - .5, y + h + .5 - dock.y0 - .5);
     if (d >= 2.5 && d < bd) { bd = d; best = { x, y }; }
   }
   return best;
 }
+const TAILORS = { tailorA: '翠湖森林島', tailorB: '溪谷山島', tailorC: '冰晶島', tailorD: '火山島', tailorE: '紅樹林島', tailorF: '大河平原' };   // 服飾店在哪座島
 const shopPaths = [];
-for (const [di, def] of [[1, { id: 'tailorA', name: '森林服飾店', wall: '#eef0dc', roof: '#3a8a4a', sign: '🎩' }], [2, { id: 'tailorB', name: '山谷造型屋', wall: '#f6e8ee', roof: '#c85a8a', sign: '👕' }], [5, { id: 'guild', name: '釣魚協會', wall: '#f4ecd8', roof: '#c8902a', sign: '🏆', w: 3, h: 2, hgt: 18 }]]) {
+for (const [di, def] of [[1, { id: 'tailorA', name: '森林服飾店', wall: '#eef0dc', roof: '#3a8a4a', sign: '🎩' }], [2, { id: 'tailorB', name: '山谷造型屋', wall: '#f6e8ee', roof: '#c85a8a', sign: '👕' }], [5, { id: 'guild', name: '釣魚協會', wall: '#f4ecd8', roof: '#c8902a', sign: '🏆', w: 3, h: 2, hgt: 18 }],
+  [6, { id: 'tailorC', name: '雪國毛帽店', wall: '#eef4fa', roof: '#3a6ac0', sign: '🧣' }], [8, { id: 'tailorD', name: '熔岩龐克屋', wall: '#3a3236', roof: '#c8302a', sign: '🎸' }],
+  [7, { id: 'tailorE', name: '叢林探險屋', wall: '#e8dcb8', roof: '#4a6a2a', sign: '🧭' }], [10, { id: 'tailorF', name: '河畔和風屋', wall: '#f4ecd8', roof: '#3a3a4a', sign: '👘' }]]) {
   const w = def.w || 2, h = def.h || 2, d = docks[di], pos = d && placeShop(d, w, h); if (!pos) continue;
   const b = { hgt: 14, ...def, x: pos.x, y: pos.y, w, h }; BUILDINGS.push(b);
   // 門口 → 碼頭起點的石板路（先橫後直）
   let x = pos.x + Math.floor(w / 2), y = pos.y + h; const tx = d.x0, ty = d.y0;
-  while (x !== tx || y !== ty) { const t = at(x, y); if (t === T.GRASS || t === T.SAND) { set(x, y, T.STONE); shopPaths.push([x, y]); } if (x !== tx) x += Math.sign(tx - x); else y += Math.sign(ty - y); }
+  while (x !== tx || y !== ty) { const t = at(x, y); if (SHOP_LAND.has(t)) { set(x, y, T.STONE); shopPaths.push([x, y]); } if (x !== tx) x += Math.sign(tx - x); else y += Math.sign(ty - y); }
 }
 for (const b of BUILDINGS) {
   for (let y = b.y; y < b.y + b.h; y++) for (let x = b.x; x < b.x + b.w; x++) { set(x, y, T.STONE); block[y * N + x] = 1; }
@@ -521,7 +527,7 @@ function initFog() {
     const REG_ISL = { lake: '翠湖森林島', river: '溪谷山島', reef: '珊瑚小島', cold: '冰晶島', mangrove: '紅樹林島', volcano: '火山島' };
     for (const [r, name] of Object.entries(REG_ISL)) if (prog.region && prog.region[r]) { const is = ISLANDS[ISLAND_IDX(name)]; revealAt(is.cx, is.cy, 13); }
     if ((prog.contestN || 0) > 0 || Object.keys(prog.contest || {}).length) { const is = ISLANDS[ISLAND_IDX('金鱗島')]; revealAt(is.cx, is.cy, 11); }
-    for (const c of prog.closet || []) { const it = WR[c.split(':')[0]] && WR[c.split(':')[0]][c.split(':')[1]]; const isl = it && { tailorA: '翠湖森林島', tailorB: '溪谷山島' }[it.shop]; if (isl) { const is = ISLANDS[ISLAND_IDX(isl)]; revealAt(is.cx, is.cy, 13); } }
+    for (const c of prog.closet || []) { const it = WR[c.split(':')[0]] && WR[c.split(':')[0]][c.split(':')[1]]; const isl = it && TAILORS[it.shop]; if (isl) { const is = ISLANDS[ISLAND_IDX(isl)]; revealAt(is.cx, is.cy, 13); } }
   }
   fogPaint(); prog.explore = fogPct();
 }
@@ -1042,6 +1048,7 @@ const ACH = [
   ['boat', '🚤 加速前進', '升級你的船', s => s.boatLv > 0],
   ['style1', '👒 第一件新衣', '在服飾店買一件服飾', s => (s.closet || []).length >= 1],
   ['style10', '🕶️ 時尚達人', '收集 10 件服飾', s => (s.closet || []).length >= 10],
+  ['tailorall', '🧳 環島購物家', '在六間服飾店都買過衣服', s => Object.keys(TAILORS).every(sh => (s.closet || []).some(c => { const [sl, id] = c.split(':'); return WR[sl] && WR[sl][id] && WR[sl][id].shop === sh; }))],
   ['wx_rain', '🌧️ 雨中垂釣', '下雨或暴雨時釣到魚', s => (s.wxc.rain || 0) + (s.wxc.storm || 0) > 0],
   ['wx_typhoon', '🌀 颱風勇者', '颱風天釣到魚', s => (s.wxc.typhoon || 0) > 0],
   ['wx_special', '⚡ 天氣限定', '釣到天氣限定的魚', s => FISH.some(f => f.weather && s.dex[f.id])],
@@ -1070,7 +1077,7 @@ const ACH = [
 // 徽章等級：bronze 銅、silver 銀、gold 金、rainbow 彩虹（最難）
 const TIER = { first: 'bronze', c10: 'bronze', c50: 'silver', c200: 'gold', d10: 'bronze', d30: 'silver', d60: 'gold', dall: 'rainbow',
   r_harbor: 'bronze', r_lake: 'bronze', r_river: 'bronze', r_reef: 'silver', r_deep: 'silver', t_dawn: 'bronze', t_dusk: 'bronze', t_night: 'silver',
-  rare: 'silver', epic: 'gold', legend: 'gold', legend_all: 'rainbow', w10: 'silver', w100: 'gold', m1000: 'bronze', m10000: 'gold', rod: 'bronze', boat: 'bronze', style1: 'bronze', style10: 'gold', wx_rain: 'bronze', wx_typhoon: 'gold', wx_special: 'silver', drift10: 'silver', contest1: 'bronze', podium: 'silver', champion: 'gold', r_cold: 'silver', r_mangrove: 'bronze', r_volcano: 'silver', r_bigriver: 'bronze', r_upriver: 'silver', aq1: 'bronze', aqleg: 'silver', aq20: 'gold', explore50: 'silver', explore85: 'gold', spot1: 'bronze', spotall: 'rainbow', dig1: 'bronze', dig5: 'gold', boss1: 'silver', boss5: 'gold', quest1: 'bronze', quest10: 'gold', gearall: 'silver', print1: 'bronze', print10: 'silver', printleg: 'gold' };
+  rare: 'silver', epic: 'gold', legend: 'gold', legend_all: 'rainbow', w10: 'silver', w100: 'gold', m1000: 'bronze', m10000: 'gold', rod: 'bronze', boat: 'bronze', style1: 'bronze', style10: 'gold', tailorall: 'gold', wx_rain: 'bronze', wx_typhoon: 'gold', wx_special: 'silver', drift10: 'silver', contest1: 'bronze', podium: 'silver', champion: 'gold', r_cold: 'silver', r_mangrove: 'bronze', r_volcano: 'silver', r_bigriver: 'bronze', r_upriver: 'silver', aq1: 'bronze', aqleg: 'silver', aq20: 'gold', explore50: 'silver', explore85: 'gold', spot1: 'bronze', spotall: 'rainbow', dig1: 'bronze', dig5: 'gold', boss1: 'silver', boss5: 'gold', quest1: 'bronze', quest10: 'gold', gearall: 'silver', print1: 'bronze', print10: 'silver', printleg: 'gold' };
 const TIER_NAME = { bronze: '銅', silver: '銀', gold: '金', rainbow: '彩虹' };
 const achParts = a => { const i = a[1].indexOf(' '); return { id: a[0], icon: a[1].slice(0, i), title: a[1].slice(i + 1), desc: a[2], tier: TIER[a[0]] || 'bronze' }; };
 const medalHtml = (b, got) => `<div class="medal ${got ? b.tier : 'lock'}"><i>${got ? b.icon : '？'}</i></div>`;
@@ -1115,7 +1122,7 @@ const SLOTS = ['hat', 'hair', 'glasses', 'beard', 'top', 'pants'];
 const owns = (slot, id) => (WR[slot][id] && WR[slot][id].price === 0) || prog.closet.includes(slot + ':' + id);
 function applyLook() { if (!prog.look) prog.look = { ...ART.DEFAULT_LOOK }; if (window.ART) ART.setLook(prog.look); }
 function drawPreview(cvs, look) { const g = cvs.getContext('2d'); g.imageSmoothingEnabled = false; g.clearRect(0, 0, cvs.width, cvs.height); g.drawImage(ART.previewFront(look), 0, 0, cvs.width, cvs.height); }
-const SHOP_OF = { tailorA: '到翠湖森林島的🎩森林服飾店買', tailorB: '到溪谷山島的👕山谷造型屋買', treasure: '藏寶圖挖寶才拿得到' };
+const SHOP_OF = { tailorA: '到翠湖森林島的🎩森林服飾店買', tailorB: '到溪谷山島的👕山谷造型屋買', tailorC: '到冰晶島的🧣雪國毛帽店買', tailorD: '到火山島的🎸熔岩龐克屋買', tailorE: '到紅樹林島的🧭叢林探險屋買', tailorF: '到大河平原的👘河畔和風屋買', treasure: '藏寶圖挖寶才拿得到' };
 function applyGear() {
   const r = RODS[prog.rodIdx] || RODS[0]; state.rod = { power: r.power, luck: r.luck + (prog.bait > 0 ? 1 : 0), name: r.name };
   state.boatSpeed = (BOATS[prog.boatLv] || BOATS[0]).speed;
@@ -1147,7 +1154,7 @@ function showPanel(html) {
   document.getElementById('closePanel').onclick = () => panelEl().classList.remove('show');
 }
 const FISH_BY_ID = Object.fromEntries(FISH.map(f => [f.id, f]));
-function openBuilding(b) { ({ shop: openShop, market: openMarket, home: openHome, board: openDex, tailorA: () => openTailor(b), tailorB: () => openTailor(b), guild: () => openGuild(), aquarium: () => openAquarium(), quests: () => openQuests(), gyotaku: () => openGyotaku() })[b.id](); }
+function openBuilding(b) { if (/^tailor/.test(b.id)) return openTailor(b); ({ shop: openShop, market: openMarket, home: openHome, board: openDex, tailorA: () => openTailor(b), tailorB: () => openTailor(b), guild: () => openGuild(), aquarium: () => openAquarium(), quests: () => openQuests(), gyotaku: () => openGyotaku() })[b.id](); }
 function openMarket() {
   const total = state.bag.reduce((a, f) => a + f.price, 0);
   const rows = bagListHtml((f, i) => { const d = FISH_BY_ID[f.id]; return `<div class="row"><span><b style="color:${RAR[d.rarity].color}">${d.name}</b> ${fmtW(f.w)}・${f.l} cm</span><button data-sell="${i}">賣 🪙${f.price}</button></div>`; });
@@ -1160,7 +1167,7 @@ function openMarket() {
   const all = document.getElementById('sellAll'); if (all) all.onclick = () => sell('all');
 }
 function openShop() {
-  const rodRows = RODS.map((r, i) => { const own = i <= prog.rodIdx; const cur = i === prog.rodIdx; return `<div class="row"><span><b>${r.name}</b>　力量 ${r.power}・幸運 ${r.luck}<br><small>${r.desc}</small></span>${cur ? '<em>使用中</em>' : own ? '<em>已擁有</em>' : `<button data-rod="${i}" ${i !== prog.rodIdx + 1 ? 'disabled' : ''}>🪙${r.price}</button>`}</div>`; }).join('');
+  const rodRows = RODS.map((r, i) => { const own = i <= prog.rodIdx; const cur = i === prog.rodIdx; return `<div class="row"><canvas class="rodIcon" data-rodicon="${r.id}" width="60" height="30"></canvas><span><b>${r.name}</b>　力量 ${r.power}・幸運 ${r.luck}<br><small>${r.desc}</small></span>${cur ? '<em>使用中</em>' : own ? '<em>已擁有</em>' : `<button data-rod="${i}" ${i !== prog.rodIdx + 1 ? 'disabled' : ''}>🪙${r.price}</button>`}</div>`; }).join('');
   const boatRows = BOATS.map(b => `<div class="row"><span><b>${b.name}</b>　速度 ${b.speed}</span>${b.lv <= prog.boatLv ? (b.lv === prog.boatLv ? '<em>使用中</em>' : '<em>已擁有</em>') : `<button data-boat="${b.lv}" ${b.lv !== prog.boatLv + 1 ? 'disabled' : ''}>🪙${b.price}</button>`}</div>`).join('');
   showPanel(`<h2>🎣 釣具店</h2><p>你有 🪙${state.coins}</p>
     <div class="list"><h3>釣竿（依序升級）</h3>${rodRows}
@@ -1169,6 +1176,7 @@ function openShop() {
     <h3>🧭 探險裝備</h3>${GEAR.map(gr => `<div class="row"><span><b>${gr.icon} ${gr.name}</b><br><small>${gr.desc}</small></span>${prog.gear[gr.id] ? '<em>已擁有</em>' : `<button data-gear="${gr.id}">🪙${gr.price}</button>`}</div>`).join('')}
     <h3>船</h3>${boatRows}</div>`);
   const pay = (cost, fn) => { if (state.coins < cost) { toast('錢不夠，先去魚市賣魚吧'); buzz(120); return; } state.coins -= cost; fn(); applyGear(); buzz(40); checkAch(); save(); updateHud(); openShop(); };
+  if (window.ART && ART.drawRodIcon) document.querySelectorAll('[data-rodicon]').forEach(c => ART.drawRodIcon(c, c.dataset.rodicon));
   document.querySelectorAll('[data-rod]').forEach(el => el.onclick = () => { const i = +el.dataset.rod; pay(RODS[i].price, () => { prog.rodIdx = i; toast('換上了 ' + RODS[i].name + '！'); }); });
   document.querySelectorAll('[data-boat]').forEach(el => el.onclick = () => { const lv = +el.dataset.boat; pay(BOATS[lv].price, () => { prog.boatLv = lv; toast('船升級成 ' + BOATS[lv].name + '！'); }); });
   document.getElementById('buyBait').onclick = () => pay(BAIT.price, () => { prog.bait += BAIT.count; toast('買了 10 個魚餌'); });
@@ -2199,7 +2207,7 @@ function drawPerson(g, x, y, t, sitting) {
   if (window.ART) {   // 🎨 美術部像素主角（走路三格動畫）
     const ph = Math.sin(p.walk), moving = Math.abs(ph) > .35 && !sitting;
     const frame = !moving ? 0 : (ph > 0 ? 1 : 2);
-    ART.drawPerson(g, x, y - (moving ? 1 : 0) * (frame === 2 ? 1 : 0), { back, flip, frame, sitting, rod: true });
+    ART.drawPerson(g, x, y - (moving ? 1 : 0) * (frame === 2 ? 1 : 0), { back, flip, frame, sitting, rod: (RODS[prog.rodIdx] || RODS[0]).id });
     return;
   }
   const step = sitting ? 0 : Math.round(Math.sin(p.walk) * 1);
@@ -2334,7 +2342,8 @@ function drawThird(g, t) {
   // 釣竿與釣線
   const bend = fish.state === 'reel' ? (fish.tension / 100) * 0.5 + (fish.struggle ? .15 : 0) : fish.state === 'bite' ? .2 : 0;
   const tipX = lerp(hx + lw * (.22 + (fish.rod || 0) * .24), fx, bend * .5), tipY = lerp(by - lh * (.55 - Math.abs(fish.rod || 0) * .08), fy, bend * .6);
-  g.strokeStyle = '#6a4224'; g.lineWidth = Math.max(1, s * .8); g.beginPath(); g.moveTo(hx, hy); g.quadraticCurveTo(hx + (tipX - hx) * .5, hy + (tipY - hy) * .3, tipX, tipY); g.stroke();
+  if (window.ART && ART.drawRod) ART.drawRod(g, (RODS[prog.rodIdx] || RODS[0]).id, hx, hy, tipX, tipY, s, t);   // 每支竿長得不一樣
+  else { g.strokeStyle = '#6a4224'; g.lineWidth = Math.max(1, s * .8); g.beginPath(); g.moveTo(hx, hy); g.quadraticCurveTo(hx + (tipX - hx) * .5, hy + (tipY - hy) * .3, tipX, tipY); g.stroke(); }
   g.strokeStyle = 'rgba(255,255,255,.75)'; g.lineWidth = 1; g.beginPath(); g.moveTo(tipX, tipY);
   const sag = fish.state === 'reel' ? 4 * (1 - fish.tension / 100) : 14; g.quadraticCurveTo((tipX + fx) / 2, Math.max(tipY, fy) + sag, fx, fy - 6); g.stroke();
   // 時段色調
