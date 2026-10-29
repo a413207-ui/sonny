@@ -26,6 +26,10 @@
   #toast.show { opacity: 1; }
   .overlay { position: fixed; inset: 0; display: none; align-items: center; justify-content: center; z-index: 20; background: rgba(10,16,30,.55); }
   .overlay.show { display: flex; }
+  #loadScr { background: #000; z-index: 60; flex-direction: column; }
+  #loadCv { position: absolute; inset: 0; width: 100%; height: 100%; image-rendering: pixelated; }
+  #loadBox { position: absolute; left: 0; right: 0; bottom: 14%; text-align: center; color: #f4ecd8; font-weight: bold; text-shadow: 0 2px 0 #000; padding: 0 16px; }
+  #loadTxt { font-size: 18px; margin-bottom: 8px; } #loadTip { font-size: 14px; opacity: .9; }
   .card { background: #fff8e6; border: 4px solid #6b4a2a; border-radius: 14px; padding: 14px 16px; width: min(92vw, 380px); max-height: 86vh; overflow: auto; box-shadow: 0 6px 0 #6b4a2a; text-align: center; }
   .card h3 { margin: 10px 0 4px; font-size: 15px; text-align: left; }
   .list { max-height: 52vh; overflow: auto; text-align: left; }
@@ -184,6 +188,7 @@
 <div id="toast"></div>
 <div id="updBar">🆕 有新版本，點我更新</div>
 <div id="bars"><div class="bar" id="tension"><div></div><span>張力</span></div><div class="bar" id="dist"><div></div><span>距離</span></div></div>
+<div class="overlay" id="loadScr"><canvas id="loadCv"></canvas><div id="loadBox"><div id="loadTxt"></div><div id="loadTip"></div></div></div>
 <div class="overlay" id="catch"><div class="card" id="catchCard"></div></div>
 <div class="overlay" id="bigmap"><div class="card">
   <h2>🗺️ 地圖</h2>
@@ -205,24 +210,25 @@
 <div class="overlay" id="fishDetail"><div class="card" id="fishDetailCard"></div></div>
 <div class="overlay" id="badgePop"><div class="card" id="badgeCard"></div></div>
 
-<script src="data/fish.js?v=2026.10.29-77"></script>
-<script src="art.js?v=2026.10.29-77"></script>
-<script src="music.js?v=2026.10.29-77"></script>
+<script src="data/fish.js?v=2026.10.29-78"></script>
+<script src="art.js?v=2026.10.29-78"></script>
+<script src="music.js?v=2026.10.29-78"></script>
 <script>
 'use strict';
 // 版本號：每次更新都要改（也要改上面三個 script 的 ?v=），遊戲會用它檢查網站上有沒有新版
-const BUILD = '2026.10.29-77';
+const BUILD = '2026.10.29-78';
 // ════════════════ 基本設定 ════════════════
 const FISH = window.FISH_DATA || [];
 const N = 160, TW = 32, TH = 16, LH = 4;         // 地圖格數、等角格寬高、陸地高度
 const OFS = 20;                                  // 地圖從 80 格擴大到 120 格：原本的島整個往中間移 20 格
 const SX = 40;                                   // 再從 120 擴大到 160：原本的海和島往右（+x）移 40 格，左邊空出來給大河平原
 const OX = N * TW / 2, OY = 24;
-const T = { DEEP: 0, SEA: 1, REEF: 2, LAKE: 3, RIVER: 4, SAND: 5, GRASS: 6, STONE: 7, DOCK: 8, SNOW: 9, ROCK: 10, ICE: 11, COLD: 12, MANGROVE: 13, VOLCANO: 14, LAGOON: 15, BIGRIVER: 16, UPRIVER: 17 };
-const WATER = new Set([T.DEEP, T.SEA, T.REEF, T.LAKE, T.RIVER, T.COLD, T.MANGROVE, T.VOLCANO, T.LAGOON, T.BIGRIVER, T.UPRIVER]);
+const T = { DEEP: 0, SEA: 1, REEF: 2, LAKE: 3, RIVER: 4, SAND: 5, GRASS: 6, STONE: 7, DOCK: 8, SNOW: 9, ROCK: 10, ICE: 11, COLD: 12, MANGROVE: 13, VOLCANO: 14, LAGOON: 15, BIGRIVER: 16, UPRIVER: 17,
+  UWALL: 18, UFLOOR: 19, USTREAM: 20, ULAKE: 21, UCRYSTAL: 22, ULAVA: 23, UHOT: 24, UCFLOOR: 25 };   // U＝地下世界
+const WATER = new Set([T.DEEP, T.SEA, T.REEF, T.LAKE, T.RIVER, T.COLD, T.MANGROVE, T.VOLCANO, T.LAGOON, T.BIGRIVER, T.UPRIVER, T.USTREAM, T.ULAKE, T.UCRYSTAL, T.ULAVA]);
 const BOATABLE = new Set([T.DEEP, T.SEA, T.REEF, T.COLD, T.MANGROVE, T.VOLCANO, T.LAGOON, T.BIGRIVER, T.UPRIVER]);
-const REGION_OF = { [T.SEA]: 'harbor', [T.DEEP]: 'deep', [T.REEF]: 'reef', [T.LAKE]: 'lake', [T.RIVER]: 'river', [T.COLD]: 'cold', [T.MANGROVE]: 'mangrove', [T.VOLCANO]: 'volcano', [T.LAGOON]: 'lagoon', [T.BIGRIVER]: 'bigriver', [T.UPRIVER]: 'upriver' };
-const REGION_NAME = { harbor: '港灣', deep: '深海', reef: '珊瑚礁', lake: '翠湖', river: '溪谷', cold: '冰川海域', mangrove: '紅樹林河口', volcano: '火山海域', wreck: '沉船', cave: '海蝕洞', lagoon: '無人島潟湖', frozen: '冰封秘境', bigriver: '大河下游', upriver: '大河上游' };
+const REGION_OF = { [T.SEA]: 'harbor', [T.DEEP]: 'deep', [T.REEF]: 'reef', [T.LAKE]: 'lake', [T.RIVER]: 'river', [T.COLD]: 'cold', [T.MANGROVE]: 'mangrove', [T.VOLCANO]: 'volcano', [T.LAGOON]: 'lagoon', [T.BIGRIVER]: 'bigriver', [T.UPRIVER]: 'upriver', [T.USTREAM]: 'ucave', [T.ULAKE]: 'ulake', [T.UCRYSTAL]: 'ucrystal', [T.ULAVA]: 'ulava' };
+const REGION_NAME = { harbor: '港灣', deep: '深海', reef: '珊瑚礁', lake: '翠湖', river: '溪谷', cold: '冰川海域', mangrove: '紅樹林河口', volcano: '火山海域', wreck: '沉船', cave: '海蝕洞', lagoon: '無人島潟湖', frozen: '冰封秘境', bigriver: '大河下游', upriver: '大河上游', ucave: '洞穴水潭', ulake: '地底湖', ucrystal: '水晶池', ulava: '熔岩河' };
 const RAR = {
   common: { name: '普通', color: '#8a9a7a', w: 60, pow: .68 },
   uncommon: { name: '少見', color: '#4a9a5a', w: 25, pow: .82 },
@@ -230,7 +236,8 @@ const RAR = {
   epic: { name: '史詩', color: '#9a4ad0', w: 4, pow: 1.25 },
   legendary: { name: '傳說', color: '#e0902a', w: 1, pow: 1.55 },
 };
-const TILE_COLOR = { [T.DEEP]: '#26508f', [T.SEA]: '#3f8fd0', [T.REEF]: '#3fc3c0', [T.LAKE]: '#4aa88a', [T.RIVER]: '#4fb0b8', [T.SAND]: '#e8d49a', [T.GRASS]: '#7cc04f', [T.STONE]: '#cdbda2', [T.DOCK]: '#a8784a', [T.SNOW]: '#eef4fa', [T.ROCK]: '#4a4448', [T.ICE]: '#dff2ff', [T.COLD]: '#4a7aa8', [T.MANGROVE]: '#4a7a5a', [T.VOLCANO]: '#4a3a56', [T.LAGOON]: '#4ad0c8', [T.BIGRIVER]: '#4a98a8', [T.UPRIVER]: '#5ab4c4' };
+const TILE_COLOR = { [T.DEEP]: '#26508f', [T.SEA]: '#3f8fd0', [T.REEF]: '#3fc3c0', [T.LAKE]: '#4aa88a', [T.RIVER]: '#4fb0b8', [T.SAND]: '#e8d49a', [T.GRASS]: '#7cc04f', [T.STONE]: '#cdbda2', [T.DOCK]: '#a8784a', [T.SNOW]: '#eef4fa', [T.ROCK]: '#4a4448', [T.ICE]: '#dff2ff', [T.COLD]: '#4a7aa8', [T.MANGROVE]: '#4a7a5a', [T.VOLCANO]: '#4a3a56', [T.LAGOON]: '#4ad0c8', [T.BIGRIVER]: '#4a98a8', [T.UPRIVER]: '#5ab4c4',
+  [T.UWALL]: '#1a1518', [T.UFLOOR]: '#4a4044', [T.USTREAM]: '#1e4a5e', [T.ULAKE]: '#163a60', [T.UCRYSTAL]: '#4a2a7a', [T.ULAVA]: '#e0561e', [T.UHOT]: '#4a2c26', [T.UCFLOOR]: '#3e3450' };
 const params = new URLSearchParams(location.search);
 
 // 可重現的雜訊
@@ -384,6 +391,7 @@ for (const [di, def] of [[1, { id: 'tailorA', name: '森林服飾店', wall: '#e
   let x = pos.x + Math.floor(w / 2), y = pos.y + h; const tx = d.x0, ty = d.y0;
   while (x !== tx || y !== ty) { const t = at(x, y); if (SHOP_LAND.has(t)) { set(x, y, T.STONE); shopPaths.push([x, y]); } if (x !== tx) x += Math.sign(tx - x); else y += Math.sign(ty - y); }
 }
+BUILDINGS.push({ id: 'mine', name: '地底洞窟', sign: '⛏️', x: 14, y: 150, w: 3, h: 2, hgt: 20, wall: '#6a6268', roof: '#4a4448' });   // 大河上游、源頭湖東邊的山壁（地下世界入口）
 for (const b of BUILDINGS) {
   for (let y = b.y; y < b.y + b.h; y++) for (let x = b.x; x < b.x + b.w; x++) { set(x, y, T.STONE); block[y * N + x] = 1; }
   b.door = [b.x + b.w / 2, b.y + b.h + .5];   // 門在建築的左前方（＋y 那一面）
@@ -404,6 +412,7 @@ for (let y = 1; y < N - 1; y++) for (let x = 1; x < N - 1; x++) {
     if (!dockNear) { block[i] = 1; trees.push({ x: x + .5, y: y + .5, k: nz(is, x, y, 12), snow: tt === T.SNOW, mangrove: !!is.mangrove, palm: !!is.palm }); }
   } else if (tt === T.GRASS && is && is.name === '溪谷山島' && !nearWater && nz(is, x, y, 13) < .07) { block[i] = 1; rocks.push({ x: x + .5, y: y + .5 }); }
 }
+for (const [x, y] of [[13, 149], [15, 149], [17, 149], [17, 150], [18, 151], [13, 150]]) { const i = y * N + x; if (!WATER.has(tile[i]) && !block[i]) { block[i] = 1; rocks.push({ x: x + .5, y: y + .5 }); } }   // 洞口旁的岩石
 for (const [x, y] of [[97, 66], [102, 59], [103, 68], [93, 67], [109, 62], [98, 74]]) if (at(x, y) === T.STONE && !block[y * N + x]) { block[y * N + x] = 1; lamps.push({ x: x + .5, y: y + .5 }); }
 const walkable = (x, y) => { const xi = Math.floor(x), yi = Math.floor(y); if (xi < 0 || yi < 0 || xi >= N || yi >= N) return false; const t = tile[yi * N + xi]; return !WATER.has(t) && !block[yi * N + xi]; };
 let ICEBREAK = false;   // 有破冰船頭：船可以開過浮冰和冰層
@@ -417,7 +426,7 @@ function groundChunk(cx, cy) {
   const key = cx + ',' + cy; let c = chunks.get(key);
   if (c) { chunks.delete(key); chunks.set(key, c); return c; }
   c = document.createElement('canvas'); c.width = CS; c.height = CS;
-  const g = c.getContext('2d'); g.fillStyle = TILE_COLOR[T.DEEP]; g.fillRect(0, 0, CS, CS); g.translate(-cx * CS, -cy * CS);
+  const g = c.getContext('2d'); g.fillStyle = UNDER ? '#07060a' : TILE_COLOR[T.DEEP]; g.fillRect(0, 0, CS, CS); g.translate(-cx * CS, -cy * CS);
   paintGround(g, cx * CS, cy * CS);
   chunks.set(key, c); if (chunks.size > 24) chunks.delete(chunks.keys().next().value);
   return c;
@@ -434,11 +443,14 @@ function paintGround(g, X0, Y0) {
       if (t === T.COLD && hash(x, y, 4) < .12) { g.fillStyle = 'rgba(240,250,255,.7)'; g.fillRect(p.x - 4 + hash(x, y, 6) * 8 | 0, p.y + 6, 4, 2); }
       if (t === T.MANGROVE && hash(x, y, 4) < .25) { g.fillStyle = 'rgba(40,70,30,.5)'; g.fillRect(p.x - 4 + hash(x, y, 6) * 8 | 0, p.y + 7, 2, 2); }
       if (t === T.VOLCANO && hash(x, y, 4) < .12) { g.fillStyle = 'rgba(255,140,60,.55)'; g.fillRect(p.x - 3 + hash(x, y, 6) * 6 | 0, p.y + 7, 2, 2); }
+      if (t === T.ULAKE && hash(x, y, 4) < .3) { g.fillStyle = 'rgba(110,220,255,.7)'; g.fillRect(p.x - 5 + hash(x, y, 6) * 10 | 0, p.y + 5 + hash(x, y, 7) * 5 | 0, 1, 1); }   // 地底湖的藍色螢光
+      if (t === T.UCRYSTAL && hash(x, y, 4) < .35) { g.fillStyle = ['#ff9ae8', '#b08aff', '#8affe0'][Math.floor(hash(x, y, 5) * 3)]; g.fillRect(p.x - 5 + hash(x, y, 6) * 10 | 0, p.y + 5 + hash(x, y, 7) * 5 | 0, 2, 1); }
+      if (t === T.ULAVA) { g.fillStyle = '#ffb030'; for (let k = 0; k < 3; k++) g.fillRect(p.x - 7 + hash(x, y, 40 + k) * 14 | 0, p.y + 4 + hash(x, y, 50 + k) * 8 | 0, 2 + (k % 2) * 2, 1); g.fillStyle = 'rgba(80,20,10,.5)'; g.fillRect(p.x - 4 + hash(x, y, 60) * 8 | 0, p.y + 7, 4, 1); }
       if (t === T.REEF && hash(x, y, 4) < .3) { g.fillStyle = ['#ff8a8a', '#ffb070', '#e070c0', '#80e0a0'][Math.floor(hash(x, y, 5) * 4)]; g.fillRect(p.x - 4 + hash(x, y, 6) * 8 | 0, p.y + 6, 3, 2); g.fillRect(p.x - 2 + hash(x, y, 8) * 6 | 0, p.y + 9, 2, 2); }
       // 岸邊淺水
       if (t === T.DEEP && hash(x, y, 21) < .25) { g.fillStyle = 'rgba(10,30,70,.35)'; g.fillRect(p.x - 6 + hash(x, y, 22) * 10 | 0, p.y + 5 + hash(x, y, 23) * 6 | 0, 4, 1); }
       // 岸邊白浪（四個方向都畫）
-      if (t !== T.DEEP) for (const [dx, dy, ox, oy] of [[-1, 0, -10, 5], [0, -1, 6, 5], [1, 0, 6, 11], [0, 1, -10, 11]]) if (!WATER.has(at(x + dx, y + dy))) { g.fillStyle = 'rgba(255,255,255,.45)'; g.fillRect(p.x + ox, p.y + oy - 1, 5, 1); g.fillStyle = 'rgba(255,255,255,.22)'; g.fillRect(p.x + ox + 1, p.y + oy + 1, 4, 1); }
+      if (t !== T.DEEP && t !== T.ULAVA) for (const [dx, dy, ox, oy] of [[-1, 0, -10, 5], [0, -1, 6, 5], [1, 0, 6, 11], [0, 1, -10, 11]]) if (!WATER.has(at(x + dx, y + dy))) { g.fillStyle = 'rgba(255,255,255,.45)'; g.fillRect(p.x + ox, p.y + oy - 1, 5, 1); g.fillStyle = 'rgba(255,255,255,.22)'; g.fillRect(p.x + ox + 1, p.y + oy + 1, 4, 1); }
       continue;
     }
     if (t === T.DOCK) {
@@ -449,6 +461,15 @@ function paintGround(g, X0, Y0) {
       continue;
     }
     const top = TILE_COLOR[t];
+    if (t === T.UWALL) {   // 地底岩壁：比地面高一截的黑色岩塊（只畫靠近通道的那一圈）
+      let edge = false; for (let dy = -1; dy <= 1 && !edge; dy++) for (let dx = -1; dx <= 1; dx++) if (at(x + dx, y + dy) !== T.UWALL) { edge = true; break; }
+      if (!edge) { dia(p.x, p.y - 12, '#0c0a0e'); continue; }
+      const HW = 12;
+      g.fillStyle = '#2a2428'; g.beginPath(); g.moveTo(p.x - TW / 2, p.y + TH / 2 - HW); g.lineTo(p.x, p.y + TH - HW); g.lineTo(p.x, p.y + TH); g.lineTo(p.x - TW / 2, p.y + TH / 2); g.closePath(); g.fill();
+      g.fillStyle = '#1e1a1e'; g.beginPath(); g.moveTo(p.x, p.y + TH - HW); g.lineTo(p.x + TW / 2, p.y + TH / 2 - HW); g.lineTo(p.x + TW / 2, p.y + TH / 2); g.lineTo(p.x, p.y + TH); g.closePath(); g.fill();
+      dia(p.x, p.y - HW, shade('#3a3236', v)); g.fillStyle = '#4e464a'; for (let k = 0; k < 3; k++) g.fillRect(p.x - 8 + hash(x, y, 90 + k) * 16 | 0, p.y - HW + 3 + hash(x, y, 95 + k) * 9 | 0, 2, 1);
+      continue;
+    }
     // 側面（2.5D 高度）
     // 側面（2.5D 高度）：左右兩面深淺不同，加一條土層線（🎨 美術部 Issue #43）
     const side = { [T.SAND]: '#b89a5a', [T.SNOW]: '#9ab0c4', [T.ROCK]: '#2a2426', [T.ICE]: '#8ab8d8' }[t] || '#6a4a2a';
@@ -467,6 +488,9 @@ function paintGround(g, X0, Y0) {
     if (t === T.SAND) { dots(7, 200, shade(top, -.14)); dots(3, 230, '#fff8e0'); if (hash(x, y, 240) < .06) { g.fillStyle = '#f4b0a0'; g.fillRect(p.x + 2, p.y + 4, 3, 2); g.fillStyle = '#fff'; g.fillRect(p.x + 3, p.y + 4, 1, 1); } }
     if (t === T.SNOW || t === T.ICE) { dots(5, 260, '#ffffff'); dots(3, 280, shade(top, -.1), 2, 1); }
     if (t === T.ROCK) { dots(6, 300, shade(top, -.25), 2, 1); if (landOf[y * N + x] && hash(x, y, 310) < .25) dots(2, 320, '#ff6a2a'); }   // 只有火山島的岩地有岩漿光點
+    if (t === T.UFLOOR || t === T.UHOT || t === T.UCFLOOR) { dots(6, 330, shade(top, -.25), 2, 1); dots(3, 350, shade(top, .18)); }
+    if (t === T.UHOT && hash(x, y, 360) < .35) { g.fillStyle = '#ff6a2a'; const cx = p.x - 6 + hash(x, y, 361) * 10 | 0, cy = p.y - LH + 5 + hash(x, y, 362) * 5 | 0; g.fillRect(cx, cy, 4, 1); g.fillRect(cx + 3, cy + 1, 3, 1); }   // 地上的岩漿裂縫
+    if (t === T.UCFLOOR && hash(x, y, 370) < .3) { g.fillStyle = ['#b07aff', '#6ae0ff', '#ff8ad8'][Math.floor(hash(x, y, 371) * 3)]; g.fillRect(p.x - 5 + hash(x, y, 372) * 10 | 0, p.y - LH + 4 + hash(x, y, 373) * 6 | 0, 1, 2); }
     if (t === T.STONE) {
       // 石板路：交錯的小石塊
       for (let r = 0; r < 4; r++) for (let c = -3; c <= 3; c++) {
@@ -515,7 +539,7 @@ function revealAt(cx, cy, r) {
 }
 const isRevealed = (x, y) => !!fog[clamp(Math.floor(y), 0, N - 1) * N + clamp(Math.floor(x), 0, N - 1)];
 const fogPct = () => Math.floor(fogCount / (N * N) * 1000) / 10;
-function fogPack() { const b = new Uint8Array(Math.ceil(N * N / 8)); for (let i = 0; i < N * N; i++) if (fog[i]) b[i >> 3] |= 1 << (i & 7); let s = ''; for (let i = 0; i < b.length; i += 4096) s += String.fromCharCode.apply(null, b.subarray(i, i + 4096)); return btoa(s); }
+function fogPack(arr = fog) { const b = new Uint8Array(Math.ceil(N * N / 8)); for (let i = 0; i < N * N; i++) if (arr[i]) b[i >> 3] |= 1 << (i & 7); let s = ''; for (let i = 0; i < b.length; i += 4096) s += String.fromCharCode.apply(null, b.subarray(i, i + 4096)); return btoa(s); }
 function fogUnpack(str, n = N, dx = 0) {   // n／dx：舊地圖的大小和要往右移幾格（地圖擴大前的存檔）
   const bin = atob(str); fog.fill(0); fogCount = 0;
   for (let i = 0; i < n * n; i++) if ((bin.charCodeAt(i >> 3) >> (i & 7)) & 1) { const x = i % n + dx, y = (i / n) | 0; if (x < N && y < N) { fog[y * N + x] = 1; fogCount++; } }
@@ -630,10 +654,11 @@ function updateWeather(dt) {
     src.buffer = buf; src.loop = true; bp.type = 'bandpass'; bp.frequency.value = 1400; bp.Q.value = .6; g.gain.value = 0;
     src.connect(bp); bp.connect(g); g.connect(a.destination); src.start(); rainNode = g;
   }
-  if (rainNode) rainNode.gain.setTargetAtTime(state.snd && !document.hidden ? wx.rain * .09 + wx.wave * .02 : 0, actx.currentTime, .5);
+  if (rainNode) rainNode.gain.setTargetAtTime(state.snd && !document.hidden && !UNDER ? wx.rain * .09 + wx.wave * .02 : 0, actx.currentTime, .5);
 }
 // 雨、天色、閃電：畫在整個畫面最上層（高解析度）
 function drawWeatherFx(t) {
+  if (UNDER) return;   // 地底看不到天氣
   const cw = cv.width, ch = cv.height;
   ctx.setTransform(1, 0, 0, 1, 0, 0);
   if (wx.dark > .02) { ctx.fillStyle = `rgba(30,38,56,${wx.dark * .45})`; ctx.fillRect(0, 0, cw, ch); }
@@ -773,6 +798,7 @@ try { musMode = localStorage.getItem(MODE_KEY) || 'auto'; } catch (e) {}
 const ISL_MOOD = { 漁港鎮: 'harbor', 金鱗島: 'festival', 冰晶島: 'cold', 火山島: 'volcano', 紅樹林島: 'mangrove', 大河平原: 'river', 翠湖森林島: 'river', 溪谷山島: 'river', 珊瑚小島: 'reef', 無人島: 'reef' };
 const REG_MOOD = { harbor: 'harbor', deep: 'deep', wreck: 'deep', cave: 'deep', reef: 'reef', lagoon: 'reef', cold: 'cold', frozen: 'cold', volcano: 'volcano', mangrove: 'mangrove', lake: 'river', river: 'river', bigriver: 'river', upriver: 'river' };
 function musicMood() {   // 現在的場合：時段、天氣、所在地
+  if (UNDER) return { phase: 'night', place: 'deep', storm: false };   // 地底：先用深海、夜晚的歌
   const o = state.onBoat ? state.boat : state.player, xi = Math.floor(o.x), yi = Math.floor(o.y);
   const is = !state.onBoat && ISLANDS[landOf[yi * N + xi] - 1];
   const place = is ? ISL_MOOD[is.name] || 'sea' : REG_MOOD[regionAt(o.x, o.y)] || 'sea';
@@ -898,7 +924,7 @@ function waterAhead(ox, oy, fx, fy) {
   for (let a = 0; a < 8; a++) { const dx = Math.cos(a * Math.PI / 4), dy = Math.sin(a * Math.PI / 4); hit = tryDir(dx, dy); if (hit) return { ...hit, fx: dx, fy: dy }; }
   return null;
 }
-function nearBuilding() { const p = state.player; return BUILDINGS.find(b => Math.hypot(b.door[0] - p.x, b.door[1] - p.y) < 1.3); }
+function nearBuilding() { const p = state.player; if (UNDER) return null; return BUILDINGS.find(b => Math.hypot(b.door[0] - p.x, b.door[1] - p.y) < 1.3); }
 function landingSpot() {
   const b = state.boat;
   for (let r = 1; r <= 1.6; r += .3) for (let a = 0; a < 16; a++) { const x = b.x + Math.cos(a * Math.PI / 8) * r, y = b.y + Math.sin(a * Math.PI / 8) * r; if (walkable(x, y)) return { x: Math.floor(x) + .5, y: Math.floor(y) + .5 }; }
@@ -918,6 +944,7 @@ function contextB() {
   if (fish.state) return null;
   if (state.onBoat) { const s = landingSpot(); return s ? { label: '下船', fn: () => { state.onBoat = false; state.boat.vx = state.boat.vy = 0; Object.assign(state.player, s); toast('上岸了'); } } : null; }   // 下船時船停住，不會滑走
   const p = state.player;
+  if (UNDER) return U.stairs && Math.hypot(U.stairs.door[0] - p.x, U.stairs.door[1] - p.y) < 1.4 ? { label: '回到地面', fn: exitUnder } : null;   // 地底：只有石階
   const tm = prog.maps.find(m => Math.hypot(m.x - p.x, m.y - p.y) < 1.1); if (tm) return { label: '挖寶', fn: () => digTreasure(tm) };
   if (Math.hypot(state.boat.x - p.x, state.boat.y - p.y) < 1.8) return { label: '上船', fn: () => { state.onBoat = true; toast('⛵ 用搖桿開船，到不同海域釣不同的魚'); } };
   const b = nearBuilding(); if (b) return { label: '進入', fn: () => openBuilding(b) };
@@ -933,10 +960,10 @@ function contextA() {
   const o = state.onBoat ? state.boat : state.player;
   return waterAhead(o.x, o.y, state.player.fx, state.player.fy) ? '拋竿' : null;
 }
-function pressB() { const c = contextB(); if (c) c.fn(); }
+function pressB() { if (loadingOn) return; const c = contextB(); if (c) c.fn(); }
 let holding = false;
 function pressA(down) {
-  holding = down; if (!down) return;
+  holding = down; if (!down || loadingOn) return;
   if (!fish.state) return startCast();
   if (fish.state === 'wait') return fail('太早拉竿，魚被嚇跑了…');
   if (fish.state === 'bite') return hook();
@@ -949,6 +976,7 @@ function startCast() {
   const o = state.onBoat ? state.boat : state.player;
   const w = waterAhead(o.x, o.y, state.player.fx, state.player.fy);
   if (!w) return toast('前面沒有水，換個方向試試');
+  if (UNDER) { toast(`⛏️ ${MINER_NAME}：「地底的魚還在調查中，下次更新就能釣了！」`, 2800); return; }
   state.player.fx = w.fx; state.player.fy = w.fy;
   Object.assign(fish, { state: 'cast', t: 0, region: regionAt(w.x, w.y), fx: w.x, fy: w.y, nibbles: [], d: 100, dMax: 100, tension: 0, struggle: false, swap: 0, boss: false, dash: 0, warn: 0, rod: 0, lure: 0, moved: 0, lured: 0, side: 1, fishX: 0, push: 0, slackT: 0, slackWarn: 0 });
   const wait = rand(2.2, 6.5) / (1 + state.rod.luck * .2) * (WEATHER[weather].bite || 1);
@@ -1127,6 +1155,7 @@ const ACH = [
   ['quest1', '📋 熱心幫忙', '完成一張委託', s => (s.questDone || 0) >= 1],
   ['quest10', '🤝 漁村好朋友', '完成 10 張委託', s => (s.questDone || 0) >= 10],
   ['gearall', '🧰 探險家裝備', '買齊三樣探險裝備', s => GEAR.every(g => (s.gear || {})[g.id])],
+  ['under1', '🕳️ 地底探險家', '第一次進入地下世界', s => !!s.underVisit],
   ['print1', '🖼️ 第一幅魚拓', '請魚拓師傅拓一幅魚拓', s => (s.prints || []).length >= 1],
   ['print10', '🎨 魚拓收藏家', '收藏 10 幅魚拓', s => (s.prints || []).length >= 10],
   ['printleg', '🏯 傳說魚拓', '把傳說魚拓成魚拓', s => (s.prints || []).some(p => FISH_BY_ID[p.id] && FISH_BY_ID[p.id].rarity === 'legendary')],
@@ -1134,7 +1163,7 @@ const ACH = [
 // 徽章等級：bronze 銅、silver 銀、gold 金、rainbow 彩虹（最難）
 const TIER = { first: 'bronze', c10: 'bronze', c50: 'silver', c200: 'gold', d10: 'bronze', d30: 'silver', d60: 'gold', dall: 'rainbow',
   r_harbor: 'bronze', r_lake: 'bronze', r_river: 'bronze', r_reef: 'silver', r_deep: 'silver', t_dawn: 'bronze', t_dusk: 'bronze', t_night: 'silver',
-  rare: 'silver', epic: 'gold', legend: 'gold', legend_all: 'rainbow', w10: 'silver', w100: 'gold', m1000: 'bronze', m10000: 'gold', rod: 'bronze', boat: 'bronze', style1: 'bronze', style10: 'gold', tailorall: 'gold', wx_rain: 'bronze', wx_typhoon: 'gold', wx_special: 'silver', drift10: 'silver', contest1: 'bronze', podium: 'silver', champion: 'gold', r_cold: 'silver', r_mangrove: 'bronze', r_volcano: 'silver', r_bigriver: 'bronze', r_upriver: 'silver', aq1: 'bronze', aqleg: 'silver', aq20: 'gold', explore50: 'silver', explore85: 'gold', spot1: 'bronze', spotall: 'rainbow', dig1: 'bronze', dig5: 'gold', boss1: 'silver', boss5: 'gold', quest1: 'bronze', quest10: 'gold', gearall: 'silver', print1: 'bronze', print10: 'silver', printleg: 'gold' };
+  rare: 'silver', epic: 'gold', legend: 'gold', legend_all: 'rainbow', w10: 'silver', w100: 'gold', m1000: 'bronze', m10000: 'gold', rod: 'bronze', boat: 'bronze', style1: 'bronze', style10: 'gold', tailorall: 'gold', wx_rain: 'bronze', wx_typhoon: 'gold', wx_special: 'silver', drift10: 'silver', contest1: 'bronze', podium: 'silver', champion: 'gold', r_cold: 'silver', r_mangrove: 'bronze', r_volcano: 'silver', r_bigriver: 'bronze', r_upriver: 'silver', aq1: 'bronze', aqleg: 'silver', aq20: 'gold', explore50: 'silver', explore85: 'gold', spot1: 'bronze', spotall: 'rainbow', dig1: 'bronze', dig5: 'gold', boss1: 'silver', boss5: 'gold', quest1: 'bronze', quest10: 'gold', gearall: 'silver', under1: 'silver', print1: 'bronze', print10: 'silver', printleg: 'gold' };
 const TIER_NAME = { bronze: '銅', silver: '銀', gold: '金', rainbow: '彩虹' };
 const achParts = a => { const i = a[1].indexOf(' '); return { id: a[0], icon: a[1].slice(0, i), title: a[1].slice(i + 1), desc: a[2], tier: TIER[a[0]] || 'bronze' }; };
 const medalHtml = (b, got) => `<div class="medal ${got ? b.tier : 'lock'}"><i>${got ? b.icon : '？'}</i></div>`;
@@ -1156,9 +1185,15 @@ function showNextBadge() {
   document.getElementById('badgeBook').onclick = () => { badgeQueue.length = 0; pop.classList.remove('show'); openDex('ach'); };
 }
 const SAVE_KEY = 'bay-fishing-save-v1';
-const prog = { dex: {}, ach: {}, catches: 0, region: {}, time: {}, rar: {}, maxW: 0, earned: 0, rodIdx: 0, boatLv: 0, bait: 0, pills: 0, look: null, closet: [], wxc: {}, drift: 0, contest: {}, contestN: 0, contestBest: 0, contestWins: 0, aquarium: [], found: {}, maps: [], dug: 0, boss: 0, quests: [], questDone: 0, rep: 0, gear: {}, explore: 0, fog: null, prints: [], rodTip: 0 };
+const prog = { dex: {}, ach: {}, catches: 0, region: {}, time: {}, rar: {}, maxW: 0, earned: 0, rodIdx: 0, boatLv: 0, bait: 0, pills: 0, look: null, closet: [], wxc: {}, drift: 0, contest: {}, contestN: 0, contestBest: 0, contestWins: 0, aquarium: [], found: {}, maps: [], dug: 0, boss: 0, quests: [], questDone: 0, rep: 0, gear: {}, explore: 0, fog: null, prints: [], rodTip: 0, lamp: 0, mineOpen: 0, underVisit: 0, ufog: null };
+function savePos() {   // 在地底時，地面位置記洞口，另外記地底的位置
+  if (!UNDER) return { x: state.player.x, y: state.player.y, bx: state.boat.x, by: state.boat.y, onBoat: state.onBoat };
+  const b = mineB(); return { x: b.door[0], y: b.door[1] + .2, bx: state.boat.x, by: state.boat.y, onBoat: false, world: 'under', ux: state.player.x, uy: state.player.y };
+}
+let resumeUnder = null;
 function save() {
-  try { prog.fog = fogPack(); prog.fogN = N; localStorage.setItem(SAVE_KEY, JSON.stringify({ v: 1, mapV: 3, coins: state.coins, bag: state.bag, prog, pos: { x: state.player.x, y: state.player.y, bx: state.boat.x, by: state.boat.y, onBoat: state.onBoat } })); } catch (e) {}
+  if (loadingOn) return;
+  try { prog.ufog = fogPack(uFog); prog.fog = fogPack(); prog.fogN = N; localStorage.setItem(SAVE_KEY, JSON.stringify({ v: 1, mapV: 3, coins: state.coins, bag: state.bag, prog, pos: savePos() })); } catch (e) {}
 }
 function load() {
   try {
@@ -1170,6 +1205,7 @@ function load() {
     if (d.pos && walkable(d.pos.x, d.pos.y)) { state.player.x = d.pos.x; state.player.y = d.pos.y; }
     if (d.pos && boatable(d.pos.bx, d.pos.by)) { state.boat.x = d.pos.bx; state.boat.y = d.pos.by; }
     if (d.pos && d.pos.onBoat && boatable(d.pos.bx, d.pos.by)) { state.onBoat = true; state.player.x = state.boat.x; state.player.y = state.boat.y; }
+    if (d.pos && d.pos.world === 'under' && prog.mineOpen) resumeUnder = { x: d.pos.ux, y: d.pos.uy };   // 上次在地底：讀取完再進去
     return true;
   } catch (e) { return false; }
 }
@@ -1179,7 +1215,7 @@ const SLOTS = ['hat', 'hair', 'glasses', 'beard', 'top', 'pants'];
 const owns = (slot, id) => (WR[slot][id] && WR[slot][id].price === 0) || prog.closet.includes(slot + ':' + id);
 function applyLook() { if (!prog.look) prog.look = { ...ART.DEFAULT_LOOK }; if (window.ART) ART.setLook(prog.look); }
 function drawPreview(cvs, look) { const g = cvs.getContext('2d'); g.imageSmoothingEnabled = false; g.clearRect(0, 0, cvs.width, cvs.height); g.drawImage(ART.previewFront(look), 0, 0, cvs.width, cvs.height); }
-const SHOP_OF = { tailorA: '到翠湖森林島的🎩森林服飾店買', tailorB: '到溪谷山島的👕山谷造型屋買', tailorC: '到冰晶島的🧣雪國毛帽店買', tailorD: '到火山島的🎸熔岩龐克屋買', tailorE: '到紅樹林島的🧭叢林探險屋買', tailorF: '到大河平原的👘河畔和風屋買', treasure: '藏寶圖挖寶才拿得到' };
+const SHOP_OF = { tailorA: '到翠湖森林島的🎩森林服飾店買', tailorB: '到溪谷山島的👕山谷造型屋買', tailorC: '到冰晶島的🧣雪國毛帽店買', tailorD: '到火山島的🎸熔岩龐克屋買', tailorE: '到紅樹林島的🧭叢林探險屋買', tailorF: '到大河平原的👘河畔和風屋買', treasure: '藏寶圖挖寶才拿得到', mine: '地下世界的委託獎勵（之後開放）' };
 function applyGear() {
   const r = RODS[prog.rodIdx] || RODS[0]; state.rod = { power: r.power, luck: r.luck + (prog.bait > 0 ? 1 : 0), name: r.name };
   state.boatSpeed = (BOATS[prog.boatLv] || BOATS[0]).speed;
@@ -1211,7 +1247,7 @@ function showPanel(html) {
   document.getElementById('closePanel').onclick = () => panelEl().classList.remove('show');
 }
 const FISH_BY_ID = Object.fromEntries(FISH.map(f => [f.id, f]));
-function openBuilding(b) { if (/^tailor/.test(b.id)) return openTailor(b); ({ shop: openShop, market: openMarket, home: openHome, board: openDex, tailorA: () => openTailor(b), tailorB: () => openTailor(b), guild: () => openGuild(), aquarium: () => openAquarium(), quests: () => openQuests(), gyotaku: () => openGyotaku() })[b.id](); }
+function openBuilding(b) { if (/^tailor/.test(b.id)) return openTailor(b); ({ shop: openShop, market: openMarket, home: openHome, board: openDex, tailorA: () => openTailor(b), tailorB: () => openTailor(b), guild: () => openGuild(), aquarium: () => openAquarium(), quests: () => openQuests(), gyotaku: () => openGyotaku(), mine: () => openMine() })[b.id](); }
 function openMarket() {
   const total = state.bag.reduce((a, f) => a + f.price, 0);
   const rows = bagListHtml((f, i) => { const d = FISH_BY_ID[f.id]; return `<div class="row"><span><b style="color:${RAR[d.rarity].color}">${d.name}</b> ${fmtW(f.w)}・${f.l} cm</span><button data-sell="${i}">賣 🪙${f.price}</button></div>`; });
@@ -2032,6 +2068,7 @@ function toggleMap() {
   const ov = document.getElementById('bigmap'); const show = !ov.classList.contains('show');
   ov.classList.toggle('show', show); if (!show) return;
   const c = document.getElementById('bigCv'), g = c.getContext('2d'); g.imageSmoothingEnabled = false;
+  if (UNDER) return drawUnderMap(c, g);
   g.fillStyle = '#26508f'; g.fillRect(0, 0, c.width, c.height);
   const sc = c.width / mapImg.width; g.drawImage(mapImg, 0, (c.height - mapImg.height * sc) / 2, mapImg.width * sc, mapImg.height * sc);
   g.drawImage(fogImg, 0, (c.height - mapImg.height * sc) / 2, mapImg.width * sc, mapImg.height * sc);
@@ -2052,6 +2089,11 @@ const mini = document.getElementById('mini'), mg = mini.getContext('2d');
 function drawMini() {
   const pl = state.onBoat ? state.boat : state.player, sc = 2;
   const p = mapPos(pl.x, pl.y, sc / 2);
+  if (UNDER) {   // 地底小地圖：只畫走過、照亮過的地方
+    mg.imageSmoothingEnabled = false; mg.fillStyle = '#07060a'; mg.fillRect(0, 0, 128, 96);
+    mg.drawImage(uMapImg, 64 - p.x, 48 - p.y); mg.drawImage(uFogImg, 64 - p.x, 48 - p.y);
+    mg.fillStyle = '#ff5040'; mg.beginPath(); mg.arc(64, 48, 3.5, 0, 7); mg.fill(); mg.strokeStyle = '#fff'; mg.lineWidth = 1.5; mg.stroke(); return;
+  }
   mg.imageSmoothingEnabled = false; mg.fillStyle = '#26508f'; mg.fillRect(0, 0, 128, 96);
   mg.drawImage(mapImg, 64 - p.x, 48 - p.y, mapImg.width * sc / 2, mapImg.height * sc / 2);
   mg.drawImage(fogImg, 64 - p.x, 48 - p.y, mapImg.width * sc / 2, mapImg.height * sc / 2);
@@ -2062,11 +2104,293 @@ function drawMini() {
   mg.fillStyle = '#ff5040'; mg.beginPath(); mg.arc(64, 48, 3.5, 0, 7); mg.fill(); mg.strokeStyle = '#fff'; mg.lineWidth = 1.5; mg.stroke();
 }
 
+// ════════════════ 🕳️ 地下世界（大河上游源頭湖旁的洞窟）════════════════
+// 做法：地底地圖另外存一份，進出時把 tile／block／landOf 整份換過去，走路、拋竿、畫地面的程式都不用改；
+// 地上才有的東西（樹、船、漂流物、迷霧、巨大魚影、天氣）在地底時跳過。地底座標放在 (48～111, 48～111)。
+const UX0 = 48, UY0 = 48, US = 64;
+const UZONE = [null, { name: '⛏️ 入口洞穴' }, { name: '💧 地底湖' }, { name: '💎 水晶洞' }, { name: '🔥 熔岩河' }];
+const UZC = [null, [12, 12], [40, 14], [14, 45], [45, 46]];   // 各區中心（地底區域內的座標）
+const U = { tile: null, block: null, landOf: null, objs: [], lava: [], stairs: null };
+const OVERW = {}; let world = 'over', UNDER = false;
+const MINE_NEED = 50, LAMP_PRICE = 800;   // 打開洞口：圖鑑 50 種＋探險燈
+const MINER_LOOK = { hat: 'helmet', hair: 'short_black', glasses: 'none', beard: 'full', top: 'vest_explorer', pants: 'khaki' }, MINER_NAME = '岩田隊長';
+const lampR = () => 44 + Math.max(0, (prog.lamp || 1) - 1) * 14;   // 提燈照亮的半徑（像素）
+function genUnder() {
+  if (U.tile) return;
+  const ut = new Uint8Array(N * N).fill(T.UWALL), ub = new Uint8Array(N * N).fill(1), ul = new Uint8Array(N * N);
+  const I = (x, y) => (y + UY0) * N + x + UX0, inU = (x, y) => x >= 1 && y >= 1 && x < US - 1 && y < US - 1;
+  const FLOOR = [0, T.UFLOOR, T.UFLOOR, T.UCFLOOR, T.UHOT], RX = [0, 9, 15, 10, 15], RY = [0, 8, 10, 10, 12];
+  const carve = (x, y, z) => { if (!inU(x, y)) return; const i = I(x, y); if (ut[i] === T.UWALL) { ut[i] = FLOOR[z]; ub[i] = 0; ul[i] = z; } };
+  for (let z = 1; z <= 4; z++) for (let y = 0; y < US; y++) for (let x = 0; x < US; x++) if (ell(x, y, UZC[z][0], UZC[z][1], RX[z], RY[z]) + (hash(x, y, 700 + z) - .5) * .4 < 1) carve(x, y, z);
+  // 隧道：彎彎曲曲連起四區
+  for (const [a, b] of [[1, 2], [1, 3], [2, 4], [3, 4]]) {
+    const [ax, ay] = UZC[a], [bx, by] = UZC[b], L = Math.hypot(bx - ax, by - ay), nx = -(by - ay) / L, ny = (bx - ax) / L;
+    for (let s = 0; s <= L; s += .25) {
+      const k = s / L, w = Math.sin(k * Math.PI * 2 + a) * 2.2, cx = ax + (bx - ax) * k + nx * w, cy = ay + (by - ay) * k + ny * w, hw = 1.3 + hash(Math.round(s), a, 710) * .5;
+      for (let dy = -2; dy <= 2; dy++) for (let dx = -2; dx <= 2; dx++) if (Math.hypot(dx, dy) <= hw) carve(Math.round(cx + dx), Math.round(cy + dy), k < .5 ? a : b);
+    }
+  }
+  // 水：入口的小水潭、地底湖、水晶池、熔岩河（從西南斜斜流到東北）
+  const water = (x, y, t) => { const i = I(x, y); if (ut[i] !== T.UWALL) { ut[i] = t; ub[i] = 0; } };
+  for (let y = 0; y < US; y++) for (let x = 0; x < US; x++) {
+    if (ell(x, y, 16, 7, 3.2, 2.2) + (hash(x, y, 720) - .5) * .3 < 1) water(x, y, T.USTREAM);
+    if (ell(x, y, 42, 12, 9, 5.5) + (hash(x, y, 721) - .5) * .25 < 1) water(x, y, T.ULAKE);
+    if (ell(x, y, 14, 46, 4.5, 3.5) + (hash(x, y, 722) - .5) * .3 < 1) water(x, y, T.UCRYSTAL);
+    if (Math.abs(x + y + 1 - 99 + Math.sin(x * .5) * .8) < 2.1) water(x, y, T.ULAVA);
+  }
+  // 往上的石階（回地面）
+  const sx = 5, sy = 14;
+  for (let y = sy - 1; y <= sy + 2; y++) for (let x = sx - 1; x <= sx + 1; x++) carve(x, y, 1);
+  ub[I(sx, sy)] = 1; U.stairs = { x: sx + UX0 + .5, y: sy + UY0 + .5, door: [sx + UX0 + .5, sy + UY0 + 1.6] };
+  // 裝飾：水晶、發光蘑菇、岩漿噴口、石筍
+  const floor = (x, y) => inU(x, y) && ut[I(x, y)] !== T.UWALL && !WATER.has(ut[I(x, y)]);
+  const CRY = ['#b07aff', '#6ae0ff', '#ff8ad8', '#8affc8'];
+  for (let y = 1; y < US - 1; y++) for (let x = 1; x < US - 1; x++) {
+    if (!floor(x, y)) continue;
+    const z = ul[I(x, y)], wx = x + UX0 + .5, wy = y + UY0 + .5;
+    if (Math.hypot(wx - U.stairs.door[0], wy - U.stairs.door[1]) < 2.5) continue;
+    let walls = 0, open = 0; for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) if (ut[I(x + dx, y + dy)] === T.UWALL) walls++;
+    for (let dy = -1; dy <= 1; dy++) for (let dx = -1; dx <= 1; dx++) if (floor(x + dx, y + dy)) open++;
+    const h = hash(x, y, 730);
+    if (walls && ((z === 3 && h < .45) || (z !== 3 && h < .05))) U.objs.push({ kind: 'crystal', x: wx, y: wy, c: z === 3 ? CRY[Math.floor(hash(x, y, 731) * 4)] : '#6ae0ff', s: .7 + hash(x, y, 732) * .6 });
+    else if (walls && (z === 1 || z === 2) && h < .16) U.objs.push({ kind: 'shroom', x: wx, y: wy, c: hash(x, y, 733) < .5 ? '#5affd0' : '#7ab8ff' });
+    else if (z === 4 && open === 9 && h < .06) U.objs.push({ kind: 'vent', x: wx, y: wy });
+    else if (open === 9 && h > .975) { ub[I(x, y)] = 1; U.objs.push({ kind: 'stalag', x: wx, y: wy, s: .7 + hash(x, y, 734) * .5 }); }
+  }
+  U.objs.push({ kind: 'stairs', x: U.stairs.x, y: U.stairs.y });
+  for (let y = 0; y < US; y++) for (let x = 0; x < US; x++) if (ut[I(x, y)] === T.ULAVA) U.lava.push([x + UX0 + .5, y + UY0 + .5]);
+  U.tile = ut; U.block = ub; U.landOf = ul;
+  // 地底小地圖
+  const g = uMapImg.getContext('2d'); g.fillStyle = '#07060a'; g.fillRect(0, 0, uMapImg.width, uMapImg.height);
+  for (let y = 0; y < US; y++) for (let x = 0; x < US; x++) {
+    const X = x + UX0, Y = y + UY0, t = ut[Y * N + X]; if (t === T.UWALL) continue;
+    g.fillStyle = TILE_COLOR[t]; const px = (X - Y) * 2 + N * 2, py = X + Y; g.fillRect(px - 2, py, 4, 2); g.fillRect(px - 1, py - 1, 2, 4);
+  }
+  { const p = mapPos(U.stairs.x, U.stairs.y, 1); g.fillStyle = '#ffd040'; g.fillRect(p.x - 3, p.y - 2, 6, 5); }
+}
+// ── 地底的地圖迷霧（另外一份，只記地底）──
+const uMapImg = document.createElement('canvas'); uMapImg.width = mapImg.width; uMapImg.height = mapImg.height;
+const uFog = new Uint8Array(N * N), uFogImg = document.createElement('canvas'); uFogImg.width = mapImg.width; uFogImg.height = mapImg.height;
+const ufg = uFogImg.getContext('2d');
+function uFogInit() {
+  ufg.fillStyle = '#07060a'; ufg.fillRect(0, 0, uFogImg.width, uFogImg.height); uFog.fill(0);
+  if (prog.ufog) try { const bin = atob(prog.ufog); for (let i = 0; i < N * N; i++) if ((bin.charCodeAt(i >> 3) >> (i & 7)) & 1) uFog[i] = 1; } catch (e) {}
+  for (let i = 0; i < N * N; i++) if (uFog[i]) fogRects(i % N, (i / N) | 0, (a, b, c, d) => ufg.clearRect(a, b, c, d));
+}
+function uReveal(cx, cy, r) {
+  const r2 = r * r;
+  for (let y = Math.floor(cy - r); y <= Math.ceil(cy + r); y++) for (let x = Math.floor(cx - r); x <= Math.ceil(cx + r); x++) {
+    if (x < 0 || y < 0 || x >= N || y >= N) continue; const i = y * N + x;
+    if (uFog[i] || (x + .5 - cx) ** 2 + (y + .5 - cy) ** 2 > r2) continue;
+    uFog[i] = 1; fogRects(x, y, (a, b, c, d) => ufg.clearRect(a, b, c, d));
+  }
+}
+let uFogT = 0;
+function uFogTick(dt) { if ((uFogT -= dt) > 0) return; uFogT = .25; uReveal(state.player.x, state.player.y, 3.4 + Math.max(0, (prog.lamp || 1) - 1)); }
+function drawUnderMap(c, g) {   // 大地圖（地底）：只放大地底那一塊
+  g.fillStyle = '#07060a'; g.fillRect(0, 0, c.width, c.height);
+  const x0 = N * 2 - US * 2 - 4, y0 = UX0 + UY0 - 4, w = US * 4 + 8, h = US * 2 + 8, sc = Math.min(c.width / w, c.height / h), ox = (c.width - w * sc) / 2, oy = (c.height - h * sc) / 2;
+  g.drawImage(uMapImg, x0, y0, w, h, ox, oy, w * sc, h * sc); g.drawImage(uFogImg, x0, y0, w, h, ox, oy, w * sc, h * sc);
+  const P = (x, y) => { const q = mapPos(x, y, 1); return { x: ox + (q.x - x0) * sc, y: oy + (q.y - y0) * sc }; };
+  g.font = 'bold 13px sans-serif'; g.textAlign = 'center'; g.lineWidth = 3;
+  for (let z = 1; z <= 4; z++) { const [zx, zy] = UZC[z]; if (!uFog[(zy + UY0) * N + zx + UX0]) continue; const q = P(zx + UX0, zy + UY0); g.strokeStyle = '#000a'; g.strokeText(UZONE[z].name, q.x, q.y); g.fillStyle = '#e8d8ff'; g.fillText(UZONE[z].name, q.x, q.y); }
+  const sq = P(U.stairs.x, U.stairs.y); g.fillStyle = '#ffd040'; g.fillText('⬆️ 石階', sq.x, sq.y - 8);
+  const pq = P(state.player.x, state.player.y); g.fillStyle = '#ff5040'; g.beginPath(); g.arc(pq.x, pq.y, 7, 0, 7); g.fill(); g.strokeStyle = '#fff'; g.lineWidth = 2; g.stroke();
+  document.querySelector('#bigmap h2').textContent = '🗺️ 地下世界';
+}
+// 進出地下世界：把地圖整份換掉
+function setWorld(w) {
+  if (w === world) return;
+  if (w === 'under') { genUnder(); OVERW.tile = tile.slice(); OVERW.block = block.slice(); OVERW.landOf = landOf.slice(); tile.set(U.tile); block.set(U.block); landOf.set(U.landOf); }
+  else { tile.set(OVERW.tile); block.set(OVERW.block); landOf.set(OVERW.landOf); }
+  world = w; UNDER = w === 'under'; chunks.clear(); lastArea = '';
+  state.boat.vx = state.boat.vy = 0; drifts.length = 0;
+}
+const mineB = () => BUILDINGS.find(b => b.id === 'mine');
+function enterUnder(resume) {
+  if (loadingOn) return;
+  panelEl().classList.remove('show');
+  runLoading('down', () => {
+    setWorld('under'); state.onBoat = false;
+    const p = state.player; if (resume && walkable(resume.x, resume.y)) { p.x = resume.x; p.y = resume.y; } else { p.x = U.stairs.door[0]; p.y = U.stairs.door[1]; }
+    p.fx = 0; p.fy = 1; uReveal(p.x, p.y, 4);
+  }, () => {
+    if (!prog.underVisit) { prog.underVisit = Date.now(); toast(`⛏️ ${MINER_NAME}：「歡迎來到地下世界！這裡很暗，跟緊你的提燈。」`, 4200); checkAch(); }
+    else toast('🕳️ 地下世界・' + areaName(), 2200);
+    save(); updateHud();
+  }, !!resume);
+}
+function exitUnder() {
+  if (loadingOn) return;
+  runLoading('up', () => {
+    setWorld('over'); const b = mineB(), p = state.player; state.onBoat = false;
+    p.x = b.door[0]; p.y = b.door[1] + .2; p.fx = 0; p.fy = 1;
+  }, () => { toast('☀️ 回到地面了（大河平原）', 2200); save(); updateHud(); });
+}
+// ── 洞口：礦工隊長 ──
+function openMine() {
+  const dex = Object.keys(prog.dex).length, okDex = dex >= MINE_NEED, okLamp = (prog.lamp || 0) > 0;
+  const pv = '<canvas id="minerPv" width="16" height="26" class="pv" style="width:64px;height:104px;flex:none"></canvas>';
+  const say = prog.mineOpen ? '洞口已經打開了。裡面很暗，提燈照不到的地方千萬別亂闖！' : okDex && okLamp ? '圖鑑也夠了、燈也有了……好！我這就把柵欄拆掉。' : '這裡正在施工，地底下又黑又危險。要進去的話，先證明你是個夠格的釣客，再帶一盞探險燈來。';
+  const row = (ok, text, extra = '') => `<div class="row"><span>${ok ? '✅' : '⬜'} ${text}</span>${extra}</div>`;
+  const lampBtn = okLamp ? '<em>已擁有</em>' : `<button id="buyLamp">🪙${LAMP_PRICE}</button>`;
+  const act = prog.mineOpen ? '<button id="goUnder">⬇️ 進入地下世界</button>' : okDex && okLamp ? '<button id="openMineBtn">🚧 請隊長拆掉柵欄</button>' : '';
+  showPanel(`<h2>⛏️ 地底洞窟</h2><div style="display:flex;gap:10px;align-items:center;text-align:left;margin-bottom:6px">${pv}<p style="margin:0"><b>${MINER_NAME}</b>：「${say}」<br><small>你有 🪙${state.coins}</small></p></div>
+    <h3>進入條件</h3>${row(okDex, `魚類圖鑑收集 ${MINE_NEED} 種（目前 ${dex} 種）`)}${row(okLamp, '🏮 探險燈：地底唯一的光源，照亮身邊一圈', lampBtn)}
+    <div style="margin-top:8px">${act}</div><p class="hint">地底的魚比地上更難釣。${prog.mineOpen ? '回地面：走到入口的石階按「回到地面」。' : ''}</p>`);
+  const c = document.getElementById('minerPv'), g = c.getContext('2d'); g.imageSmoothingEnabled = false; g.drawImage(ART.previewFront(MINER_LOOK), 0, 0);
+  const lb = document.getElementById('buyLamp'); if (lb) lb.onclick = () => { if (state.coins < LAMP_PRICE) { toast('錢不夠，先去魚市賣點魚吧'); buzz(120); return; } state.coins -= LAMP_PRICE; prog.lamp = 1; SFX.pickup(); toast('🏮 買了探險燈！'); save(); updateHud(); openMine(); };
+  const ob = document.getElementById('openMineBtn'); if (ob) ob.onclick = () => { prog.mineOpen = Date.now(); SFX.badge(); buzz([40, 40, 40, 40, 200]); toast(`🚧 ${MINER_NAME}把柵欄拆掉了！洞口打開了`, 3200); save(); openMine(); };
+  const gb = document.getElementById('goUnder'); if (gb) gb.onclick = () => enterUnder();
+}
+function drawMiner(g, vx, vy, t) {
+  const b = mineB(); if (!b) return;
+  const p = iso(b.door[0] + 1.7, b.door[1] - .3), x = Math.round(p.x - vx), y = Math.round(p.y - vy - LH);
+  if (!drawMiner.img) drawMiner.img = ART.previewFront(MINER_LOOK);
+  g.fillStyle = 'rgba(0,0,0,.2)'; g.fillRect(x - 5, y - 1, 10, 2);
+  g.drawImage(drawMiner.img, x - 6, y - 19 - (Math.sin(t * 2.3) > .95 ? 1 : 0), 12, 19.5);
+  if (!prog.mineOpen) { g.fillStyle = '#2a1e14'; g.fillRect(x + 6, y - 14, 1, 14); g.fillStyle = '#c8a070'; g.fillRect(x + 4, y - 16, 5, 3); }   // 手上拿著施工圖
+}
+// 洞口：岩石山丘＋木框坑道口；沒開放時有施工柵欄和三角錐
+function drawMineEntrance(g, b, vx, vy) {
+  const P = isoBox(g, b.x, b.y, b.w, b.h, b.hgt, '#7a7068', '#5e5650', vx, vy);
+  const px = (x, y, w, h, c) => { g.fillStyle = c; g.fillRect(x | 0, y | 0, w, h); };
+  for (let k = 1; k < 4; k++) { const z = k * 5; g.strokeStyle = 'rgba(40,30,30,.35)'; g.lineWidth = 1; g.beginPath(); g.moveTo(...P(b.x, b.y + b.h, z)); g.lineTo(...P(b.x + b.w, b.y + b.h, z + (k % 2))); g.lineTo(...P(b.x + b.w, b.y, z)); g.stroke(); }   // 岩層紋路
+  // 山頂堆起來的大石塊（後面的先畫），讓它像一座岩石小山
+  const rocks = [];
+  for (let i = 0; i < 12; i++) rocks.push({ u: b.x + .25 + hash(i, 1, 740) * (b.w - .5), v: b.y + .2 + hash(i, 2, 740) * (b.h - .4), z: b.hgt + hash(i, 3, 740) * 9, r: 6 + hash(i, 4, 740) * 6 });
+  rocks.sort((a, c) => (a.u + a.v) - (c.u + c.v));
+  for (const r of rocks) { const [rx, ry] = P(r.u, r.v, r.z); const w = r.r * 2 | 0, h = r.r * 1.3 | 0;
+    const X = rx - r.r, Y = ry - h; px(X - 1, Y + 1, w + 2, h - 2, '#2a2224'); px(X + 1, Y - 1, w - 2, h + 2, '#2a2224'); px(X, Y, w, h, '#2a2224');   // 圓角描邊
+    px(X + 1, Y, w - 2, h, '#7e746e'); px(X, Y + 1, w, h - 2, '#7e746e'); px(X + 2, Y, w - 5, 2, '#a0968e'); px(X + 1, Y + h - 2, w - 2, 2, '#5a524e'); px(X + w - 3, Y + 2, 2, h - 4, '#625a56');
+    if (hash(r.u * 10 | 0, r.v * 10 | 0, 742) < .4) px(rx - r.r + 2, ry - h, 4, 1, '#5a8a3a'); }   // 石頭上的青苔
+  const d = b.door[0], A = P(d - .9, b.y + b.h, 0), B = P(d + .9, b.y + b.h, 0), C = P(d + .9, b.y + b.h, 13), D = P(d - .9, b.y + b.h, 13);
+  g.fillStyle = '#0a0608'; g.beginPath(); g.moveTo(...A); g.lineTo(...B); g.lineTo(...C); g.lineTo(...P(d, b.y + b.h, 17)); g.lineTo(...D); g.closePath(); g.fill();   // 黑漆漆的坑道口
+  g.fillStyle = '#6a4224'; for (const q of [A, B]) g.fillRect(q[0] - 1, q[1] - 12, 2, 12);   // 木框
+  g.strokeStyle = '#6a4224'; g.lineWidth = 2; g.beginPath(); g.moveTo(D[0] - 1, D[1] - 1); g.lineTo(C[0] + 1, C[1] - 1); g.stroke();
+  const [sx, sy] = P(d + 1.15, b.y + b.h, 13); px(sx - 6, sy - 5, 13, 8, '#2a1e14'); px(sx - 5, sy - 4, 11, 6, '#e8c88a'); px(sx - 3, sy - 3, 2, 4, '#5a5a62'); px(sx, sy - 3, 2, 4, '#5a5a62'); px(sx - 4, sy - 3, 6, 1, '#8a6a3a');   // 鎬子招牌
+  if (!prog.mineOpen) {   // 🚧 施工中柵欄
+    for (let k = 0; k < 2; k++) { const y0 = 3 + k * 4; g.strokeStyle = '#2a1e14'; g.lineWidth = 3; g.beginPath(); g.moveTo(A[0] - 2, A[1] - y0); g.lineTo(B[0] + 2, B[1] - y0); g.stroke();
+      for (let s = 0; s < 6; s++) { const u = s / 6, u2 = (s + 1) / 6; g.strokeStyle = s % 2 ? '#2a2a2a' : '#ffd040'; g.lineWidth = 2; g.beginPath(); g.moveTo(A[0] - 2 + (B[0] - A[0] + 4) * u, A[1] - y0 + (B[1] - A[1]) * u); g.lineTo(A[0] - 2 + (B[0] - A[0] + 4) * u2, A[1] - y0 + (B[1] - A[1]) * u2); g.stroke(); } }
+    for (const [u, v] of [[d - 1.3, b.y + b.h + .5], [d + 1.1, b.y + b.h + .7]]) { const [cx, cy] = P(u, v, 0); px(cx - 3, cy - 1, 7, 2, '#2a1e14'); px(cx - 2, cy - 7, 5, 6, '#ff7a2a'); px(cx - 1, cy - 9, 3, 2, '#ff7a2a'); px(cx - 2, cy - 5, 5, 1, '#ffffff'); }   // 三角錐
+    const [tx, ty] = P(d - .1, b.y + b.h + .25, 9); px(tx - 9, ty - 6, 19, 8, '#2a1e14'); px(tx - 8, ty - 5, 17, 6, '#ffd040'); for (let s = 0; s < 4; s++) px(tx - 7 + s * 4, ty - 4, 2, 4, '#2a2a2a');   // 施工中牌子
+  } else {   // 打開了：入口掛一盞燈，鐵軌伸進洞裡
+    const [lx, ly] = P(d, b.y + b.h, 11); px(lx - 2, ly, 5, 5, '#2a1e14'); px(lx - 1, ly + 1, 3, 3, Math.sin(performance.now() / 160) > -.6 ? '#ffd56a' : '#ffb040');
+    for (const o of [-.35, .35]) { const [r0x, r0y] = P(d + o, b.y + b.h, 0), [r1x, r1y] = P(d + o * .6, b.y + b.h + 1.2, 0); g.strokeStyle = '#8a8a92'; g.lineWidth = 1; g.beginPath(); g.moveTo(r0x, r0y); g.lineTo(r1x, r1y); g.stroke(); }
+  }
+}
+// ── 地底的物件 ──
+function drawUObj(g, o, vx, vy, t) {
+  const p = iso(o.x, o.y), x = Math.round(p.x - vx), y = Math.round(p.y - vy - LH);
+  const px = (a, b, w, h, c) => { g.fillStyle = c; g.fillRect(x + a, y + b, w, h); };
+  if (o.kind === 'crystal') { const s = o.s, h = Math.round(12 * s); px(-1, -1, 9, 2, 'rgba(0,0,0,.3)'); g.fillStyle = '#1a1028'; g.fillRect(x - 3, y - h - 1, 6, h + 1); g.fillRect(x + 2, y - h * .6 - 1 | 0, 5, h * .6 + 1 | 0); g.fillStyle = o.c; g.fillRect(x - 2, y - h, 4, h); g.fillRect(x + 3, y - h * .6 | 0, 3, h * .6 | 0); g.fillStyle = '#ffffff'; g.fillRect(x - 1, y - h + 1, 1, Math.max(2, h / 3 | 0)); return; }
+  if (o.kind === 'shroom') { px(-1, -4, 2, 4, '#c8d8e0'); px(-4, -7, 8, 3, o.c); px(-3, -8, 6, 1, o.c); px(-2, -7, 1, 1, '#ffffff'); px(3, -3, 1, 3, '#c8d8e0'); px(1, -5, 5, 2, o.c); return; }
+  if (o.kind === 'vent') { px(-4, -2, 8, 3, '#2a1a18'); px(-2, -2, 4, 2, '#ff6a2a'); for (let i = 0; i < 3; i++) { const ph = (t * .6 + i / 3) % 1; g.fillStyle = `rgba(120,100,100,${.5 * (1 - ph)})`; g.fillRect(x - 2 + Math.sin(ph * 6 + i) * 3 | 0, y - 4 - ph * 18 | 0, 4, 3); } return; }
+  if (o.kind === 'stalag') { const h = Math.round(16 * o.s); for (let k = 0; k < h; k++) { const w = Math.max(1, Math.round((h - k) / h * 5)); g.fillStyle = k % 4 === 0 ? '#3a3236' : '#4e464a'; g.fillRect(x - w, y - k, w * 2, 1); } px(-1, -h, 1, 2, '#6a6266'); return; }
+  if (o.kind === 'stairs') {   // 往上的石階＋從上面照下來的光
+    for (let k = 0; k < 5; k++) { const [a, b] = [iso(o.x - .45 + k * .02, o.y - .45 + k * .2), iso(o.x + .45, o.y - .45 + k * .2)]; g.fillStyle = k % 2 ? '#7a7276' : '#8a8286'; g.beginPath(); g.moveTo(a.x - vx, a.y - vy - LH - k * 4); g.lineTo(b.x - vx, b.y - vy - LH - k * 4); g.lineTo(b.x - vx, b.y - vy - LH - k * 4 + 3); g.lineTo(a.x - vx, a.y - vy - LH - k * 4 + 3); g.closePath(); g.fill(); }
+    g.fillStyle = 'rgba(255,240,190,.12)'; g.beginPath(); g.moveTo(x - 10, y - 60); g.lineTo(x + 10, y - 60); g.lineTo(x + 14, y + 2); g.lineTo(x - 14, y + 2); g.closePath(); g.fill();
+    for (let i = 0; i < 4; i++) { const ph = (t * .3 + i / 4) % 1; g.fillStyle = `rgba(255,250,220,${.6 * Math.sin(ph * Math.PI)})`; g.fillRect(x - 8 + hash(i, 1, 750) * 16 | 0, y - 50 + ph * 50 | 0, 1, 1); }   // 光裡的灰塵
+  }
+}
+// ── 地底的黑暗：先蓋一層黑，再從燈、水晶、岩漿的位置挖出光 ──
+const darkCv = document.createElement('canvas'), dkg = darkCv.getContext('2d'), litCv = document.createElement('canvas'), ltg = litCv.getContext('2d');   // 黑暗層、彩色光層都在小畫布上合好，再一次貼到畫面（手機比較順）
+const glowSprite = {};
+function glowOf(col) {
+  if (glowSprite[col]) return glowSprite[col];
+  const c = document.createElement('canvas'); c.width = c.height = 64; const g = c.getContext('2d'), gr = g.createRadialGradient(32, 32, 0, 32, 32, 32);
+  gr.addColorStop(0, col); gr.addColorStop(.45, col.replace(/[\d.]+\)$/, m => (parseFloat(m) * .55) + ')')); gr.addColorStop(1, col.replace(/[\d.]+\)$/, '0)')); g.fillStyle = gr; g.fillRect(0, 0, 64, 64);
+  return glowSprite[col] = c;
+}
+function drawUnderDark(g, gf, lw, lh, vx, vy, pl, t) {
+  if (darkCv.width !== lw + 8 || darkCv.height !== lh + 8) { darkCv.width = litCv.width = lw + 8; darkCv.height = litCv.height = lh + 8; }
+  dkg.globalCompositeOperation = 'source-over'; dkg.globalAlpha = 1; dkg.clearRect(0, 0, darkCv.width, darkCv.height);
+  dkg.fillStyle = 'rgba(3,2,8,.975)'; dkg.fillRect(0, 0, darkCv.width, darkCv.height);
+  dkg.globalCompositeOperation = 'destination-out';
+  const W = glowOf('rgba(255,255,255,1)'), lights = [];
+  const at2 = (x, y, r, a, col) => { const p = iso(x, y), sx = p.x - vx + 4, sy = p.y - vy - LH + 4; if (sx < -r || sy < -r || sx > lw + r + 8 || sy > lh + r + 8) return; dkg.globalAlpha = a; dkg.drawImage(W, sx - r, sy - r * .75, r * 2, r * 1.5); if (col) lights.push([sx, sy, r, col]); };
+  const fl = 1 + Math.sin(t * 9) * .025 + Math.sin(t * 23) * .015;   // 提燈火光會微微晃動
+  at2(pl.x, pl.y - .4, lampR() * fl, 1, 'rgba(255,190,110,.32)'); at2(pl.x, pl.y - .4, lampR() * .6, 1);
+  for (const o of U.objs) {
+    if (Math.abs(o.x - pl.x) > 16 || Math.abs(o.y - pl.y) > 16) continue;
+    if (o.kind === 'crystal') at2(o.x, o.y - .3, 20 * o.s * (1 + Math.sin(t * 2 + o.x) * .08), .75, hexA(o.c, .4));
+    else if (o.kind === 'shroom') at2(o.x, o.y, 13, .55, hexA(o.c, .3));
+    else if (o.kind === 'vent') at2(o.x, o.y, 18, .7, 'rgba(255,110,40,.4)');
+    else if (o.kind === 'stairs') at2(o.x, o.y, 46, .95, 'rgba(255,235,180,.25)');
+  }
+  for (const [x, y] of U.lava) if ((x * 3 + y) % 3 < 1 && Math.abs(x - pl.x) < 12 && Math.abs(y - pl.y) < 12) at2(x, y, 34 + Math.sin(t * 2 + x * .7 + y) * 3, .6, (x + y) % 2 < 1 ? 'rgba(255,120,40,.26)' : null);   // 只取三分之一的岩漿格發光，省效能
+  dkg.globalAlpha = 1; dkg.globalCompositeOperation = 'source-over';
+  ltg.globalCompositeOperation = 'source-over'; ltg.clearRect(0, 0, litCv.width, litCv.height); ltg.globalCompositeOperation = 'lighter';
+  for (const [sx, sy, r, col] of lights) ltg.drawImage(glowOf(col), sx - r * .8, sy - r * .6, r * 1.6, r * 1.2);
+  g.drawImage(darkCv, -4, -4);
+  gf.globalCompositeOperation = 'source-atop'; gf.drawImage(darkCv, -4, -4); gf.globalCompositeOperation = 'source-over';   // 擋在前面的物件也要變暗
+  g.globalCompositeOperation = 'lighter'; g.drawImage(litCv, -4, -4); g.globalCompositeOperation = 'source-over';
+}
+const hexA = (hex, a) => { const n = parseInt(hex.slice(1), 16); return `rgba(${n >> 16},${n >> 8 & 255},${n & 255},${a})`; };
+// ── 讀取畫面：提燈下樓梯（回地面就倒過來往上爬）──
+let loadingOn = false;
+const LOAD_TIPS = ['地底很暗，提燈照得到的地方才看得清楚', '迷路了就找往上的石階，可以回到地面', '水晶會發光，跟著光走比較不會迷路', '熔岩河很燙，靠近時小心腳步', `${MINER_NAME}說：地底的魚比地上難釣很多`, '地底湖的水面下，好像有藍色的光在游…', `${MINER_NAME}正在調查地底的魚，之後就能釣了`, '小地圖只會記下你走過、照亮過的地方'];
+function runLoading(dir, work, done, resume) {
+  loadingOn = true; const el = document.getElementById('loadScr'), cvL = document.getElementById('loadCv'), g = cvL.getContext('2d');
+  const H = 170, Wd = Math.max(80, Math.round(H * innerWidth / innerHeight)); cvL.width = Wd; cvL.height = H; g.imageSmoothingEnabled = false;
+  el.classList.add('show'); if (window.BGM) BGM.duck(2.6);
+  const txt = document.getElementById('loadTxt'), tip = document.getElementById('loadTip');
+  let ti = Math.floor(Math.random() * LOAD_TIPS.length), tipT = 0, worked = false, lastStep = -1;
+  const t0 = performance.now(), DUR = 2300, label = dir === 'down' ? (resume ? '⬇️ 回到地下世界' : '⬇️ 前往地下世界') : '⬆️ 回到大河平原';
+  tip.textContent = '💡 ' + LOAD_TIPS[ti];
+  const stepFn = now => {
+    const k = Math.min(1, (now - t0) / DUR), t = (now - t0) / 1000;
+    if (!worked && k > .3) { worked = true; try { work(); } catch (e) { console.error(e); } }
+    drawLoading(g, Wd, H, k, t, dir);
+    const st = Math.floor(t * 3.2); if (st !== lastStep && k < .95) { lastStep = st; if (state.snd) tone(150, 110, .06, .1, 'triangle'); }
+    if (st % 4 === 3 && Math.random() < .02 && state.snd) tone(1500, 900, .1, .05);
+    txt.textContent = `${label}… ${Math.round(k * 100)}%`;
+    if ((tipT += 16) > 1500) { tipT = 0; ti = (ti + 1) % LOAD_TIPS.length; tip.textContent = '💡 ' + LOAD_TIPS[ti]; }
+    if (k < 1) requestAnimationFrame(stepFn); else { el.classList.remove('show'); loadingOn = false; if (done) done(); }
+  };
+  requestAnimationFrame(stepFn);
+}
+function drawLoading(g, W, H, k, t, dir) {
+  const down = dir === 'down', light = down ? 1 - k : k;   // 往下越來越暗；往上越來越亮
+  const lerpC = (a, b, u) => { const A = parseInt(a.slice(1), 16), B = parseInt(b.slice(1), 16); const c = s => Math.round(((A >> s) & 255) + (((B >> s) & 255) - ((A >> s) & 255)) * u); return `rgb(${c(16)},${c(8)},${c(0)})`; };
+  g.fillStyle = lerpC('#0a080e', '#3a3a44', light * .8); g.fillRect(0, 0, W, H);
+  // 石牆磚塊（跟著腳步捲動）
+  const scroll = (down ? 1 : -1) * t * 22, bw = 14, bh = 7;
+  for (let r = -2; r < H / bh + 2; r++) for (let c = -1; c < W / bw + 2; c++) {
+    const y = r * bh - ((scroll % bh) + bh) % bh, x = c * bw - (r % 2) * bw / 2 + (((scroll * .9) % bw) + bw) % bw * 0;
+    const v = hash(c, r + Math.floor(scroll / bh), 760);
+    g.fillStyle = lerpC('#141018', '#5a5260', light * .9 * (.75 + v * .25)); g.fillRect(x + 1, y + 1, bw - 2, bh - 2);
+  }
+  // 斜斜往下的石階（側面看）
+  const cx = Math.round(W / 2), cy = Math.round(H * .52), sw = 12, sh = 6, off = (((down ? 1 : -1) * t * 3.2) % 1 + 1) % 1;
+  for (let i = -8; i <= 8; i++) {
+    const x = cx - 6 + (i - off) * sw, y = cy + (i - off) * sh;
+    g.fillStyle = lerpC('#1e1a22', '#8a8288', light); g.fillRect(x, y, sw, H);
+    g.fillStyle = lerpC('#2e2a32', '#a8a0a6', light); g.fillRect(x, y, sw, 2);
+  }
+  // 頂端的光（洞口）
+  if (light > .05) { const gr = g.createLinearGradient(0, 0, 0, H * .5); gr.addColorStop(0, `rgba(255,240,200,${.5 * light})`); gr.addColorStop(1, 'rgba(255,240,200,0)'); g.fillStyle = gr; g.fillRect(0, 0, W, H * .5); }
+  // 主角提燈（走路時一上一下）
+  const bob = Math.abs(Math.sin(t * Math.PI * 3.2)) * 2, px = cx, py = cy - 1 - bob, frame = Math.floor(t * 6.4) % 2 ? 1 : 2;
+  const gl = g.createRadialGradient(px + 6, py - 9, 0, px + 6, py - 9, 46); gl.addColorStop(0, 'rgba(255,200,120,.45)'); gl.addColorStop(1, 'rgba(255,200,120,0)'); g.fillStyle = gl; g.fillRect(px - 50, py - 60, 110, 110);
+  if (window.ART) ART.drawPerson(g, px, py, { back: !down, flip: false, frame, sitting: false, rod: null });
+  g.fillStyle = '#2a1e14'; g.fillRect(px + 5, py - 11, 3, 4); g.fillStyle = Math.sin(t * 20) > -.5 ? '#ffd56a' : '#ffb040'; g.fillRect(px + 6, py - 10, 1, 2);   // 手上的提燈
+  // 水滴與蝙蝠
+  for (let i = 0; i < 3; i++) { const ph = (t * .8 + i * .37) % 1, dx = hash(i, Math.floor(t * .8 + i * .37), 761) * W; g.fillStyle = 'rgba(150,200,255,.8)'; g.fillRect(dx | 0, ph * H | 0, 1, 2); }
+  const bt = (t * .45) % 1; if (bt < .6) { const bx = W * (bt / .6) * 1.2 - 10, by = H * .22 + Math.sin(t * 5) * 4, wing = Math.sin(t * 30) > 0; g.fillStyle = '#0e0a10'; g.fillRect(bx | 0, by | 0, 3, 2); g.fillRect(bx - 3 | 0, by - (wing ? 2 : 0) | 0, 3, 1); g.fillRect(bx + 3 | 0, by - (wing ? 2 : 0) | 0, 3, 1); }
+  // 讀取條：地面的綠色 → 地底的藍紫色
+  const bw2 = Math.round(W * .7), bx2 = Math.round((W - bw2) / 2), by2 = H - 18;
+  g.fillStyle = '#2a1e14'; g.fillRect(bx2 - 2, by2 - 2, bw2 + 4, 9); g.fillStyle = '#1a1418'; g.fillRect(bx2 - 1, by2 - 1, bw2 + 2, 7);
+  g.fillStyle = down ? lerpC('#5ab04a', '#7a5ad0', k) : lerpC('#7a5ad0', '#5ab04a', k); g.fillRect(bx2, by2, Math.round(bw2 * k), 5);
+  g.fillStyle = 'rgba(255,255,255,.35)'; g.fillRect(bx2, by2, Math.round(bw2 * k), 1);
+}
+
 // ════════════════ 更新 ════════════════
 let lastArea = '';
 const y0IceBelt = y => y < 11;   // 北方厚冰層
 function areaName() {
   const o = state.onBoat ? state.boat : state.player, xi = Math.floor(o.x), yi = Math.floor(o.y);
+  if (UNDER) { const z = UZONE[landOf[yi * N + xi]]; return z ? z.name : '⛏️ 地底通道'; }
   if (state.onBoat) { const s = spotAt(o.x, o.y); if (s && prog.found[s.id]) return s.cond && !s.cond() ? `${s.name}（漲潮中，清晨才進得去）` : s.icon + ' ' + s.name; return REGION_NAME[REGION_OF[at(xi, yi)]] || (at(xi, yi) === T.ICE ? '冰層' : '海上'); }
   const is = ISLANDS[landOf[yi * N + xi] - 1]; return is ? is.name : (at(xi, yi) === T.DOCK ? '碼頭' : '岸邊');
 }
@@ -2103,9 +2427,12 @@ function update(dt) {
   // 大浪會把船推來推去
   if (state.onBoat && wx.wave > .3) { const tt = performance.now() / 1000; b.vx += Math.sin(tt * .37) * wx.wave * .9 * dt; b.vy += Math.cos(tt * .29) * wx.wave * .9 * dt; }
   updateWeather(dt);
+  if (UNDER) uFogTick(dt);
+  else {
   updateDrift(dt);
   fogTick(dt); updateBoss(dt);
-  if (!state.onBoat) for (const m of prog.maps) if (!treasureHinted.has(m.id) && Math.hypot(m.x - p.x, m.y - p.y) < 4) { treasureHinted.add(m.id); toast('🗺️ 藏寶圖上的地方……好像就在這附近！', 2600); }
+  }
+  if (!state.onBoat && !UNDER) for (const m of prog.maps) if (!treasureHinted.has(m.id) && Math.hypot(m.x - p.x, m.y - p.y) < 4) { treasureHinted.add(m.id); toast('🗺️ 藏寶圖上的地方……好像就在這附近！', 2600); }
   contestTick(dt);
   updateSick(dt);
   updateFishing(dt);
@@ -2141,7 +2468,7 @@ function drawIso(g, gf, t) {
   const c = iso(pl.x, pl.y), camX = c.x - W / PIX / 2, camY = c.y - H / PIX / 2;
   const vx = Math.floor(camX), vy = Math.floor(camY);
   cam.vx = vx; cam.vy = vy; cam.fx = camX - vx; cam.fy = camY - vy;
-  g.fillStyle = TILE_COLOR[T.DEEP]; g.fillRect(0, 0, lw, lh);
+  g.fillStyle = UNDER ? '#07060a' : TILE_COLOR[T.DEEP]; g.fillRect(0, 0, lw, lh);
   for (let cy = Math.floor(vy / CS); cy <= Math.floor((vy + lh) / CS); cy++) for (let cx = Math.floor(vx / CS); cx <= Math.floor((vx + lw) / CS); cx++) g.drawImage(groundChunk(cx, cy), cx * CS - vx, cy * CS - vy);
   // 先把旁邊快要看到的地塊畫好（每格畫面最多一塊，開船時不會卡一下）
   pre: for (let cy = Math.floor((vy - 256) / CS); cy <= Math.floor((vy + lh + 256) / CS); cy++) for (let cx = Math.floor((vx - 256) / CS); cx <= Math.floor((vx + lw + 256) / CS); cx++) if (!chunks.has(cx + ',' + cy)) { groundChunk(cx, cy); break pre; }
@@ -2149,14 +2476,16 @@ function drawIso(g, gf, t) {
   const R = Math.ceil(Math.max(lw / TW, lh / TH)) + 2, px = Math.floor(pl.x), py = Math.floor(pl.y), fr = Math.floor(t * 1.6);
   g.fillStyle = 'rgba(255,255,255,.55)';
   for (let y = py - R; y <= py + R; y++) for (let x = px - R; x <= px + R; x++) {
-    const tt = at(x, y); if (!WATER.has(tt)) continue;
+    const tt = at(x, y); if (!WATER.has(tt) || tt === T.ULAVA) continue;
     if (hash(x, y, fr) < .07 + wx.wave * .1) { const p = iso(x + hash(x, y, fr + 1), y + .5); g.fillRect(Math.round(p.x - vx), Math.round(p.y - vy), 3 + Math.round(wx.wave * 3), 1); }
     if ((tt === T.RIVER || tt === T.BIGRIVER || tt === T.UPRIVER) && hash(x, y, 30) < .4) { const p = iso(x + ((t * .6 + hash(x, y, 31)) % 1), y + .5); g.fillRect(Math.round(p.x - vx), Math.round(p.y - vy), 2, 1); }
   }
-  drawBossShadow(g, vx, vy, t);
+  if (!UNDER) drawBossShadow(g, vx, vy, t);
   // 依深度排序的物件
   const objs = [];
   const near = o => Math.abs(o.x - pl.x) < R && Math.abs(o.y - pl.y) < R;
+  if (UNDER) for (const o of U.objs) { if (near(o)) objs.push({ k: o.x + o.y, f: G => drawUObj(G, o, vx, vy, t) }); }
+  else {
   for (const tr of trees) if (near(tr)) objs.push({ k: tr.x + tr.y, f: G => drawTree(G, tr, vx, vy, t) });
   for (const r of rocks) if (near(r)) objs.push({ k: r.x + r.y, f: G => drawRock(G, r, vx, vy) });
   for (const l of lamps) if (near(l)) objs.push({ k: l.x + l.y, f: G => drawLamp(G, l, vx, vy) });
@@ -2167,6 +2496,8 @@ function drawIso(g, gf, t) {
   if (near(volcano)) objs.push({ k: volcano.x + volcano.y + 1.5, f: G => drawVolcano(G, vx, vy, t) });
   for (const d of drifts) if (near(d)) objs.push({ k: d.x + d.y, f: G => drawDrift(G, d, vx, vy, t) });
   if (!state.onBoat) objs.push({ k: state.boat.x + state.boat.y, f: G => drawBoat(G, vx, vy, t) });
+  { const mb = mineB(); if (mb && near(mb)) objs.push({ k: mb.door[0] + 1.7 + mb.door[1] - .3, f: G => drawMiner(G, vx, vy, t) }); }
+  }
   // 主角（在船上就是整艘船）不貼齊像素格，畫在自己的圖層，鏡頭跟著它平滑移動
   const focusK = state.onBoat ? state.boat.x + state.boat.y : state.player.x + state.player.y + .01;
   pgx.imageSmoothingEnabled = false; pgx.clearRect(0, 0, pcv.width, pcv.height);
@@ -2174,10 +2505,12 @@ function drawIso(g, gf, t) {
   else { const p = iso(state.player.x, state.player.y); drawPerson(pgx, PC_X, PC_Y, t); cam.px = p.x - PC_X - vx; cam.py = p.y - LH - PC_Y - vy; }
   gf.imageSmoothingEnabled = false; gf.clearRect(0, 0, lw, lh);
   objs.sort((a, b) => a.k - b.k).forEach(o => o.f(o.k > focusK ? gf : g));
+  if (UNDER) drawUnderDark(g, gf, lw, lh, vx, vy, pl, t);   // 地底：在小畫布上蓋黑暗、挖出燈光
 }
 // 時段色調與夜晚燈光：畫在最上面，主角也會被染色
 function drawIsoFx(g) {
   const lw = low.width, lh = low.height, pl = state.onBoat ? state.boat : state.player, vx = cam.vx, vy = cam.vy;
+  if (UNDER) return;   // 地底的黑暗在 drawIso 裡的小畫布上就處理好了
   // 時段色調與夜晚燈光
   const ph = PHASE[phase];
   if (ph.tint) { g.fillStyle = ph.tint; g.fillRect(-2, -2, lw + 4, lh + 4); }
@@ -2226,6 +2559,7 @@ function isoBox(g, x0, y0, w, h, hgt, wall, roof, vx, vy) {
 }
 function drawBuilding(g, b, vx, vy) {
   if (b.id === 'quests') return drawQuestBoard(g, b, vx, vy);
+  if (b.id === 'mine') return drawMineEntrance(g, b, vx, vy);
   const P = isoBox(g, b.x, b.y, b.w, b.h, b.hgt, b.wall, b.roof, vx, vy);
   // 斜屋頂：中脊
   const ridge = [P(b.x + .5, b.y + b.h / 2, b.hgt + 8), P(b.x + b.w - .5, b.y + b.h / 2, b.hgt + 8)];
@@ -2469,7 +2803,7 @@ function frame(now) {
   if (sk > 0) { ctx.setTransform(1, 0, 0, 1, 0, 0); ctx.fillStyle = `rgba(110,170,60,${.16 * sk})`; ctx.fillRect(0, 0, cv.width, cv.height); }
   drawWeatherFx(t);
   // 建築名稱（高解析度文字）
-  if (viewMix < .5 && !state.onBoat) {
+  if (viewMix < .5 && !state.onBoat && !UNDER) {
     const pl = state.player, vx = cam.vx + cam.fx, vy = cam.vy + cam.fy;
     ctx.font = `bold ${12 * DPR}px sans-serif`; ctx.textAlign = 'center'; ctx.lineWidth = 3 * DPR;
     for (const b of BUILDINGS) { if (Math.hypot(b.door[0] - pl.x, b.door[1] - pl.y) > 6) continue; const p = iso(b.x + b.w / 2, b.y + b.h / 2); const sx = (p.x - vx) * PIX * DPR, sy = (p.y - vy - LH - b.hgt - 14) * PIX * DPR; ctx.strokeStyle = '#3a2a18'; ctx.strokeText(b.sign + ' ' + b.name, sx, sy); ctx.fillStyle = '#fff6dd'; ctx.fillText(b.sign + ' ' + b.name, sx, sy); }
@@ -2495,10 +2829,10 @@ document.getElementById('updBar').addEventListener('click', () => {
 });
 setTimeout(checkUpdate, 8000); setInterval(checkUpdate, 5 * 60 * 1000);
 document.addEventListener('visibilitychange', () => { if (!document.hidden) checkUpdate(); });
-load(); initFog(); applyGear(); applyLook(); updateHud(); drawMini(); setInterval(save, 10000); addEventListener('pagehide', save);
-toast('歡迎來到漁港鎮！走到碼頭盡頭「上船」出海，或在水邊直接「拋竿」', 3200);
+load(); initFog(); uFogInit(); applyGear(); applyLook(); updateHud(); drawMini(); setInterval(save, 10000); addEventListener('pagehide', save);
+if (resumeUnder) enterUnder(resumeUnder); else toast('歡迎來到漁港鎮！走到碼頭盡頭「上船」出海，或在水邊直接「拋竿」', 3200);
 if (params.get('demo') === 'boat') { state.onBoat = true; }
-window.__game = { state, fish, FISH, docks, BUILDINGS, prog, ACH, save, applyGear, openBuilding, checkAch, openDex, startCast, hook }; window.__walk = walkable; window.__pick = pickFish; window.__drifts = drifts; window.__regionAt = regionAt; window.__boatable = boatable; window.__islands = ISLANDS; window.__openFishDetail = openFishDetail; window.__aq = () => aq; window.__drawAq = drawAquarium; window.__tile = at; window.__adv = { SPOTS, fogPct, revealAt, isRevealed, discover, giveMap, digTreasure, openQuests, genQuest, get boss() { return boss; }, set boss(v) { boss = v; }, set bossCD(v) { bossCD = v; }, GEAR, drawTreasureMap }; window.__contextB = contextB; window.__checkUpdate = checkUpdate; window.__actx = () => actx; window.__contest = { nextContestKey, contestAt, runContest, openGuild, contestTable, startCeremony, get cut() { return cut; } };   // 給測試用
+window.__game = { state, fish, FISH, docks, BUILDINGS, prog, ACH, save, applyGear, openBuilding, checkAch, openDex, startCast, hook }; window.__walk = walkable; window.__pick = pickFish; window.__drifts = drifts; window.__regionAt = regionAt; window.__boatable = boatable; window.__islands = ISLANDS; window.__openFishDetail = openFishDetail; window.__aq = () => aq; window.__drawAq = drawAquarium; window.__tile = at; window.__adv = { SPOTS, fogPct, revealAt, isRevealed, discover, giveMap, digTreasure, openQuests, genQuest, get boss() { return boss; }, set boss(v) { boss = v; }, set bossCD(v) { bossCD = v; }, GEAR, drawTreasureMap }; window.__contextB = contextB; window.__uzone = (x, y) => (UNDER ? landOf : (U.landOf || landOf))[y * N + x]; window.__uzc = UZC.map(c => c); window.__ustairs = () => U.stairs; window.__world = () => world; window.__checkUpdate = checkUpdate; window.__actx = () => actx; window.__contest = { nextContestKey, contestAt, runContest, openGuild, contestTable, startCeremony, get cut() { return cut; } };   // 給測試用
 requestAnimationFrame(frame);
 </script>
 </body>

@@ -89,6 +89,7 @@ window.ART = (() => {
     bandana_green: { name: '綠色頭巾', price: 140, shop: 'tailorE', style: 'bandana', h: '#3a8a3a', H: '#6ac06a' },
     bandana_red: { name: '紅色頭巾', price: 140, shop: 'tailorD', style: 'bandana', h: '#c83a2a', H: '#f06a5a' },
     kasa: { name: '斗笠', price: 200, shop: 'tailorF', style: 'kasa', h: '#c8a860', H: '#e8cc88' },
+    helmet: { name: '礦工安全帽', price: 9999, shop: 'mine', style: 'helmet', h: '#e8b020', H: '#ffd040' },   // 地下世界委託獎勵（之後開放）
     headband: { name: '必勝頭帶', price: 120, shop: 'tailorF', style: 'headband', h: '#f4f0e8', H: '#e03a2a' },
   });
   Object.assign(WARDROBE.hair, {
@@ -151,6 +152,7 @@ window.ART = (() => {
     spiky: ['............', '..k.k..k.k..', '.kdkdkkdkdk.', '.kddddddddk.', '.kddddddddk.'],
     topknot: ['....kkkk....', '....kddk....', '...kkkkkk...', '..kddddddk..', '.kddddddddk.'],
     bun: ['...kk..kk...', '..kddkkddk..', '...kkkkkk...', '..kddddddk..', '.kddddddddk.'],
+    helmet: ['....kkkk....', '..kkhhhhkk..', '.khhHHxhhhk.', 'khhhhhhhhhhk', 'kkkkkkkkkkkk'],
   };
   const HAT16 = {
     fisher: ['....kkkkkkkk....', '...kHHHHHHHHk...', '..khhHHHHHHhhk..', '.khhhhhhhhhhhhk.', 'kkkkkkkkkkkkkkkk'],
@@ -171,6 +173,7 @@ window.ART = (() => {
     spiky: ['................', '..k.k.k..k.k.k..', '.kdkdkdkkdkdkdk.', '..kddddddddddk..', '..kddddddddddk..'],
     topknot: ['......kkkk......', '......kddk......', '....kkkkkkkk....', '...kddddddddk...', '..kddddddddddk..'],
     bun: ['...kk......kk...', '..kddk....kddk..', '...kkkkkkkkkk...', '...kddddddddk...', '..kddddddddddk..'],
+    helmet: ['.....kkkkkk.....', '...kkhhhhhhkk...', '..khhhHxxHhhhk..', '.khhhhhhhhhhhhk.', 'kkkkkkkkkkkkkkkk'],
   };
   const HAIR_TOP = { mohawk: 1, spiky: 1, topknot: 1, bun: 1 };   // 這些髮型頭頂有自己的形狀
   const hatKey = P => P.hat.style !== 'none' ? P.hat.style : P.hair.style === 'bald' ? 'bald' : HAIR_TOP[P.hair.style] ? P.hair.style : 'hair';
