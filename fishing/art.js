@@ -89,6 +89,9 @@ window.ART = (() => {
     bandana_green: { name: '綠色頭巾', price: 140, shop: 'tailorE', style: 'bandana', h: '#3a8a3a', H: '#6ac06a' },
     bandana_red: { name: '紅色頭巾', price: 140, shop: 'tailorD', style: 'bandana', h: '#c83a2a', H: '#f06a5a' },
     kasa: { name: '斗笠', price: 200, shop: 'tailorF', style: 'kasa', h: '#c8a860', H: '#e8cc88' },
+    gold_fisher: { name: '港務的金邊漁夫帽', price: 9999, shop: 'friend', style: 'fisher', h: '#24305a', H: '#e8b020' },
+    forest_beanie: { name: '護林員的森林毛帽', price: 9999, shop: 'friend', style: 'beanie', h: '#2a6a3a', H: '#8ac04a' },
+    lava_bandana: { name: '火山學者的熔岩頭巾', price: 9999, shop: 'friend', style: 'bandana', h: '#ff6a2a', H: '#ffd040' },
     kid_cap: { name: '小志的紅棒球帽', price: 9999, shop: 'friend', style: 'cap', h: '#d0402a', H: '#f06a4a' },
     old_captain: { name: '老船長帽', price: 9999, shop: 'friend', style: 'captain', h: '#24305a', H: '#3a4a80' },
     helmet: { name: '礦工安全帽', price: 9999, shop: 'mine', style: 'helmet', h: '#e8b020', H: '#ffd040' },   // 地下世界委託獎勵（之後開放）
@@ -105,6 +108,7 @@ window.ART = (() => {
     bun_pink: { name: '包包頭（粉）', price: 220, shop: 'tailorF', style: 'bun', d: '#f0a0c0', D: '#c87090' },
   });
   Object.assign(WARDROBE.glasses, {
+    ice_glass: { name: '北極爺的冰晶墨鏡', price: 9999, shop: 'friend', style: 'sunc', G: '#8ad8ff' },
     artist_glass: { name: '畫家的紅框眼鏡', price: 9999, shop: 'friend', style: 'round', G: '#d03a6a' },
     scholar_glass: { name: '博士的金框眼鏡', price: 9999, shop: 'friend', style: 'round', G: '#d8a020' },
     crystal_glass: { name: '水晶眼鏡', price: 9999, shop: 'mine', style: 'round', G: '#8affff' },   // 地底委託獎勵
@@ -117,6 +121,12 @@ window.ART = (() => {
     stubble: { name: '鬍渣', price: 100, shop: 'tailorE', style: 'stubble' },
   });
   Object.assign(WARDROBE.top, {
+    mountain_jacket: { name: '登山客的橘色風衣', price: 9999, shop: 'friend', y: '#e8742a', Y: '#b8541a', L: '#ff9a4a', w: '#2a2a30' },
+    coral_shirt: { name: '潛水教練的珊瑚衫', price: 9999, shop: 'friend', y: '#ff8a8a', Y: '#d06060', L: '#ffb0a8', w: '#ffffff', z: '#fff0a0', pattern: 'dots' },
+    lighthouse_stripe: { name: '燈塔守的紅白條紋衣', price: 9999, shop: 'friend', y: '#f4f0e8', Y: '#c8c4bc', L: '#ffffff', w: '#d0302a', z: '#d0302a', pattern: 'stripe' },
+    guild_coat: { name: '協會的金鱗外套', price: 9999, shop: 'friend', y: '#c8902a', Y: '#9a6a1a', L: '#f0c050', w: '#ffffff', z: '#ffe080', pattern: 'dots' },
+    mangrove_vest: { name: '蟹婆的紅樹林背心', price: 9999, shop: 'friend', y: '#4a7a5a', Y: '#2a5a3a', L: '#6a9a7a', w: '#d8c898', z: '#3a5a2a', pattern: 'camo' },
+    castaway_tatter: { name: '魯賓遜的破布衫', price: 9999, shop: 'friend', y: '#d8c8a0', Y: '#a89870', L: '#f0e4c0', w: '#6a4224', z: '#b8a880', pattern: 'stripe' },
     grandma_knit: { name: '阿嬤的手織毛衣', price: 9999, shop: 'friend', y: '#c86a8a', Y: '#9a4a66', L: '#e898b0', w: '#fff2c8', z: '#fff2c8', pattern: 'dots' },
     postman: { name: '郵差制服', price: 9999, shop: 'friend', y: '#2a7a4a', Y: '#1a5a34', L: '#4a9a6a', w: '#ffd040' },
     miner_suit: { name: '礦工工作服', price: 9999, shop: 'mine', y: '#3a5a8a', Y: '#24406a', L: '#5a7ab0', w: '#ffd040', z: '#ffd040', pattern: 'stripe' },   // 地底委託獎勵

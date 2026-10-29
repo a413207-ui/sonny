@@ -214,13 +214,13 @@
 <div class="overlay" id="fishDetail"><div class="card" id="fishDetailCard"></div></div>
 <div class="overlay" id="badgePop"><div class="card" id="badgeCard"></div></div>
 
-<script src="data/fish.js?v=2026.10.29-81"></script>
-<script src="art.js?v=2026.10.29-81"></script>
-<script src="music.js?v=2026.10.29-81"></script>
+<script src="data/fish.js?v=2026.10.29-82"></script>
+<script src="art.js?v=2026.10.29-82"></script>
+<script src="music.js?v=2026.10.29-82"></script>
 <script>
 'use strict';
 // 版本號：每次更新都要改（也要改上面三個 script 的 ?v=），遊戲會用它檢查網站上有沒有新版
-const BUILD = '2026.10.29-81';
+const BUILD = '2026.10.29-82';
 // ════════════════ 基本設定 ════════════════
 const FISH = window.FISH_DATA || [];
 const N = 160, TW = 32, TH = 16, LH = 4;         // 地圖格數、等角格寬高、陸地高度
@@ -1187,9 +1187,10 @@ const ACH = [
   ['uquest5', '⛏️ 地底委託達人', '完成 5 張地底委託', s => (s.uquestDone || 0) >= 5],
   ['uall', '💎 地底魚博士', '地底的魚全部收集', s => FISH.filter(f => f.regions.some(r => UREG.has(r))).every(f => s.dex[f.id])],
   ['udragon', '🐉 地底龍王', '釣到傳說中的地底龍魚', s => !!s.dex.udragon],
-  ['res5', '🤝 柳河鎮的朋友', '和一位居民變成 5 顆心', s => RESIDENTS.some(r => Math.floor(((s.res || {})[r.id] || {}).p / 5 || 0) >= 5)],
+  ['resmeet', '👋 到處都有朋友', '和每一座島的居民都聊過天', s => RESIDENTS.every(r => (s.res || {})[r.id])],
+  ['res5', '🤝 交到朋友', '和一位居民變成 5 顆心', s => RESIDENTS.some(r => Math.floor(((s.res || {})[r.id] || {}).p / 5 || 0) >= 5)],
   ['res10', '💞 知心好友', '和一位居民變成 10 顆心', s => RESIDENTS.some(r => Math.floor(((s.res || {})[r.id] || {}).p / 5 || 0) >= 10)],
-  ['resall', '🏘️ 柳河鎮的大家', '和所有居民都變成 10 顆心', s => RESIDENTS.every(r => Math.floor(((s.res || {})[r.id] || {}).p / 5 || 0) >= 10)],
+  ['resall', '🏘️ 大家的好朋友', '和所有居民都變成 10 顆心', s => RESIDENTS.every(r => Math.floor(((s.res || {})[r.id] || {}).p / 5 || 0) >= 10)],
   ['cook1', '🍳 第一道料理', '在柳河食堂做一道料理', s => (s.cooked || 0) >= 1],
   ['cook20', '👨‍🍳 柳河大廚', '做 20 道料理', s => (s.cooked || 0) >= 20],
   ['serve10', '🛎️ 人氣食堂', '端 10 道料理給客人', s => (s.served || 0) >= 10],
@@ -1203,7 +1204,7 @@ const ACH = [
 // 徽章等級：bronze 銅、silver 銀、gold 金、rainbow 彩虹（最難）
 const TIER = { first: 'bronze', c10: 'bronze', c50: 'silver', c200: 'gold', d10: 'bronze', d30: 'silver', d60: 'gold', dall: 'rainbow',
   r_harbor: 'bronze', r_lake: 'bronze', r_river: 'bronze', r_reef: 'silver', r_deep: 'silver', t_dawn: 'bronze', t_dusk: 'bronze', t_night: 'silver',
-  rare: 'silver', epic: 'gold', legend: 'gold', legend_all: 'rainbow', w10: 'silver', w100: 'gold', m1000: 'bronze', m10000: 'gold', rod: 'bronze', boat: 'bronze', style1: 'bronze', style10: 'gold', tailorall: 'gold', wx_rain: 'bronze', wx_typhoon: 'gold', wx_special: 'silver', drift10: 'silver', contest1: 'bronze', podium: 'silver', champion: 'gold', r_cold: 'silver', r_mangrove: 'bronze', r_volcano: 'silver', r_bigriver: 'bronze', r_upriver: 'silver', aq1: 'bronze', aqleg: 'silver', aq20: 'gold', explore50: 'silver', explore85: 'gold', spot1: 'bronze', spotall: 'rainbow', dig1: 'bronze', dig5: 'gold', boss1: 'silver', boss5: 'gold', quest1: 'bronze', quest10: 'gold', gearall: 'silver', under1: 'silver', uzones: 'silver', ufish1: 'bronze', ulava: 'silver', uquest5: 'gold', uall: 'gold', udragon: 'rainbow', res5: 'bronze', res10: 'silver', resall: 'gold', cook1: 'bronze', cook20: 'silver', serve10: 'silver', museum1: 'bronze', museumhall: 'gold', museumall: 'rainbow', print1: 'bronze', print10: 'silver', printleg: 'gold' };
+  rare: 'silver', epic: 'gold', legend: 'gold', legend_all: 'rainbow', w10: 'silver', w100: 'gold', m1000: 'bronze', m10000: 'gold', rod: 'bronze', boat: 'bronze', style1: 'bronze', style10: 'gold', tailorall: 'gold', wx_rain: 'bronze', wx_typhoon: 'gold', wx_special: 'silver', drift10: 'silver', contest1: 'bronze', podium: 'silver', champion: 'gold', r_cold: 'silver', r_mangrove: 'bronze', r_volcano: 'silver', r_bigriver: 'bronze', r_upriver: 'silver', aq1: 'bronze', aqleg: 'silver', aq20: 'gold', explore50: 'silver', explore85: 'gold', spot1: 'bronze', spotall: 'rainbow', dig1: 'bronze', dig5: 'gold', boss1: 'silver', boss5: 'gold', quest1: 'bronze', quest10: 'gold', gearall: 'silver', under1: 'silver', uzones: 'silver', ufish1: 'bronze', ulava: 'silver', uquest5: 'gold', uall: 'gold', udragon: 'rainbow', resmeet: 'silver', res5: 'bronze', res10: 'silver', resall: 'gold', cook1: 'bronze', cook20: 'silver', serve10: 'silver', museum1: 'bronze', museumhall: 'gold', museumall: 'rainbow', print1: 'bronze', print10: 'silver', printleg: 'gold' };
 const TIER_NAME = { bronze: '銅', silver: '銀', gold: '金', rainbow: '彩虹' };
 const achParts = a => { const i = a[1].indexOf(' '); return { id: a[0], icon: a[1].slice(0, i), title: a[1].slice(i + 1), desc: a[2], tier: TIER[a[0]] || 'bronze' }; };
 const medalHtml = (b, got) => `<div class="medal ${got ? b.tier : 'lock'}"><i>${got ? b.icon : '？'}</i></div>`;
@@ -1256,7 +1257,7 @@ const SLOTS = ['hat', 'hair', 'glasses', 'beard', 'top', 'pants'];
 const owns = (slot, id) => (WR[slot][id] && WR[slot][id].price === 0) || prog.closet.includes(slot + ':' + id);
 function applyLook() { if (!prog.look) prog.look = { ...ART.DEFAULT_LOOK }; if (window.ART) ART.setLook(prog.look); }
 function drawPreview(cvs, look) { const g = cvs.getContext('2d'); g.imageSmoothingEnabled = false; g.clearRect(0, 0, cvs.width, cvs.height); g.drawImage(ART.previewFront(look), 0, 0, cvs.width, cvs.height); }
-const SHOP_OF = { tailorA: '到翠湖森林島的🎩森林服飾店買', tailorB: '到溪谷山島的👕山谷造型屋買', tailorC: '到冰晶島的🧣雪國毛帽店買', tailorD: '到火山島的🎸熔岩龐克屋買', tailorE: '到紅樹林島的🧭叢林探險屋買', tailorF: '到大河平原的👘河畔和風屋買', treasure: '藏寶圖挖寶才拿得到', mine: '地底營地的委託獎勵（完成地底委託拿到）', friend: '柳河鎮居民 10 顆心的友情禮物' };
+const SHOP_OF = { tailorA: '到翠湖森林島的🎩森林服飾店買', tailorB: '到溪谷山島的👕山谷造型屋買', tailorC: '到冰晶島的🧣雪國毛帽店買', tailorD: '到火山島的🎸熔岩龐克屋買', tailorE: '到紅樹林島的🧭叢林探險屋買', tailorF: '到大河平原的👘河畔和風屋買', treasure: '藏寶圖挖寶才拿得到', mine: '地底營地的委託獎勵（完成地底委託拿到）', friend: '各島居民 10 顆心的友情禮物' };
 function applyGear() {
   const r = RODS[prog.rodIdx] || RODS[0]; state.rod = { power: r.power, luck: r.luck + (prog.bait > 0 ? 1 : 0), name: r.name };
   state.boatSpeed = UNDER ? 4.5 : (BOATS[prog.boatLv] || BOATS[0]).speed;   // 地底木筏比較慢
@@ -1710,6 +1711,7 @@ function fitsNeed(f, q) {
   if (q.exact && d.rarity !== q.exact) return false;
   if (q.rar && !rarAtLeast(d, q.rar)) return false;
   if (q.shape && !q.shape.includes(d.shape)) return false;
+  if (q.regs && !d.regions.some(r => q.regs.includes(r))) return false;
   if (q.reg === 'fresh' && !d.regions.some(r => FRESH_R.has(r))) return false;
   if (q.reg === 'sea' && !d.regions.some(r => SEA_R.has(r))) return false;
   if (q.reg === 'under' && !d.regions.some(r => UREG.has(r))) return false;
@@ -1851,6 +1853,87 @@ const RESIDENTS = [
     likes: { reg: 'under', label: '地底的魚' }, loves: 'olm', loveName: '洞螈',
     lines: ['我在研究地底生物，你在洞窟裡看過會發光的魚嗎？', '博物館的地底館還有好多空位呢。', '魚的身體構造真是太奇妙了！', '熔岩河的魚能在那麼燙的地方活下來，真不可思議。', '聽說龍穴只有在冒泡的時候，地底龍魚才會出現。'],
     gifts: [['coins', 800], ['dish', 'glowpot'], ['coins', 3000], ['outfit', 'glasses', 'scholar_glass']] },
+  // ── 各島的居民（每座島兩位）── isl＝住在哪座島（在那座島上走動）
+  { id: 'harbormaster', isl: '漁港鎮', name: '港務老王', look: { hat: 'captain', hair: 'gray', glasses: 'none', beard: 'full', top: 'black_jacket', pants: 'black' }, night: false,
+    likes: { regs: ['harbor'], label: '港灣的魚' }, loves: 'red_seabream', loveName: '真鯛',
+    lines: ['碼頭盡頭按「上船」就能出海。', '真鯛只在清晨出現，要早起喔。', '燈塔那邊晚上會有燈塔鮟鱇。', '船跑遠了？站在水邊按「叫船」就好。'],
+    gifts: [['bait', 5], ['coins', 800], ['map'], ['outfit', 'hat', 'gold_fisher']] },
+  { id: 'lily', isl: '漁港鎮', name: '麵包店莉莉', look: { hat: 'none', hair: 'bangs_blonde', glasses: 'none', beard: 'none', top: 'raincoat_red', pants: 'jeans' }, night: false,
+    likes: { exact: 'common', label: '普通的小魚' }, loves: 'sardine', loveName: '沙丁魚',
+    lines: ['今天的沙丁魚麵包剛出爐喔！', '委託板常常有人要找魚，可以去看看。', '我最喜歡下雨天，聽雨聲揉麵團。', '大河那邊的柳河食堂，料理超好吃！'],
+    gifts: [['bait', 3], ['dish', 'fry'], ['coins', 1500], ['map']] },
+  { id: 'ranger', isl: '翠湖森林島', name: '護林員阿森', look: { hat: 'safari', hair: 'short_brown', glasses: 'none', beard: 'stubble', top: 'vest_explorer', pants: 'cargo' }, night: false,
+    likes: { regs: ['lake'], label: '翠湖的魚' }, loves: 'golden_koi', loveName: '黃金錦鯉',
+    lines: ['翠湖的水很乾淨，魚也長得特別漂亮。', '黃金錦鯉白天才會浮上來。', '森林服飾店的帽子是我們島的驕傲！', '晚上湖邊有月影鯉，記得帶燈。'],
+    gifts: [['bait', 5], ['coins', 900], ['dish', 'soup'], ['outfit', 'hat', 'forest_beanie']] },
+  { id: 'kiki', isl: '翠湖森林島', name: '琪琪', look: { hat: 'beanie_pink', hair: 'long_brown', glasses: 'none', beard: 'none', top: 'hoodie_green', pants: 'shorts_red' }, night: false,
+    likes: { regs: ['lake'], rar: 'uncommon', label: '少見以上的湖魚' }, loves: 'moon_carp', loveName: '月影鯉',
+    lines: ['你有看過月影鯉嗎？聽說像月亮一樣發光！', '我在湖邊撿到好漂亮的石頭～', '魚在咬的時候浮標會輕輕動，那是假的喔。', '我想把釣到的魚都捐給博物館！'],
+    gifts: [['bait', 3], ['coins', 700], ['coins', 2000], ['map']] },
+  { id: 'hiker', isl: '溪谷山島', name: '登山客阿峰', look: { hat: 'cap_blue', hair: 'short_black', glasses: 'sun', beard: 'none', top: 'parka_blue', pants: 'khaki' }, night: false,
+    likes: { regs: ['river', 'upriver'], label: '溪裡的魚' }, loves: 'mountain_salmon', loveName: '山櫻鮭',
+    lines: ['溪谷的水很急，魚的力氣也很大。', '山櫻鮭只在清晨出現，超難遇到！', '山谷造型屋的衣服很適合登山喔。', '下雨天溪裡會有雨香魚。'],
+    gifts: [['bait', 5], ['pills', 3], ['coins', 1500], ['outfit', 'top', 'mountain_jacket']] },
+  { id: 'teafarmer', isl: '溪谷山島', name: '茶農秀蘭', look: { hat: 'kasa', hair: 'bun_brown', glasses: 'none', beard: 'none', top: 'yukata_blue', pants: 'hakama' }, night: false,
+    likes: { regs: ['river'], exact: 'common', label: '溪裡的小魚' }, loves: 'ayu', loveName: '香魚',
+    lines: ['溪水泡的茶最香了，要不要喝一杯？', '香魚聞起來真的有西瓜的香味喔。', '釣不到的時候，就慢慢等吧，急不得。', '山上的橋那邊，魚特別多。'],
+    gifts: [['bait', 3], ['dish', 'soup'], ['coins', 1200], ['map']] },
+  { id: 'diver', isl: '珊瑚小島', name: '潛水教練阿浪', look: { hat: 'none', hair: 'spiky_black', glasses: 'goggles', beard: 'none', top: 'sailor', pants: 'shorts_red' }, night: false,
+    likes: { regs: ['reef'], label: '珊瑚礁的魚' }, loves: 'seahorse', loveName: '海馬',
+    lines: ['珊瑚礁底下超美的，魚的顏色超多！', '海馬很害羞，要很有耐心才釣得到。', '珊瑚礁的浪比較小，不容易暈船。', '獅子魚的刺有毒，拿的時候小心！'],
+    gifts: [['bait', 5], ['coins', 1000], ['dish', 'sashimi'], ['outfit', 'top', 'coral_shirt']] },
+  { id: 'coralgirl', isl: '珊瑚小島', name: '研究員小珊', look: { hat: 'straw', hair: 'long_red', glasses: 'round', beard: 'none', top: 'hawaii', pants: 'jeans' }, night: false,
+    likes: { regs: ['reef'], rar: 'rare', label: '稀有的珊瑚礁魚' }, loves: 'lionfish', loveName: '獅子魚',
+    lines: ['我在研究珊瑚礁的魚怎麼找伴。', '聽說有一條珊瑚女王，全身像彩虹一樣。', '七彩珊瑚魚只在晴天出現喔。', '吳博士是我的老師，他現在在研究地底。'],
+    gifts: [['bait', 3], ['coins', 900], ['coins', 2500], ['map']] },
+  { id: 'keeper', isl: '西南孤島', name: '燈塔守老燈伯', look: { hat: 'fisher_red', hair: 'gray', glasses: 'none', beard: 'white', top: 'raincoat_yellow', pants: 'jeans' }, night: true,
+    likes: { regs: ['harbor', 'deep'], label: '海裡的魚' }, loves: 'lighthouse_angler', loveName: '燈塔鮟鱇',
+    lines: ['我守這座孤島四十年了。', '深海離陸地遠，浪大容易暈，記得帶藥。', '晚上的海最安靜，適合想事情。', '有人在漂流瓶裡寫信給我，你看過嗎？'],
+    gifts: [['pills', 3], ['coins', 1000], ['map'], ['outfit', 'top', 'lighthouse_stripe']] },
+  { id: 'drifter', isl: '西南孤島', name: '旅人阿漂', look: { hat: 'straw', hair: 'short_brown', glasses: 'none', beard: 'stubble', top: 'hawaii', pants: 'khaki' }, night: false,
+    likes: { regs: ['deep'], label: '深海的魚' }, loves: 'mahi_mahi', loveName: '鬼頭刀',
+    lines: ['我是被漂流瓶的信吸引來的。', '開船撈漂流瓶，有時候會撿到藏寶圖！', '鬼頭刀游得超快，顏色像彩虹。', '下一站去哪呢……大河上游好像很有趣。'],
+    gifts: [['bait', 5], ['map'], ['coins', 2000], ['map']] },
+  { id: 'secretary', isl: '金鱗島', name: '協會秘書金小姐', look: { hat: 'none', hair: 'bangs_blonde', glasses: 'party', beard: 'none', top: 'black_jacket', pants: 'black' }, night: true,
+    likes: { rar: 'epic', label: '史詩以上的大魚' }, loves: 'bluefin_tuna', loveName: '黑鮪魚',
+    lines: ['每天晚上 8 點是評比大賽，記得報名！', '評比看重量、長度和稀有度，稀有度最重要喔。', '交給協會的魚會被收走，選一條好的再報名。', '上一屆冠軍是鐵竿阿雄……他好強。'],
+    gifts: [['coins', 1500], ['dish', 'bento'], ['coins', 4000], ['outfit', 'top', 'guild_coat']] },
+  { id: 'rival', isl: '金鱗島', name: '冠軍釣客阿雄', look: { hat: 'captain', hair: 'short_black', glasses: 'sun', beard: 'goatee', top: 'leather', pants: 'skinny_black' }, night: true,
+    likes: { rar: 'rare', label: '稀有以上的魚' }, loves: 'swordfish', loveName: '劍旗魚',
+    lines: ['哼，你也是來參加評比的？', '想贏我，先去釣一條劍旗魚再說。', '真正的高手，會看天氣挑魚。', '……你上次那條魚，還不錯嘛。'],
+    gifts: [['bait', 10], ['coins', 2000], ['map'], ['coins', 6000]] },
+  { id: 'icegrandpa', isl: '冰晶島', name: '冰釣老爺爺', look: { hat: 'ushanka', hair: 'gray', glasses: 'none', beard: 'white', top: 'parka_blue', pants: 'snow_pants' }, night: true,
+    likes: { regs: ['cold', 'frozen'], label: '冰川海域的魚' }, loves: 'arctic_char', loveName: '北極紅點鮭',
+    lines: ['冰層北邊還有一池祕密的海水……', '要開進冰川深處，得有破冰船頭。', '冷的地方容易暈船，要多注意。', '極光出現的夜晚，會有極光魚王。'],
+    gifts: [['pills', 3], ['coins', 1200], ['dish', 'soup'], ['outfit', 'glasses', 'ice_glass']] },
+  { id: 'snowkid', isl: '冰晶島', name: '小雪', look: { hat: 'earmuff', hair: 'long_silver', glasses: 'none', beard: 'none', top: 'sweater_snow', pants: 'snow_pants' }, night: false,
+    likes: { regs: ['cold'], exact: 'common', label: '冰川的小魚' }, loves: 'capelin', loveName: '毛鱗魚',
+    lines: ['我堆了一個雪人，你有看到嗎？', '毛鱗魚炸起來好好吃！', '雪國毛帽店的耳罩好暖喔～', '爺爺說冰層下面住著好大的鯊魚。'],
+    gifts: [['bait', 3], ['coins', 600], ['coins', 1800], ['map']] },
+  { id: 'crabgranny', isl: '紅樹林島', name: '蟹婆', look: { hat: 'kasa', hair: 'gray', glasses: 'none', beard: 'none', top: 'vest_explorer', pants: 'cargo' }, night: false,
+    likes: { regs: ['mangrove'], label: '紅樹林的魚' }, loves: 'archerfish', loveName: '射水魚',
+    lines: ['招潮蟹揮大螯是在跟你打招呼喔。', '射水魚會噴水把蟲打下來，很聰明吧。', '紅樹林的水很平靜，不太會暈船。', '叢林探險屋的背心很適合來這裡。'],
+    gifts: [['bait', 5], ['coins', 900], ['dish', 'curry'], ['outfit', 'top', 'mangrove_vest']] },
+  { id: 'oyster', isl: '紅樹林島', name: '蚵農阿昌', look: { hat: 'straw', hair: 'short_black', glasses: 'none', beard: 'stubble', top: 'hoodie_green', pants: 'shorts_red' }, night: false,
+    likes: { regs: ['mangrove', 'bigriver'], label: '河口的魚' }, loves: 'milkfish', loveName: '虱目魚',
+    lines: ['虱目魚粥配油條，就是最棒的早餐！', '河口這邊海水和河水混在一起，魚種特別多。', '聽說紅樹林之主很大很大……', '退潮的時候彈塗魚會跳出來曬太陽。'],
+    gifts: [['bait', 5], ['coins', 800], ['coins', 2000], ['map']] },
+  { id: 'volcanologist', isl: '火山島', name: '炎博士', look: { hat: 'safari', hair: 'spiky_orange', glasses: 'goggles', beard: 'none', top: 'black_jacket', pants: 'khaki' }, night: false,
+    likes: { regs: ['volcano'], label: '火山海域的魚' }, loves: 'flamefish', loveName: '火焰魚',
+    lines: ['火山海域的水溫比較高，魚都紅通通的。', '熔岩鳳凰魚……我研究了十年還沒看過。', '地底的熔岩河，聽說跟這座火山相連！', '靠近火山口要小心，別太接近。'],
+    gifts: [['bait', 5], ['coins', 1200], ['dish', 'glowpot'], ['outfit', 'hat', 'lava_bandana']] },
+  { id: 'onsen', isl: '火山島', name: '溫泉老闆娘', look: { hat: 'headband', hair: 'bun_pink', glasses: 'none', beard: 'none', top: 'happi', pants: 'hakama' }, night: true,
+    likes: { regs: ['volcano'], exact: 'common', label: '火山的小魚' }, loves: 'rosy_seabass', loveName: '紅喉',
+    lines: ['釣累了嗎？來泡個溫泉吧！', '紅喉烤起來油油亮亮的，超香！', '熔岩龐克屋的衣服好酷，我也想要一件。', '泡完溫泉，暈船都會好喔。'],
+    gifts: [['pills', 5], ['dish', 'soup'], ['coins', 2000], ['map']] },
+  { id: 'castaway', isl: '無人島', name: '漂流者魯賓遜', look: { hat: 'straw', hair: 'long_brown', glasses: 'none', beard: 'full', top: 'raincoat_yellow', pants: 'shorts_red' }, night: true,
+    likes: { regs: ['lagoon'], label: '潟湖的魚' }, loves: 'palm_trevally', loveName: '椰影浪人鰺',
+    lines: ['你、你是人嗎？我是魯賓遜，在這座島上好久了……', '潟湖的水清到看得見魚在游。', '我把漂流瓶丟出去求救，你有撿到嗎？', '島上的椰子蟹會偷我的魚！'],
+    gifts: [['bait', 5], ['map'], ['coins', 3000], ['outfit', 'top', 'castaway_tatter']] },
+  { id: 'crabboy', isl: '無人島', name: '寄居蟹小星', look: { hat: 'cap_blue', hair: 'spiky_black', glasses: 'none', beard: 'none', top: 'sailor', pants: 'shorts_red' }, night: false,
+    likes: { shape: ['crab'], label: '螃蟹類' }, loves: 'coconut_crab', loveName: '椰子蟹',
+    lines: ['我跟魯賓遜叔叔一起漂流到這裡的！', '我在收集各種螃蟹，你有嗎？', '椰子蟹會爬到椰子樹上，好厲害！', '聽說這座島的寶藏埋在沙灘下……'],
+    gifts: [['bait', 3], ['coins', 800], ['map'], ['map']] },
 ];
 const RES_BY = Object.fromEntries(RESIDENTS.map(r => [r.id, r]));
 const HEART_AT = [2, 5, 8, 10], resPts = id => ((prog.res || {})[id] || {}).p || 0, resHeart = id => Math.min(10, Math.floor(resPts(id) / 5));
@@ -1859,7 +1942,21 @@ const todayKey = () => new Date().toDateString();
 const townTiles = [];
 for (let y = 72; y < 92; y++) for (let x = 8; x < 26; x++) if (at(x, y) === T.STONE && walkable(x + .5, y + .5) && ell(x, y, RTOWN.x, RTOWN.y, RTOWN.rx, RTOWN.ry) < 1 && !BUILDINGS.some(b => !b.deco && Math.hypot(b.door[0] - x - .5, b.door[1] - y - .5) < 1.8)) townTiles.push([x + .5, y + .5]);   // 不在門口逗留
 const pierTile = (() => { for (let x = 16; x < 26; x++) if (at(x, 82) === T.DOCK) return [x - .5, 82.5]; return [20.5, 82.5]; })();
-const resNPC = RESIDENTS.map((r, i) => { const [x, y] = townTiles[Math.floor(hash(i, 3, 810) * townTiles.length)]; return { r, x, y, tx: x, ty: y, wait: rand(1, 4), walk: 0, fx: 0, fy: 1, say: '', sayT: 0, frames: null }; });
+// 每位居民在自己的島上走動：柳河鎮的人在石板廣場；其他人在島中心附近可走的地方
+const resAreaCache = {};
+function resTiles(r) {
+  const key = r.isl || '柳河鎮'; if (resAreaCache[key]) return resAreaCache[key];
+  if (key === '柳河鎮') return resAreaCache[key] = townTiles;
+  const k = ISLAND_IDX(key), is = ISLANDS[k], out = [];
+  for (let y = Math.floor(is.cy - 12); y <= is.cy + 12; y++) for (let x = Math.floor(is.cx - 12); x <= is.cx + 12; x++) {
+    if (x < 1 || y < 1 || x >= N - 1 || y >= N - 1 || landOf[y * N + x] !== k + 1 || !walkable(x + .5, y + .5)) continue;
+    if (BUILDINGS.some(b => !b.deco && Math.hypot(b.door[0] - x - .5, b.door[1] - y - .5) < 1.8) || docks.some(d => d.x0 === x && d.y0 === y)) continue;
+    out.push([x + .5, y + .5]);
+  }
+  out.sort((a, b) => Math.hypot(a[0] - is.cx, a[1] - is.cy) - Math.hypot(b[0] - is.cx, b[1] - is.cy));
+  return resAreaCache[key] = out.slice(0, Math.max(12, Math.floor(out.length * .7)));   // 偏島的中間，不要老是站在海邊
+}
+const resNPC = RESIDENTS.map((r, i) => { const T = resTiles(r), [x, y] = T[Math.floor(hash(i, 3, 810) * T.length)]; return { r, x, y, tx: x, ty: y, wait: rand(1, 4), walk: 0, fx: 0, fy: 1, say: '', sayT: 0, frames: null }; });
 const resAwake = n => phase !== 'night' || n.r.night;
 function updateResidents(dt) {
   if (UNDER) return;
@@ -1872,7 +1969,8 @@ function updateResidents(dt) {
     const dx = n.tx - n.x, dy = n.ty - n.y, d = Math.hypot(dx, dy);
     if (d < .1) {   // 到了：休息一下，再挑下一個地方（阿海伯晚上待在碼頭）
       n.wait = rand(2, 6);
-      const [x, y] = n.r.home === 'pier' && (phase === 'night' || Math.random() < .5) ? pierTile : townTiles[Math.floor(Math.random() * townTiles.length)];
+      const T = resTiles(n.r), near7 = T.filter(([x, y]) => Math.hypot(x - n.x, y - n.y) < 7), pool = near7.length ? near7 : T;
+      const [x, y] = n.r.home === 'pier' && (phase === 'night' || Math.random() < .5) ? pierTile : pool[Math.floor(Math.random() * pool.length)];
       if (Math.hypot(x - n.x, y - n.y) < 7) { n.tx = x; n.ty = y; } continue;
     }
     const sp = 1.3 * dt, nx = n.x + dx / d * sp, ny = n.y + dy / d * sp;
@@ -1902,6 +2000,7 @@ function giveResGift(r, g, hearts) {
   else if (g[0] === 'pills') { prog.pills = (prog.pills || 0) + g[1]; what = `💊 暈船藥 ×${g[1]}`; }
   else if (g[0] === 'coins') { state.coins += g[1]; what = `🪙${g[1]}`; }
   else if (g[0] === 'dish') { prog.dishes[g[1]] = (prog.dishes[g[1]] || 0) + 1; what = `${RECIPE_BY[g[1]].icon}${RECIPE_BY[g[1]].name}`; }
+  else if (g[0] === 'map') { const m = giveMap(); if (m) what = '🗺️ 一張藏寶圖'; else { state.coins += 1500; what = '🪙1500（藏寶圖已經滿了）'; } }
   else if (g[0] === 'outfit') { if (!prog.closet.includes(g[1] + ':' + g[2])) prog.closet.push(g[1] + ':' + g[2]); what = `限定服飾「${WR[g[1]][g[2]].name}」（回小屋換穿）`; }
   setTimeout(() => { toast(`💝 ${r.name}和你變成 ${hearts} 顆心的朋友了！送你 ${what}`, 4200); SFX.badge(); buzz([40, 40, 40, 40, 200]); }, 600);
 }
