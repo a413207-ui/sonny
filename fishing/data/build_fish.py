@@ -195,6 +195,37 @@ REGION_ONLY_TIMES = {"cave": ["dawn"]}
 
 # 天氣限定魚：只有在指定天氣才會上鉤（最後一欄＝天氣，逗號分隔）
 # 天氣：sunny 晴天、cloudy 多雲、rain 下雨、storm 暴雨、waves 大浪、typhoon 颱風
+# ── 🕳️ 地下世界（2026-10-29）：四區，任何時間都能釣，比地上同稀有度的魚更難拉 ──
+UNDER_FISH = [
+    # 入口洞穴的水潭 ucave
+    ("cave_blind", "盲眼洞穴魚", "C", "ucave", "any", (0.02, 0.1), (6, 12), "slim", "#e8d0c8", "#ff9aa0", "沒有眼睛，靠身體兩側感覺水流。"),
+    ("glass_shrimp", "透明蝦", "C", "ucave", "any", (0.005, 0.03), (3, 7), "slim", "#d0f0ec", "#ff7a7a", "身體透明得看得到小小的心臟在跳。"),
+    ("rock_loach", "岩縫泥鰍", "C", "ucave", "any", (0.02, 0.12), (8, 18), "eel", "#8a7a6a", "#3a2e24", "整天鑽在岩石縫裡，很難拉出來。"),
+    ("stalac_goby", "鐘乳蝦虎", "U", "ucave", "any", (0.05, 0.3), (8, 16), "slim", "#a8a0a4", "#f4f0ff", "背鰭尖尖的，像倒掛的鐘乳石。"),
+    ("olm", "洞螈", "R", "ucave", "any", (0.1, 0.5), (20, 35), "eel", "#f0cfc6", "#ff8aa0", "粉紅色的洞穴精靈，聽說能十年不吃東西。"),
+    # 地底湖 ulake
+    ("lantern_fish", "螢光燈籠魚", "C", "ulake", "any", (0.05, 0.4), (8, 18), "round", "#1e3050", "#6ae0ff", "頭上的小燈籠在黑水裡一閃一閃。"),
+    ("dark_tetra", "黑水燈魚", "C", "ulake", "any", (0.01, 0.06), (4, 9), "slim", "#202838", "#5affd0", "成群游過時像一條發光的河。"),
+    ("ghost_catfish", "幽靈鯰", "U", "ulake", "any", (0.3, 2.0), (20, 45), "slim", "#c8d0e0", "#8a9ab0", "身體透明，只看得到一根根骨頭。"),
+    ("starlight_eel", "星光鰻", "U", "ulake", "any", (0.5, 3.0), (50, 120), "eel", "#14243a", "#a0f0ff", "身上的光點像地底的星空。"),
+    ("under_sturgeon", "地底鱘", "R", "ulake", "any", (5.0, 30.0), (80, 180), "long", "#3a4a5a", "#9ad0ff", "活了上百年的老鱘，在湖底慢慢巡游。"),
+    ("lake_angler", "湖底鮟鱇", "E", "ulake", "any", (5.0, 25.0), (40, 90), "round", "#1a1a2a", "#6affff", "用頭上的光把小魚騙到嘴邊。"),
+    ("mirror_ghost", "鏡湖幽靈魚", "L", "ulake", "any", (20.0, 80.0), (120, 240), "myth", "#d8e4ff", "#7ac8ff", "只有提燈照到水面的那一瞬間才看得見牠。"),
+    # 水晶洞的水晶池 ucrystal
+    ("crystal_minnow", "水晶小魚", "C", "ucrystal", "any", (0.01, 0.08), (5, 11), "slim", "#c8b0ff", "#ffffff", "鱗片像碎水晶，一游就叮叮作響。"),
+    ("amethyst_fish", "紫晶魚", "U", "ucrystal", "any", (0.3, 1.5), (15, 32), "flat", "#8a5ad0", "#e0c0ff", "全身是透亮的紫水晶色。"),
+    ("prism_ray", "稜鏡魟", "R", "ucrystal", "any", (2.0, 12.0), (40, 90), "ray", "#a0e0ff", "#ff9ae8", "提燈一照，就把光折成一道彩虹。"),
+    ("crystal_turtle", "晶甲龜", "R", "ucrystal", "any", (3.0, 15.0), (30, 60), "turtle", "#6a5aa0", "#b0f0ff", "背上長滿了發光的水晶。"),
+    ("gem_scale", "寶石鱗魚", "E", "ucrystal", "any", (3.0, 12.0), (40, 80), "flat", "#3ad0a0", "#ff5a8a", "每一片鱗都是不同顏色的寶石。"),
+    # 熔岩河 ulava（要耐熱釣線）
+    ("ember_minnow", "餘燼小魚", "C", "ulava", "any", (0.02, 0.15), (5, 12), "slim", "#ff7a2a", "#ffe060", "在岩漿裡游泳的小火花。"),
+    ("lava_eel", "熔岩鰻", "U", "ulava", "any", (1.0, 6.0), (60, 150), "eel", "#5a1a10", "#ff8a2a", "身上的裂縫透出岩漿的紅光。"),
+    ("magma_crab", "岩漿蟹", "U", "ulava", "any", (0.5, 3.0), (15, 30), "crab", "#c8401a", "#ffd040", "殼燒得通紅，夾子比鐵還硬。"),
+    ("obsidian_fish", "黑曜石魚", "R", "ulava", "any", (2.0, 10.0), (30, 70), "flat", "#1a1218", "#ff5a2a", "全身像黑曜石一樣又黑又亮。"),
+    ("flame_pike", "炎鱗狼魚", "E", "ulava", "any", (8.0, 40.0), (100, 200), "long", "#a02a10", "#ffd040", "張口就噴出熱氣，是熔岩河的霸主。"),
+    ("udragon", "地底龍魚", "L", "ulava", "any", (200.0, 800.0), (400, 900), "myth", "#3a1a3a", "#ff6a2a", "住在熔岩河最深處的古龍，只在龍穴冒泡時現身。"),
+]
+
 WEATHER_FISH = [
     ("kelp_drifter", "漂流藻魚", "C", "harbor,reef", "any", (0.05, 0.2), (6, 14), "flat", "#8a8a3a", "#d8d870", "躲在漂流海藻下面，跟著浪一起漂來。", "rain,storm,waves,typhoon"),
     ("rain_ayu", "雨香魚", "U", "river", "any", (0.1, 0.4), (15, 30), "slim", "#7a9aa8", "#a0e0ff", "下雨溪水變涼時成群出現。", "rain,storm,typhoon"),
@@ -207,7 +238,7 @@ WEATHER_FISH = [
 ]
 WEATHERS = ["sunny", "cloudy", "rain", "storm", "waves", "typhoon"]
 
-REGIONS = ["harbor", "lake", "river", "reef", "deep", "cold", "mangrove", "volcano", "wreck", "cave", "lagoon", "frozen", "bigriver", "upriver"]
+REGIONS = ["harbor", "lake", "river", "reef", "deep", "cold", "mangrove", "volcano", "wreck", "cave", "lagoon", "frozen", "bigriver", "upriver", "ucave", "ulake", "ucrystal", "ulava"]
 TIMES = ["dawn", "day", "dusk", "night"]
 
 
@@ -223,7 +254,7 @@ def shade(hex_color, k):
 
 def build():
     out = []
-    for row in FISH + WEATHER_FISH:
+    for row in FISH + WEATHER_FISH + UNDER_FISH:
         (fid, name, rar, region, times, w, l, shape, body, accent, desc) = row[:11]
         f = {
             "id": fid,

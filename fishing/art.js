@@ -103,6 +103,7 @@ window.ART = (() => {
     bun_pink: { name: '包包頭（粉）', price: 220, shop: 'tailorF', style: 'bun', d: '#f0a0c0', D: '#c87090' },
   });
   Object.assign(WARDROBE.glasses, {
+    crystal_glass: { name: '水晶眼鏡', price: 9999, shop: 'mine', style: 'round', G: '#8affff' },   // 地底委託獎勵
     goggles: { name: '雪地護目鏡', price: 240, shop: 'tailorC', style: 'goggles', G: '#ff9a3a' },
     shades_red: { name: '紅色墨鏡', price: 220, shop: 'tailorD', style: 'sunc', G: '#c8202a' },
     shades_green: { name: '叢林墨鏡', price: 180, shop: 'tailorE', style: 'sunc', G: '#2a6a3a' },
@@ -112,6 +113,7 @@ window.ART = (() => {
     stubble: { name: '鬍渣', price: 100, shop: 'tailorE', style: 'stubble' },
   });
   Object.assign(WARDROBE.top, {
+    miner_suit: { name: '礦工工作服', price: 9999, shop: 'mine', y: '#3a5a8a', Y: '#24406a', L: '#5a7ab0', w: '#ffd040', z: '#ffd040', pattern: 'stripe' },   // 地底委託獎勵
     parka_blue: { name: '羽絨外套（藍）', price: 320, shop: 'tailorC', y: '#3a6ac0', Y: '#244a8a', L: '#6a9ae0', w: '#f4f0e8' },
     sweater_snow: { name: '雪花毛衣', price: 280, shop: 'tailorC', y: '#c03a3a', Y: '#8a2424', L: '#e06a6a', w: '#f4f0e8', z: '#ffffff', pattern: 'dots' },
     leather: { name: '龐克皮衣', price: 360, shop: 'tailorD', y: '#2a2226', Y: '#161214', L: '#4a3a3e', w: '#e03a2a' },

@@ -111,6 +111,31 @@
         'C5 - Eb5 - G5 - C6 -', 'Ab5 - G5 - F5 - Eb5 -', 'D5 - F5 - G5 - - -', 'C5 - - - - - . .',
       ],
     },
+    // ── 地下世界 ──
+    {
+      name: '地底的回聲', moods: ['under'], bpm: 62, swing: 0, lead: 'musicbox', perc: false,
+      chords: ['Am', 'F', 'Dm', 'E', 'Am', 'F', 'E', 'Am'],
+      melody: [
+        'E5 - . . A5 - . .', 'C6 - - - A5 - . .', 'D5 - . . F5 - A5 -', 'G#5 - - - E5 - . .',
+        'A5 - . . E5 - C5 -', 'F5 - - - A5 - C6 -', 'B5 - G#5 - E5 - D5 -', 'C5 - - - A4 - . .',
+      ],
+    },
+    {
+      name: '水晶之歌', moods: ['crystal'], bpm: 74, swing: 0, lead: 'bell', perc: false,
+      chords: ['Emaj7', 'C#m7', 'Amaj7', 'B', 'Emaj7', 'C#m7', 'Amaj7', 'B'],
+      melody: [
+        'G#5 B5 E6 - D#6 - B5 -', 'C#6 - G#5 - E5 - - -', 'A5 C#6 E6 - C#6 - A5 -', 'B5 - - - F#5 - . .',
+        'E6 - D#6 - B5 - G#5 -', 'C#6 - B5 - G#5 - E5 -', 'F#5 - A5 - C#6 - B5 A5', 'B5 - - - - - . .',
+      ],
+    },
+    {
+      name: '熔岩脈動', moods: ['lava'], bpm: 84, swing: 0, lead: 'marimba', perc: true,
+      chords: ['Em', 'C', 'D', 'B', 'Em', 'C', 'B', 'Em'],
+      melody: [
+        'E4 . E4 G4 B4 - . .', 'C5 - B4 - G4 - E4 -', 'D5 . D5 F#5 A5 - F#5 -', 'D#5 - - - B4 - . .',
+        'E5 . E5 G5 B5 - A5 G5', 'E5 - C5 - G4 - . .', 'F#5 - D#5 - B4 - F#4 -', 'E4 - - - . . . .',
+      ],
+    },
   ];
   const LOOPS = 2;   // 每首播兩遍再換下一首
 

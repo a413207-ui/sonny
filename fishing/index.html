@@ -210,13 +210,13 @@
 <div class="overlay" id="fishDetail"><div class="card" id="fishDetailCard"></div></div>
 <div class="overlay" id="badgePop"><div class="card" id="badgeCard"></div></div>
 
-<script src="data/fish.js?v=2026.10.29-78"></script>
-<script src="art.js?v=2026.10.29-78"></script>
-<script src="music.js?v=2026.10.29-78"></script>
+<script src="data/fish.js?v=2026.10.29-79"></script>
+<script src="art.js?v=2026.10.29-79"></script>
+<script src="music.js?v=2026.10.29-79"></script>
 <script>
 'use strict';
 // 版本號：每次更新都要改（也要改上面三個 script 的 ?v=），遊戲會用它檢查網站上有沒有新版
-const BUILD = '2026.10.29-78';
+const BUILD = '2026.10.29-79';
 // ════════════════ 基本設定 ════════════════
 const FISH = window.FISH_DATA || [];
 const N = 160, TW = 32, TH = 16, LH = 4;         // 地圖格數、等角格寬高、陸地高度
@@ -226,7 +226,7 @@ const OX = N * TW / 2, OY = 24;
 const T = { DEEP: 0, SEA: 1, REEF: 2, LAKE: 3, RIVER: 4, SAND: 5, GRASS: 6, STONE: 7, DOCK: 8, SNOW: 9, ROCK: 10, ICE: 11, COLD: 12, MANGROVE: 13, VOLCANO: 14, LAGOON: 15, BIGRIVER: 16, UPRIVER: 17,
   UWALL: 18, UFLOOR: 19, USTREAM: 20, ULAKE: 21, UCRYSTAL: 22, ULAVA: 23, UHOT: 24, UCFLOOR: 25 };   // U＝地下世界
 const WATER = new Set([T.DEEP, T.SEA, T.REEF, T.LAKE, T.RIVER, T.COLD, T.MANGROVE, T.VOLCANO, T.LAGOON, T.BIGRIVER, T.UPRIVER, T.USTREAM, T.ULAKE, T.UCRYSTAL, T.ULAVA]);
-const BOATABLE = new Set([T.DEEP, T.SEA, T.REEF, T.COLD, T.MANGROVE, T.VOLCANO, T.LAGOON, T.BIGRIVER, T.UPRIVER]);
+const BOATABLE = new Set([T.DEEP, T.SEA, T.REEF, T.COLD, T.MANGROVE, T.VOLCANO, T.LAGOON, T.BIGRIVER, T.UPRIVER, T.USTREAM, T.ULAKE, T.UCRYSTAL]);   // 地底的水（岩漿除外）木筏能划
 const REGION_OF = { [T.SEA]: 'harbor', [T.DEEP]: 'deep', [T.REEF]: 'reef', [T.LAKE]: 'lake', [T.RIVER]: 'river', [T.COLD]: 'cold', [T.MANGROVE]: 'mangrove', [T.VOLCANO]: 'volcano', [T.LAGOON]: 'lagoon', [T.BIGRIVER]: 'bigriver', [T.UPRIVER]: 'upriver', [T.USTREAM]: 'ucave', [T.ULAKE]: 'ulake', [T.UCRYSTAL]: 'ucrystal', [T.ULAVA]: 'ulava' };
 const REGION_NAME = { harbor: '港灣', deep: '深海', reef: '珊瑚礁', lake: '翠湖', river: '溪谷', cold: '冰川海域', mangrove: '紅樹林河口', volcano: '火山海域', wreck: '沉船', cave: '海蝕洞', lagoon: '無人島潟湖', frozen: '冰封秘境', bigriver: '大河下游', upriver: '大河上游', ucave: '洞穴水潭', ulake: '地底湖', ucrystal: '水晶池', ulava: '熔岩河' };
 const RAR = {
@@ -798,7 +798,7 @@ try { musMode = localStorage.getItem(MODE_KEY) || 'auto'; } catch (e) {}
 const ISL_MOOD = { 漁港鎮: 'harbor', 金鱗島: 'festival', 冰晶島: 'cold', 火山島: 'volcano', 紅樹林島: 'mangrove', 大河平原: 'river', 翠湖森林島: 'river', 溪谷山島: 'river', 珊瑚小島: 'reef', 無人島: 'reef' };
 const REG_MOOD = { harbor: 'harbor', deep: 'deep', wreck: 'deep', cave: 'deep', reef: 'reef', lagoon: 'reef', cold: 'cold', frozen: 'cold', volcano: 'volcano', mangrove: 'mangrove', lake: 'river', river: 'river', bigriver: 'river', upriver: 'river' };
 function musicMood() {   // 現在的場合：時段、天氣、所在地
-  if (UNDER) return { phase: 'night', place: 'deep', storm: false };   // 地底：先用深海、夜晚的歌
+  if (UNDER) { const z = landOf[Math.floor(state.player.y) * N + Math.floor(state.player.x)]; return { phase: 'under', place: z === 3 ? 'crystal' : z === 4 ? 'lava' : 'under', storm: false }; }   // 地底：依區域放地底的歌
   const o = state.onBoat ? state.boat : state.player, xi = Math.floor(o.x), yi = Math.floor(o.y);
   const is = !state.onBoat && ISLANDS[landOf[yi * N + xi] - 1];
   const place = is ? ISL_MOOD[is.name] || 'sea' : REG_MOOD[regionAt(o.x, o.y)] || 'sea';
@@ -840,7 +840,7 @@ function openMusic() {
   document.querySelectorAll('[data-mmode]').forEach(el => el.onclick = () => { setMusMode(el.dataset.mmode); if (state.music) BGM.play(chooseTrack(BGM.index())); openMusic(); });
   document.querySelectorAll('[data-trk]').forEach(el => el.onclick = () => { setMusMode(el.dataset.trk); if (!state.music) toggleMusic(); BGM.play(+el.dataset.trk); setTimeout(openMusic, 50); });
 }
-const MOOD_NAME = { day: '白天', dawn: '清晨', dusk: '黃昏', night: '夜晚', harbor: '港口', sea: '海上', reef: '珊瑚礁', cold: '雪地', volcano: '火山', river: '河邊', storm: '暴風雨', festival: '慶典', mangrove: '紅樹林', deep: '深海' };
+const MOOD_NAME = { under: '地底', crystal: '水晶洞', lava: '熔岩河', day: '白天', dawn: '清晨', dusk: '黃昏', night: '夜晚', harbor: '港口', sea: '海上', reef: '珊瑚礁', cold: '雪地', volcano: '火山', river: '河邊', storm: '暴風雨', festival: '慶典', mangrove: '紅樹林', deep: '深海' };
 function setMusMode(m) { musMode = m; try { localStorage.setItem(MODE_KEY, m); } catch (e) {} }
 function toggleMusic() {
   state.music = !state.music; musLabel(); try { localStorage.setItem(MUS_KEY, state.music ? 'on' : 'off'); } catch (e) {}
@@ -889,7 +889,7 @@ const SICK_ON = 60, SICK_OFF = 30, SICK_WARN = 35, PILL = { name: '暈船藥', p
 Object.assign(state, { sick: 0, sickOn: false, sickWarned: false, pillT: 0 });
 function updateSick(dt) {
   let d;
-  if (state.onBoat) {
+  if (state.onBoat && !UNDER) {
     const reg = REGION_OF[at(Math.floor(state.boat.x), Math.floor(state.boat.y))];
     const base = { deep: 1.1, reef: .45, cold: .9, volcano: .95, mangrove: .3, bigriver: .15, upriver: .1, lake: .1, river: .1 }[reg] || .55;
     const sp = Math.hypot(state.boat.vx, state.boat.vy) / (state.boatSpeed || 6);
@@ -944,7 +944,13 @@ function contextB() {
   if (fish.state) return null;
   if (state.onBoat) { const s = landingSpot(); return s ? { label: '下船', fn: () => { state.onBoat = false; state.boat.vx = state.boat.vy = 0; Object.assign(state.player, s); toast('上岸了'); } } : null; }   // 下船時船停住，不會滑走
   const p = state.player;
-  if (UNDER) return U.stairs && Math.hypot(U.stairs.door[0] - p.x, U.stairs.door[1] - p.y) < 1.4 ? { label: '回到地面', fn: exitUnder } : null;   // 地底：只有石階
+  if (UNDER) {   // 地底：石階、營地、木筏
+    if (Math.hypot(U.stairs.door[0] - p.x, U.stairs.door[1] - p.y) < 1.4) return { label: '回到地面', fn: exitUnder };
+    if (Math.hypot(U.camp.door[0] - p.x, U.camp.door[1] - p.y) < 1.4) return { label: '營地', fn: () => openCamp() };
+    if (!prog.raft) return null;
+    if (Math.hypot(state.boat.x - p.x, state.boat.y - p.y) < 1.8) return { label: '上木筏', fn: () => { state.onBoat = true; toast('🛶 用搖桿划木筏，划到湖中間釣大魚'); } };
+    const spot = boatSpotNear(p.x, p.y); return spot ? { label: '叫木筏', fn: () => { callBoat(spot); toast('🛶 木筏漂過來了！按「上木筏」'); } } : null;
+  }
   const tm = prog.maps.find(m => Math.hypot(m.x - p.x, m.y - p.y) < 1.1); if (tm) return { label: '挖寶', fn: () => digTreasure(tm) };
   if (Math.hypot(state.boat.x - p.x, state.boat.y - p.y) < 1.8) return { label: '上船', fn: () => { state.onBoat = true; toast('⛵ 用搖桿開船，到不同海域釣不同的魚'); } };
   const b = nearBuilding(); if (b) return { label: '進入', fn: () => openBuilding(b) };
@@ -976,17 +982,18 @@ function startCast() {
   const o = state.onBoat ? state.boat : state.player;
   const w = waterAhead(o.x, o.y, state.player.fx, state.player.fy);
   if (!w) return toast('前面沒有水，換個方向試試');
-  if (UNDER) { toast(`⛏️ ${MINER_NAME}：「地底的魚還在調查中，下次更新就能釣了！」`, 2800); return; }
+  if (UNDER && regionAt(w.x, w.y) === 'ulava' && !prog.heatLine) { toast('🔥 一般釣線一碰到岩漿就燒斷了！到營地買「耐熱釣線」', 3000); buzz(80); return; }
   state.player.fx = w.fx; state.player.fy = w.fy;
   Object.assign(fish, { state: 'cast', t: 0, region: regionAt(w.x, w.y), fx: w.x, fy: w.y, nibbles: [], d: 100, dMax: 100, tension: 0, struggle: false, swap: 0, boss: false, dash: 0, warn: 0, rod: 0, lure: 0, moved: 0, lured: 0, side: 1, fishX: 0, push: 0, slackT: 0, slackWarn: 0 });
-  const wait = rand(2.2, 6.5) / (1 + state.rod.luck * .2) * (WEATHER[weather].bite || 1);
+  const wait = rand(2.2, 6.5) / (1 + state.rod.luck * .2) * (UNDER ? 1.15 : (WEATHER[weather].bite || 1));   // 地底沒有天氣，魚也比較謹慎
   fish.biteAt = .7 + wait;
-  if (boss && Math.hypot(w.x - boss.x, w.y - boss.y) < 2.8) { fish.boss = true; fish.biteAt = .7 + rand(1.5, 3); toast('🎣 拋到巨大魚影旁邊了…屏住呼吸！', 2500); return; }
+  if (UNDER && lairActive() && Math.hypot(w.x - U.lair.x, w.y - U.lair.y) < 2.4) { fish.boss = true; fish.biteAt = .7 + rand(2, 3.5); toast('🐉 龍穴冒出巨大的泡泡……有東西在下面！', 2800); buzz([80, 40, 80]); return; }
+  if (!UNDER && boss && Math.hypot(w.x - boss.x, w.y - boss.y) < 2.8) { fish.boss = true; fish.biteAt = .7 + rand(1.5, 3); toast('🎣 拋到巨大魚影旁邊了…屏住呼吸！', 2500); return; }
   for (let k = 0, n = Math.floor(rand(0, 4)); k < n; k++) fish.nibbles.push(rand(1.2, fish.biteAt - .3));
   toast(`🎣 拋竿！（${REGION_NAME[fish.region]}）浮標沉下去再拉竿`);
 }
 function pickFish(region) {
-  let pool = FISH.filter(f => f.regions.includes(region) && f.times.includes(phase) && (!f.weather || f.weather.includes(weather)));
+  let pool = FISH.filter(f => f.regions.includes(region) && f.times.includes(phase) && (!f.weather || f.weather.includes(weather)) && !BOSS_ONLY.has(f.id));
   // 有天氣限定魚可以釣時，35% 機會從牠們裡面挑
   const special = pool.filter(f => f.weather); if (special.length && Math.random() < .35) pool = special;
   const byR = {}; for (const f of pool) (byR[f.rarity] = byR[f.rarity] || []).push(f);
@@ -1005,17 +1012,19 @@ function hook() {
   fish.state = 'reel'; fish.t = 0; fish.d = 80; fish.tension = 20;   // 上鉤時魚離 80（滿 110 就跑掉）
   fish.swap = rand(.4, 1.2);
   fish.swapPow = 0;
+  fish.under = UREG.has(fish.region); if (fish.under) fish.power *= 1.25;   // 地底魚比地上同稀有度的更有力
   // 巨物：力氣大、距離遠、會衝刺，但掙扎頻率和稀有魚差不多，換好竿子就拉得上來
-  if (fish.boss) { boss = null; fish.power = clamp(1.2 * (.9 + fish.catch.k * .25), 1.1, 1.35); fish.swapPow = 1; fish.d = fish.dMax = 150; fish.dashT = rand(3, 5); buzz([120, 50, 120, 50, 240]); SFX.hook(); toast('‼️‼️ 是巨物！牠會衝刺，看到「⚠️」就先放手！', 3200); return; }
+  if (fish.boss) { boss = null; fish.power = UNDER ? clamp(1.25 * (.9 + fish.catch.k * .25), 1.15, 1.38) : clamp(1.2 * (.9 + fish.catch.k * .25), 1.1, 1.35); fish.swapPow = 1; fish.d = fish.dMax = 150; fish.dashT = rand(3, 5); buzz([120, 50, 120, 50, 240]); SFX.hook(); toast('‼️‼️ 是巨物！牠會衝刺，看到「⚠️」就先放手！', 3200); return; }
   buzz([60, 30, 60]); SFX.hook();
   toast(fish.catch.def.rarity === 'legendary' || fish.catch.def.rarity === 'epic' ? '‼️ 好重！是大傢伙！按住收線，張力太高就放手' : '上鉤了！按住「收線」，張力太高就放手，但線不能太鬆');
 }
-function fail(msg) { buzz(200); SFX.fail(); fish.state = 'fail'; fish.t = 0; fish.msg = msg; toast(msg, 2200); }
+function fail(msg) { if (fish.boss && UNDER) lairRest(false); buzz(200); SFX.fail(); fish.state = 'fail'; fish.t = 0; fish.msg = msg; toast(msg, 2200); }
 function endFishing(msg) { fish.state = null; holding = false; if (msg) toast(msg); }
 const trophyFish = document.createElement('canvas'); trophyFish.width = 64; trophyFish.height = 32;
 function caught() {
   fish.state = 'trophy'; fish.t = 0; buzz([40, 30, 40, 30, 160]); SFX.caught();
   if (fish.boss) prog.boss = (prog.boss || 0) + 1;
+  if (fish.boss && UNDER) lairRest(true);
   const c = fish.catch; fish.isNew = !prog.dex[c.def.id]; state.bag.push({ id: c.def.id, w: +c.weight.toFixed(2), l: +c.length.toFixed(1), price: c.price, at: Date.now() });
   drawFishTo(trophyFish, c.def); toast(`🎉 釣到了 ${c.def.name}！`, 1800);
   recordCatch(c);
@@ -1067,7 +1076,7 @@ function updateFishing(dt) {
     const rp = state.rod.power;
     if (holding) { fish.d -= (fish.struggle ? 6 : 17) * rp * rk * dt; fish.tension += (fish.struggle ? 90 * fish.power : 24 * fish.power) * pk * dt / rp * (1 + wx.wave * .15); }
     else { fish.tension -= 45 * dt; fish.d += (fish.struggle ? 14 : 5) * fish.power * dt; }
-    if (fish.struggle) fish.d += (fish.boss ? 6 : 10) * fish.power * Math.max(0, 1 - fish.push) * dt;   // 掙扎時魚橫衝，沒壓竿就被拉遠
+    if (fish.struggle) fish.d += (fish.boss ? 6 : 10) * (fish.under ? 1.3 : 1) * fish.power * Math.max(0, 1 - fish.push) * dt;   // 掙扎時魚橫衝，沒壓竿就被拉遠
     // 線放太鬆（張力幾乎 0）超過 1.4 秒，魚會脫鉤
     if (fish.tension < 3 && !(fish.dash > 0) && !(fish.warn > 0)) { fish.slackT = (fish.slackT || 0) + dt; if (fish.slackT > .5 && !fish.slackWarn) { fish.slackWarn = 1; toast('線太鬆了！快收線，魚要脫鉤了', 1200); buzz(40); } }
     else { fish.slackT = Math.max(0, (fish.slackT || 0) - dt * 2); if (fish.slackT === 0) fish.slackWarn = 0; }
@@ -1156,6 +1165,12 @@ const ACH = [
   ['quest10', '🤝 漁村好朋友', '完成 10 張委託', s => (s.questDone || 0) >= 10],
   ['gearall', '🧰 探險家裝備', '買齊三樣探險裝備', s => GEAR.every(g => (s.gear || {})[g.id])],
   ['under1', '🕳️ 地底探險家', '第一次進入地下世界', s => !!s.underVisit],
+  ['uzones', '🗺️ 地底踏查', '地下世界四個區域都去過', s => ((s.uzones || 0) & 30) === 30],
+  ['ufish1', '🔦 第一條地底魚', '在地下世界釣到魚', s => FISH.some(f => f.regions.some(r => UREG.has(r)) && s.dex[f.id])],
+  ['ulava', '🔥 熔岩釣手', '在熔岩河釣到魚', s => (s.region.ulava || 0) > 0],
+  ['uquest5', '⛏️ 地底委託達人', '完成 5 張地底委託', s => (s.uquestDone || 0) >= 5],
+  ['uall', '💎 地底魚博士', '地底的魚全部收集', s => FISH.filter(f => f.regions.some(r => UREG.has(r))).every(f => s.dex[f.id])],
+  ['udragon', '🐉 地底龍王', '釣到傳說中的地底龍魚', s => !!s.dex.udragon],
   ['print1', '🖼️ 第一幅魚拓', '請魚拓師傅拓一幅魚拓', s => (s.prints || []).length >= 1],
   ['print10', '🎨 魚拓收藏家', '收藏 10 幅魚拓', s => (s.prints || []).length >= 10],
   ['printleg', '🏯 傳說魚拓', '把傳說魚拓成魚拓', s => (s.prints || []).some(p => FISH_BY_ID[p.id] && FISH_BY_ID[p.id].rarity === 'legendary')],
@@ -1163,7 +1178,7 @@ const ACH = [
 // 徽章等級：bronze 銅、silver 銀、gold 金、rainbow 彩虹（最難）
 const TIER = { first: 'bronze', c10: 'bronze', c50: 'silver', c200: 'gold', d10: 'bronze', d30: 'silver', d60: 'gold', dall: 'rainbow',
   r_harbor: 'bronze', r_lake: 'bronze', r_river: 'bronze', r_reef: 'silver', r_deep: 'silver', t_dawn: 'bronze', t_dusk: 'bronze', t_night: 'silver',
-  rare: 'silver', epic: 'gold', legend: 'gold', legend_all: 'rainbow', w10: 'silver', w100: 'gold', m1000: 'bronze', m10000: 'gold', rod: 'bronze', boat: 'bronze', style1: 'bronze', style10: 'gold', tailorall: 'gold', wx_rain: 'bronze', wx_typhoon: 'gold', wx_special: 'silver', drift10: 'silver', contest1: 'bronze', podium: 'silver', champion: 'gold', r_cold: 'silver', r_mangrove: 'bronze', r_volcano: 'silver', r_bigriver: 'bronze', r_upriver: 'silver', aq1: 'bronze', aqleg: 'silver', aq20: 'gold', explore50: 'silver', explore85: 'gold', spot1: 'bronze', spotall: 'rainbow', dig1: 'bronze', dig5: 'gold', boss1: 'silver', boss5: 'gold', quest1: 'bronze', quest10: 'gold', gearall: 'silver', under1: 'silver', print1: 'bronze', print10: 'silver', printleg: 'gold' };
+  rare: 'silver', epic: 'gold', legend: 'gold', legend_all: 'rainbow', w10: 'silver', w100: 'gold', m1000: 'bronze', m10000: 'gold', rod: 'bronze', boat: 'bronze', style1: 'bronze', style10: 'gold', tailorall: 'gold', wx_rain: 'bronze', wx_typhoon: 'gold', wx_special: 'silver', drift10: 'silver', contest1: 'bronze', podium: 'silver', champion: 'gold', r_cold: 'silver', r_mangrove: 'bronze', r_volcano: 'silver', r_bigriver: 'bronze', r_upriver: 'silver', aq1: 'bronze', aqleg: 'silver', aq20: 'gold', explore50: 'silver', explore85: 'gold', spot1: 'bronze', spotall: 'rainbow', dig1: 'bronze', dig5: 'gold', boss1: 'silver', boss5: 'gold', quest1: 'bronze', quest10: 'gold', gearall: 'silver', under1: 'silver', uzones: 'silver', ufish1: 'bronze', ulava: 'silver', uquest5: 'gold', uall: 'gold', udragon: 'rainbow', print1: 'bronze', print10: 'silver', printleg: 'gold' };
 const TIER_NAME = { bronze: '銅', silver: '銀', gold: '金', rainbow: '彩虹' };
 const achParts = a => { const i = a[1].indexOf(' '); return { id: a[0], icon: a[1].slice(0, i), title: a[1].slice(i + 1), desc: a[2], tier: TIER[a[0]] || 'bronze' }; };
 const medalHtml = (b, got) => `<div class="medal ${got ? b.tier : 'lock'}"><i>${got ? b.icon : '？'}</i></div>`;
@@ -1185,10 +1200,11 @@ function showNextBadge() {
   document.getElementById('badgeBook').onclick = () => { badgeQueue.length = 0; pop.classList.remove('show'); openDex('ach'); };
 }
 const SAVE_KEY = 'bay-fishing-save-v1';
-const prog = { dex: {}, ach: {}, catches: 0, region: {}, time: {}, rar: {}, maxW: 0, earned: 0, rodIdx: 0, boatLv: 0, bait: 0, pills: 0, look: null, closet: [], wxc: {}, drift: 0, contest: {}, contestN: 0, contestBest: 0, contestWins: 0, aquarium: [], found: {}, maps: [], dug: 0, boss: 0, quests: [], questDone: 0, rep: 0, gear: {}, explore: 0, fog: null, prints: [], rodTip: 0, lamp: 0, mineOpen: 0, underVisit: 0, ufog: null };
+const prog = { dex: {}, ach: {}, catches: 0, region: {}, time: {}, rar: {}, maxW: 0, earned: 0, rodIdx: 0, boatLv: 0, bait: 0, pills: 0, look: null, closet: [], wxc: {}, drift: 0, contest: {}, contestN: 0, contestBest: 0, contestWins: 0, aquarium: [], found: {}, maps: [], dug: 0, boss: 0, quests: [], questDone: 0, rep: 0, gear: {}, explore: 0, fog: null, prints: [], rodTip: 0, lamp: 0, mineOpen: 0, underVisit: 0, ufog: null, raft: 0, uraft: null, heatLine: 0, uquests: [], uquestDone: 0, uzones: 0, udragonAt: 0 };
 function savePos() {   // 在地底時，地面位置記洞口，另外記地底的位置
   if (!UNDER) return { x: state.player.x, y: state.player.y, bx: state.boat.x, by: state.boat.y, onBoat: state.onBoat };
-  const b = mineB(); return { x: b.door[0], y: b.door[1] + .2, bx: state.boat.x, by: state.boat.y, onBoat: false, world: 'under', ux: state.player.x, uy: state.player.y };
+  const b = mineB(); if (prog.raft && state.boat.x > 0) prog.uraft = { x: state.boat.x, y: state.boat.y };
+  return { x: b.door[0], y: b.door[1] + .2, bx: OVERW.boat.x, by: OVERW.boat.y, onBoat: false, world: 'under', ux: state.player.x, uy: state.player.y };
 }
 let resumeUnder = null;
 function save() {
@@ -1215,10 +1231,10 @@ const SLOTS = ['hat', 'hair', 'glasses', 'beard', 'top', 'pants'];
 const owns = (slot, id) => (WR[slot][id] && WR[slot][id].price === 0) || prog.closet.includes(slot + ':' + id);
 function applyLook() { if (!prog.look) prog.look = { ...ART.DEFAULT_LOOK }; if (window.ART) ART.setLook(prog.look); }
 function drawPreview(cvs, look) { const g = cvs.getContext('2d'); g.imageSmoothingEnabled = false; g.clearRect(0, 0, cvs.width, cvs.height); g.drawImage(ART.previewFront(look), 0, 0, cvs.width, cvs.height); }
-const SHOP_OF = { tailorA: '到翠湖森林島的🎩森林服飾店買', tailorB: '到溪谷山島的👕山谷造型屋買', tailorC: '到冰晶島的🧣雪國毛帽店買', tailorD: '到火山島的🎸熔岩龐克屋買', tailorE: '到紅樹林島的🧭叢林探險屋買', tailorF: '到大河平原的👘河畔和風屋買', treasure: '藏寶圖挖寶才拿得到', mine: '地下世界的委託獎勵（之後開放）' };
+const SHOP_OF = { tailorA: '到翠湖森林島的🎩森林服飾店買', tailorB: '到溪谷山島的👕山谷造型屋買', tailorC: '到冰晶島的🧣雪國毛帽店買', tailorD: '到火山島的🎸熔岩龐克屋買', tailorE: '到紅樹林島的🧭叢林探險屋買', tailorF: '到大河平原的👘河畔和風屋買', treasure: '藏寶圖挖寶才拿得到', mine: '地底營地的委託獎勵（完成地底委託拿到）' };
 function applyGear() {
   const r = RODS[prog.rodIdx] || RODS[0]; state.rod = { power: r.power, luck: r.luck + (prog.bait > 0 ? 1 : 0), name: r.name };
-  state.boatSpeed = (BOATS[prog.boatLv] || BOATS[0]).speed;
+  state.boatSpeed = UNDER ? 4.5 : (BOATS[prog.boatLv] || BOATS[0]).speed;   // 地底木筏比較慢
   ICEBREAK = !!(prog.gear && prog.gear.ice);
 }
 function stats() { return { ...prog, dexN: Object.keys(prog.dex).length }; }
@@ -1640,7 +1656,7 @@ function drawBossShadow(g, vx, vy, t) {
 // ════════════════ 📋 委託板 ════════════════
 const QUEST_TITLES = ['新來的釣客', '熟面孔', '漁村好朋友', '港口紅人', '漁村英雄', '傳說釣客'];
 const repLv = () => Math.min(QUEST_TITLES.length, 1 + Math.floor((prog.rep || 0) / 6));
-const HIDDEN_REGIONS = new Set(['wreck', 'cave', 'lagoon', 'frozen']);
+const HIDDEN_REGIONS = new Set(['wreck', 'cave', 'lagoon', 'frozen', 'ucave', 'ulake', 'ucrystal', 'ulava']);
 function genQuest() {
   const who = NPC_NAMES[Math.floor(Math.random() * NPC_NAMES.length)], u = Math.random(), id = 'q' + Date.now().toString(36) + Math.floor(Math.random() * 1e4);
   if (u < .2) { const n = 2 + Math.floor(Math.random() * 3); return { id, who, type: 'drift', n, start: prog.drift || 0, reward: 120 * n, rep: 1 }; }
@@ -2114,7 +2130,7 @@ const U = { tile: null, block: null, landOf: null, objs: [], lava: [], stairs: n
 const OVERW = {}; let world = 'over', UNDER = false;
 const MINE_NEED = 50, LAMP_PRICE = 800;   // 打開洞口：圖鑑 50 種＋探險燈
 const MINER_LOOK = { hat: 'helmet', hair: 'short_black', glasses: 'none', beard: 'full', top: 'vest_explorer', pants: 'khaki' }, MINER_NAME = '岩田隊長';
-const lampR = () => 44 + Math.max(0, (prog.lamp || 1) - 1) * 14;   // 提燈照亮的半徑（像素）
+const lampR = () => [44, 44, 58, 72][prog.lamp || 1] || 44;   // 提燈照亮的半徑（像素），營地可以升級
 function genUnder() {
   if (U.tile) return;
   const ut = new Uint8Array(N * N).fill(T.UWALL), ub = new Uint8Array(N * N).fill(1), ul = new Uint8Array(N * N);
@@ -2142,13 +2158,18 @@ function genUnder() {
   const sx = 5, sy = 14;
   for (let y = sy - 1; y <= sy + 2; y++) for (let x = sx - 1; x <= sx + 1; x++) carve(x, y, 1);
   ub[I(sx, sy)] = 1; U.stairs = { x: sx + UX0 + .5, y: sy + UY0 + .5, door: [sx + UX0 + .5, sy + UY0 + 1.6] };
+  // 地底營地（地底探險家・小光）：石階右邊
+  const cx0 = 10, cy0 = 15;
+  for (let y = cy0 - 1; y <= cy0 + 2; y++) for (let x = cx0 - 1; x <= cx0 + 1; x++) carve(x, y, 1);
+  for (let y = cy0 - 1; y <= cy0 + 2; y++) for (let x = cx0 - 1; x <= cx0 + 1; x++) if (WATER.has(ut[I(x, y)])) { ut[I(x, y)] = T.UFLOOR; ub[I(x, y)] = 0; }
+  ub[I(cx0, cy0)] = 1; U.camp = { x: cx0 + UX0 + .5, y: cy0 + UY0 + .5, door: [cx0 + UX0 + .5, cy0 + UY0 + 1.6] };
   // 裝飾：水晶、發光蘑菇、岩漿噴口、石筍
   const floor = (x, y) => inU(x, y) && ut[I(x, y)] !== T.UWALL && !WATER.has(ut[I(x, y)]);
   const CRY = ['#b07aff', '#6ae0ff', '#ff8ad8', '#8affc8'];
   for (let y = 1; y < US - 1; y++) for (let x = 1; x < US - 1; x++) {
     if (!floor(x, y)) continue;
     const z = ul[I(x, y)], wx = x + UX0 + .5, wy = y + UY0 + .5;
-    if (Math.hypot(wx - U.stairs.door[0], wy - U.stairs.door[1]) < 2.5) continue;
+    if (Math.hypot(wx - U.stairs.door[0], wy - U.stairs.door[1]) < 2.5 || Math.hypot(wx - U.camp.door[0], wy - U.camp.door[1]) < 2.5) continue;
     let walls = 0, open = 0; for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) if (ut[I(x + dx, y + dy)] === T.UWALL) walls++;
     for (let dy = -1; dy <= 1; dy++) for (let dx = -1; dx <= 1; dx++) if (floor(x + dx, y + dy)) open++;
     const h = hash(x, y, 730);
@@ -2157,7 +2178,16 @@ function genUnder() {
     else if (z === 4 && open === 9 && h < .06) U.objs.push({ kind: 'vent', x: wx, y: wy });
     else if (open === 9 && h > .975) { ub[I(x, y)] = 1; U.objs.push({ kind: 'stalag', x: wx, y: wy, s: .7 + hash(x, y, 734) * .5 }); }
   }
-  U.objs.push({ kind: 'stairs', x: U.stairs.x, y: U.stairs.y });
+  U.objs.push({ kind: 'stairs', x: U.stairs.x, y: U.stairs.y }, { kind: 'camp', x: U.camp.x, y: U.camp.y });
+  // 龍穴：熔岩河靠岸、走得到的地方，離熔岩河區中心最近的一格
+  const seen = new Uint8Array(N * N), q = [[sx, sy + 1]]; seen[I(sx, sy + 1)] = 1;
+  while (q.length) { const [x, y] = q.pop(); for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) { const nx = x + dx, ny = y + dy; if (inU(nx, ny) && !seen[I(nx, ny)] && floor(nx, ny) && !ub[I(nx, ny)]) { seen[I(nx, ny)] = 1; q.push([nx, ny]); } } }
+  let best = null, bd = 1e9;
+  for (let y = 1; y < US - 1; y++) for (let x = 1; x < US - 1; x++) if (ut[I(x, y)] === T.ULAVA && [[1, 0], [-1, 0], [0, 1], [0, -1]].some(([dx, dy]) => seen[I(x + dx, y + dy)])) { const d = Math.hypot(x - 47, y - 50); if (d < bd) { bd = d; best = [x, y]; } }
+  U.lair = { x: best[0] + UX0 + .5, y: best[1] + UY0 + .5 }; U.objs.push({ kind: 'lair', x: U.lair.x, y: U.lair.y });
+  // 地底湖裡游來游去的藍色光點（魚群）
+  const lakeT = []; for (let y = 0; y < US; y++) for (let x = 0; x < US; x++) if (ut[I(x, y)] === T.ULAKE) lakeT.push([x + UX0 + .5, y + UY0 + .5]);
+  U.lakeT = lakeT; U.motes = []; for (let i = 0; i < 9; i++) { const [x, y] = lakeT[Math.floor(hash(i, 1, 780) * lakeT.length)]; U.motes.push({ x, y, tx: x, ty: y, c: i % 3 ? '#6ae0ff' : '#8affd0' }); }
   for (let y = 0; y < US; y++) for (let x = 0; x < US; x++) if (ut[I(x, y)] === T.ULAVA) U.lava.push([x + UX0 + .5, y + UY0 + .5]);
   U.tile = ut; U.block = ub; U.landOf = ul;
   // 地底小地圖
@@ -2203,8 +2233,11 @@ function setWorld(w) {
   if (w === world) return;
   if (w === 'under') { genUnder(); OVERW.tile = tile.slice(); OVERW.block = block.slice(); OVERW.landOf = landOf.slice(); tile.set(U.tile); block.set(U.block); landOf.set(U.landOf); }
   else { tile.set(OVERW.tile); block.set(OVERW.block); landOf.set(OVERW.landOf); }
+  const B = state.boat, pick = () => ({ x: B.x, y: B.y, ang: B.ang || 0 });
+  if (w === 'under') { OVERW.boat = pick(); const r = prog.raft && prog.uraft; Object.assign(B, r ? { x: r.x, y: r.y, ang: 0 } : { x: -50, y: -50, ang: 0 }); }   // 地底的「船」是木筏
+  else { if (prog.raft && B.x > 0) prog.uraft = { x: B.x, y: B.y }; Object.assign(B, OVERW.boat); }
   world = w; UNDER = w === 'under'; chunks.clear(); lastArea = '';
-  state.boat.vx = state.boat.vy = 0; drifts.length = 0;
+  state.boat.vx = state.boat.vy = 0; drifts.length = 0; applyGear();
 }
 const mineB = () => BUILDINGS.find(b => b.id === 'mine');
 function enterUnder(resume) {
@@ -2287,6 +2320,21 @@ function drawUObj(g, o, vx, vy, t) {
   if (o.kind === 'shroom') { px(-1, -4, 2, 4, '#c8d8e0'); px(-4, -7, 8, 3, o.c); px(-3, -8, 6, 1, o.c); px(-2, -7, 1, 1, '#ffffff'); px(3, -3, 1, 3, '#c8d8e0'); px(1, -5, 5, 2, o.c); return; }
   if (o.kind === 'vent') { px(-4, -2, 8, 3, '#2a1a18'); px(-2, -2, 4, 2, '#ff6a2a'); for (let i = 0; i < 3; i++) { const ph = (t * .6 + i / 3) % 1; g.fillStyle = `rgba(120,100,100,${.5 * (1 - ph)})`; g.fillRect(x - 2 + Math.sin(ph * 6 + i) * 3 | 0, y - 4 - ph * 18 | 0, 4, 3); } return; }
   if (o.kind === 'stalag') { const h = Math.round(16 * o.s); for (let k = 0; k < h; k++) { const w = Math.max(1, Math.round((h - k) / h * 5)); g.fillStyle = k % 4 === 0 ? '#3a3236' : '#4e464a'; g.fillRect(x - w, y - k, w * 2, 1); } px(-1, -h, 1, 2, '#6a6266'); return; }
+  if (o.kind === 'camp') {   // 地底營地：帳篷、營火、小光
+    g.fillStyle = '#2a1e14'; g.beginPath(); g.moveTo(x - 14, y + 1); g.lineTo(x - 2, y - 16); g.lineTo(x + 10, y + 1); g.closePath(); g.fill();
+    g.fillStyle = '#c86a3a'; g.beginPath(); g.moveTo(x - 12, y); g.lineTo(x - 2, y - 14); g.lineTo(x + 8, y); g.closePath(); g.fill();
+    g.fillStyle = '#e8945a'; g.beginPath(); g.moveTo(x - 2, y - 14); g.lineTo(x + 8, y); g.lineTo(x + 2, y); g.closePath(); g.fill(); px(-4, -6, 4, 6, '#2a1408');
+    const fx = x + 13, fy = y + 6; g.fillStyle = '#4a3a2a'; g.fillRect(fx - 4, fy, 9, 2);
+    for (let i = 0; i < 3; i++) { const f = Math.sin(t * 11 + i * 2) * 1.5; g.fillStyle = i === 1 ? '#ffd040' : '#ff6a2a'; g.fillRect(fx - 2 + i * 2, fy - 5 - f | 0, 2, 5 + f | 0); }
+    if (!drawUObj.npc) drawUObj.npc = ART.previewFront({ hat: 'safari', hair: 'bangs_blonde', glasses: 'round', beard: 'none', top: 'vest_explorer', pants: 'cargo' });
+    g.drawImage(drawUObj.npc, x - 22, y - 13 - (Math.sin(t * 2.2) > .95 ? 1 : 0), 12, 19.5); return;
+  }
+  if (o.kind === 'lair') {   // 龍穴：冒泡的岩漿漩渦
+    if (!lairActive()) { px(-6, 4, 12, 2, 'rgba(40,10,6,.6)'); return; }
+    for (let i = 0; i < 3; i++) { const ph = (t * .8 + i / 3) % 1; g.strokeStyle = `rgba(255,${200 - i * 40},80,${.9 * (1 - ph)})`; g.lineWidth = 1; g.beginPath(); g.ellipse(x, y + 8, 4 + ph * 16, (4 + ph * 16) * .4, 0, 0, 7); g.stroke(); }
+    for (let i = 0; i < 4; i++) { const ph = (t * 1.3 + i * .27) % 1; g.fillStyle = '#ffe080'; g.fillRect(x - 6 + hash(i, Math.floor(t * 1.3 + i * .27), 781) * 12 | 0, y + 6 - ph * 8 | 0, 2, 2); }
+    g.fillStyle = 'rgba(20,6,10,.55)'; g.beginPath(); g.ellipse(x + Math.sin(t * .7) * 3, y + 9, 13, 4, -.3, 0, 7); g.fill(); return;
+  }
   if (o.kind === 'stairs') {   // 往上的石階＋從上面照下來的光
     for (let k = 0; k < 5; k++) { const [a, b] = [iso(o.x - .45 + k * .02, o.y - .45 + k * .2), iso(o.x + .45, o.y - .45 + k * .2)]; g.fillStyle = k % 2 ? '#7a7276' : '#8a8286'; g.beginPath(); g.moveTo(a.x - vx, a.y - vy - LH - k * 4); g.lineTo(b.x - vx, b.y - vy - LH - k * 4); g.lineTo(b.x - vx, b.y - vy - LH - k * 4 + 3); g.lineTo(a.x - vx, a.y - vy - LH - k * 4 + 3); g.closePath(); g.fill(); }
     g.fillStyle = 'rgba(255,240,190,.12)'; g.beginPath(); g.moveTo(x - 10, y - 60); g.lineTo(x + 10, y - 60); g.lineTo(x + 14, y + 2); g.lineTo(x - 14, y + 2); g.closePath(); g.fill();
@@ -2317,7 +2365,11 @@ function drawUnderDark(g, gf, lw, lh, vx, vy, pl, t) {
     else if (o.kind === 'shroom') at2(o.x, o.y, 13, .55, hexA(o.c, .3));
     else if (o.kind === 'vent') at2(o.x, o.y, 18, .7, 'rgba(255,110,40,.4)');
     else if (o.kind === 'stairs') at2(o.x, o.y, 46, .95, 'rgba(255,235,180,.25)');
+    else if (o.kind === 'camp') at2(o.x + .6, o.y + .6, 52 + Math.sin(t * 11) * 2, 1, 'rgba(255,150,60,.35)');
+    else if (o.kind === 'lair' && lairActive()) at2(o.x, o.y, 40 + Math.sin(t * 3) * 4, .9, 'rgba(255,90,30,.45)');
   }
+  for (const m of U.motes || []) if (Math.abs(m.x - pl.x) < 14 && Math.abs(m.y - pl.y) < 14) at2(m.x, m.y, 12, .55, hexA(m.c, .35));
+  if (prog.raft && state.boat.x > 0 && Math.abs(state.boat.x - pl.x) < 14 && Math.abs(state.boat.y - pl.y) < 14) at2(state.boat.x, state.boat.y - .3, 26, .9, 'rgba(255,190,110,.25)');   // 木筏上的燈
   for (const [x, y] of U.lava) if ((x * 3 + y) % 3 < 1 && Math.abs(x - pl.x) < 12 && Math.abs(y - pl.y) < 12) at2(x, y, 34 + Math.sin(t * 2 + x * .7 + y) * 3, .6, (x + y) % 2 < 1 ? 'rgba(255,120,40,.26)' : null);   // 只取三分之一的岩漿格發光，省效能
   dkg.globalAlpha = 1; dkg.globalCompositeOperation = 'source-over';
   ltg.globalCompositeOperation = 'source-over'; ltg.clearRect(0, 0, litCv.width, litCv.height); ltg.globalCompositeOperation = 'lighter';
@@ -2325,6 +2377,113 @@ function drawUnderDark(g, gf, lw, lh, vx, vy, pl, t) {
   g.drawImage(darkCv, -4, -4);
   gf.globalCompositeOperation = 'source-atop'; gf.drawImage(darkCv, -4, -4); gf.globalCompositeOperation = 'source-over';   // 擋在前面的物件也要變暗
   g.globalCompositeOperation = 'lighter'; g.drawImage(litCv, -4, -4); g.globalCompositeOperation = 'source-over';
+}
+// ════════ 🕳️ 地下世界（第 2～4 步）：木筏、營地、委託、龍穴、氣氛 ════════
+const UREG = new Set(['ucave', 'ulake', 'ucrystal', 'ulava']), BOSS_ONLY = new Set(['udragon']);
+const LAIR_REST = 20 * 60 * 1000;   // 龍穴：地底龍魚釣上來或跑掉後，休息 20 分鐘再冒泡
+const lairActive = () => Date.now() > (prog.udragonAt || 0);
+function lairRest(won) { prog.udragonAt = Date.now() + LAIR_REST; if (!won) setTimeout(() => toast('🐉 地底龍魚潛回熔岩深處……龍穴要 20 分鐘後才會再冒泡', 3200), 1400); }
+const CAMP_NAME = '小光';
+const LAMP_LV = [null, { name: '探險燈', r: 44 }, { name: '探險燈 Lv2（更亮）', r: 58, price: 1500 }, { name: '探險燈 Lv3（超亮）', r: 72, price: 4000 }];
+const CAMP_SHOP = [
+  { id: 'raft', icon: '🛶', name: '地底小木筏', price: 1500, desc: '划到地底湖、水晶池的中間。站在水邊按「叫木筏」。', has: () => prog.raft },
+  { id: 'lamp2', icon: '🏮', name: LAMP_LV[2].name, price: LAMP_LV[2].price, desc: '照亮的範圍變大，小地圖也記得更多。', has: () => (prog.lamp || 0) >= 2, need: () => (prog.lamp || 0) >= 1 },
+  { id: 'lamp3', icon: '🏮', name: LAMP_LV[3].name, price: LAMP_LV[3].price, desc: '整片洞穴都看得比較清楚。', has: () => (prog.lamp || 0) >= 3, need: () => (prog.lamp || 0) >= 2 },
+  { id: 'heat', icon: '🔥', name: '耐熱釣線', price: 2500, desc: '岩漿燒不斷的特殊釣線，熔岩河一定要有。', has: () => prog.heatLine },
+];
+// 地底委託獎勵：完成第 1／3／6 張送限定服飾
+const UQ_REWARDS = [[1, 'hat', 'helmet'], [3, 'top', 'miner_suit'], [6, 'glasses', 'crystal_glass']];
+function genUQuest() {
+  const pool = FISH.filter(f => f.regions.some(r => UREG.has(r)) && !BOSS_ONLY.has(f.id) && ['common', 'uncommon', 'rare', 'epic'].includes(f.rarity) && (prog.heatLine || !f.regions.includes('ulava')));
+  const def = pool[Math.floor(Math.random() * pool.length)], who = ['礦工阿土', '探險家小光', '地質學家', '岩田隊長', '洞穴畫家', '老礦工'][Math.floor(Math.random() * 6)];
+  const id = 'u' + Date.now().toString(36) + Math.floor(Math.random() * 1e4);
+  if (Math.random() < .55) return { id, who, type: 'fish', fid: def.id, reward: def.price * 4 + 100, rep: 1 };
+  return { id, who, type: 'big', fid: def.id, minW: +(def.weightKg[0] + (def.weightKg[1] - def.weightKg[0]) * .45).toFixed(2), reward: def.price * 6 + 200, rep: 2 };
+}
+let campTab = 'shop';
+function openCamp(tab) {
+  if (tab) campTab = tab;
+  const tabs = `<div class="slots" style="justify-content:center"><button data-ctab="shop" class="${campTab === 'shop' ? 'on' : ''}">🛒 補給</button><button data-ctab="quest" class="${campTab === 'quest' ? 'on' : ''}">📋 地底委託</button></div>`;
+  let body = '';
+  if (campTab === 'shop') {
+    body = CAMP_SHOP.map(it => { const has = it.has(), locked = it.need && !it.need(); return `<div class="row"><span>${it.icon} <b>${it.name}</b><br><small>${it.desc}</small></span>${has ? '<em>已擁有</em>' : `<button data-cbuy="${it.id}" ${locked ? 'disabled' : ''}>🪙${it.price}</button>`}</div>`; }).join('');
+  } else {
+    if (!prog.uquests) prog.uquests = [];
+    while (prog.uquests.length < 3) prog.uquests.push(genUQuest());
+    body = prog.uquests.map((q, i) => {
+      const def = FISH_BY_ID[q.fid], m = questMatch(q), text = q.type === 'big' ? `想要一條 ${fmtW(q.minW)} 以上的「${def.name}」` : `想要一條「${def.name}」`;
+      return `<div class="row" style="align-items:flex-start"><span><b>${q.who}</b>：「${text}」<br><small>出沒：${def.regions.map(r => REGION_NAME[r]).join('、')}・獎金 🪙${q.reward}</small></span>
+        <span style="display:flex;flex-direction:column;gap:4px;align-items:flex-end">${m !== null ? `<button data-uqdo="${i}">交付</button>` : '<em>還沒達成</em>'}<button data-uqskip="${i}" style="font-size:11px;padding:2px 6px;background:#f3e6c8">換一張</button></span></div>`;
+    }).join('');
+    const next = UQ_REWARDS.find(([n]) => (prog.uquestDone || 0) < n);
+    body = `<p><small>已完成 ${prog.uquestDone || 0} 張${next ? `・完成第 ${next[0]} 張送「${WR[next[1]][next[2]].name}」` : '・限定服飾全部拿到了！'}</small></p>` + body;
+  }
+  showPanel(`<h2>⛺ 地底營地</h2><p style="text-align:left;margin:4px 0"><b>${CAMP_NAME}</b>：「${campTab === 'shop' ? '在地底，燈和船就是命！需要什麼儘管說。' : '大家都在找地底的魚，幫個忙吧！'}」<br><small>你有 🪙${state.coins}・提燈 Lv.${prog.lamp || 0}</small></p>${tabs}<div class="list">${body}</div>`);
+  document.querySelectorAll('[data-ctab]').forEach(el => el.onclick = () => openCamp(el.dataset.ctab));
+  document.querySelectorAll('[data-cbuy]').forEach(el => el.onclick = () => {
+    const it = CAMP_SHOP.find(x => x.id === el.dataset.cbuy); if (state.coins < it.price) { toast('錢不夠，先回地面的魚市賣點魚吧'); buzz(120); return; }
+    state.coins -= it.price;
+    if (it.id === 'raft') { prog.raft = 1; toast('🛶 買了地底小木筏！站在水邊按「叫木筏」'); }
+    else if (it.id === 'heat') { prog.heatLine = 1; toast('🔥 換上耐熱釣線！熔岩河也能釣了'); }
+    else { prog.lamp = it.id === 'lamp2' ? 2 : 3; toast('🏮 提燈變亮了！'); }
+    SFX.pickup(); buzz(40); checkAch(); save(); updateHud(); openCamp();
+  });
+  document.querySelectorAll('[data-uqdo]').forEach(el => el.onclick = () => {
+    const i = +el.dataset.uqdo, q = prog.uquests[i], m = questMatch(q); if (m === null) return;
+    state.bag.splice(m, 1); state.coins += q.reward; prog.uquestDone = (prog.uquestDone || 0) + 1; prog.uquests[i] = genUQuest();
+    let msg = `✅ ${q.who}：「謝謝你！」獎金 🪙${q.reward}`;
+    for (const [n, slot, id] of UQ_REWARDS) if (prog.uquestDone === n && !prog.closet.includes(slot + ':' + id)) { prog.closet.push(slot + ':' + id); msg += `・獲得限定服飾「${WR[slot][id].name}」（回小屋換穿）`; }
+    toast(msg, 3600); SFX.pickup(); buzz(40); checkAch(); save(); updateHud(); openCamp();
+  });
+  document.querySelectorAll('[data-uqskip]').forEach(el => el.onclick = () => { prog.uquests[+el.dataset.uqskip] = genUQuest(); save(); openCamp(); });
+}
+// ── 木筏 ──
+function drawRaft(g, x, y, ang, t) {
+  const px = (a, b, w, h, c) => { g.fillStyle = c; g.fillRect(x + a, y + b, w, h); };
+  px(-11, 3, 22, 1, 'rgba(160,220,255,.35)');
+  for (let i = 0; i < 4; i++) { px(-10, -5 + i * 2.5 | 0, 20, 3, '#2a1e14'); px(-9, -4 + i * 2.5 | 0, 18, 1, i % 2 ? '#8a5a30' : '#a8784a'); }
+  px(-7, -5, 1, 10, '#5a3a1e'); px(6, -5, 1, 10, '#5a3a1e');
+  px(7, -14, 1, 10, '#3a2a18'); px(5, -16, 5, 3, '#2a1e14'); px(6, -15, 3, 2, Math.sin(t * 9) > -.5 ? '#ffd56a' : '#ffb040');   // 木筏上的小提燈
+}
+// ── 地底的小動態：水滴、蝙蝠、湖裡的光點 ──
+const udrips = [], ubats = []; let udripT = 1, ubatT = 25;
+function uTick(dt) {
+  const p = state.onBoat ? state.boat : state.player;
+  if ((udripT -= dt) <= 0) { udripT = rand(.5, 1.4); const a = Math.random() * 6.28, r = rand(.5, 4); udrips.push({ x: p.x + Math.cos(a) * r, y: p.y + Math.sin(a) * r, h: 46, v: 0, ring: 0 }); }
+  for (let i = udrips.length - 1; i >= 0; i--) { const d = udrips[i]; if (d.h > 0) { d.v += 140 * dt; d.h -= d.v * dt; if (d.h <= 0) { d.h = 0; d.ring = .01; if (state.snd && Math.random() < .35 && Math.hypot(d.x - p.x, d.y - p.y) < 3) tone(1300 + Math.random() * 500, 700, .12, .04); } } else if ((d.ring += dt * 1.6) > 1) udrips.splice(i, 1); }
+  if ((ubatT -= dt) <= 0) { ubatT = rand(18, 40); const dir = Math.random() < .5 ? 1 : -1; ubats.push({ x: p.x - dir * 7, y: p.y + rand(-3, 3), vx: dir * 4.5, vy: rand(-1, 1), t: 0 }); if (state.snd) { tone(3200, 2600, .05, .03); tone(3400, 2800, .05, .03, 'sine', .12); } }
+  for (let i = ubats.length - 1; i >= 0; i--) { const b = ubats[i]; b.t += dt; b.x += b.vx * dt; b.y += (b.vy + Math.sin(b.t * 6) * 1.5) * dt; if (b.t > 4) ubats.splice(i, 1); }
+  for (const m of U.motes || []) {
+    const dx = m.tx - m.x, dy = m.ty - m.y, d = Math.hypot(dx, dy);
+    if (d < .2) { const [x, y] = U.lakeT[Math.floor(Math.random() * U.lakeT.length)]; if (Math.hypot(x - m.x, y - m.y) < 6) { m.tx = x; m.ty = y; } else { m.tx = m.x + rand(-1, 1); m.ty = m.y + rand(-1, 1); if (at(Math.floor(m.tx), Math.floor(m.ty)) !== T.ULAKE) { m.tx = m.x; m.ty = m.y; } } }
+    else { m.x += dx / d * .8 * dt; m.y += dy / d * .8 * dt; }
+  }
+  // 四區都去過
+  const z = landOf[Math.floor(state.player.y) * N + Math.floor(state.player.x)];
+  if (z && !((prog.uzones || 0) & (1 << z))) { prog.uzones = (prog.uzones || 0) | (1 << z); checkAch(); if (z === 4 && lairActive()) setTimeout(() => toast('🐉 熔岩河深處的龍穴正在冒泡……（要耐熱釣線，往泡泡旁邊拋竿）', 4000), 1600); }
+}
+function drawUFx(g, vx, vy, t) {   // 畫在地面上、物件下面
+  for (const d of udrips) { const p = iso(d.x, d.y), x = Math.round(p.x - vx), y = Math.round(p.y - vy - LH);
+    if (d.h > 0) { g.fillStyle = 'rgba(170,220,255,.85)'; g.fillRect(x, y - d.h | 0, 1, 2); }
+    else { g.strokeStyle = `rgba(170,220,255,${.7 * (1 - d.ring)})`; g.lineWidth = 1; g.beginPath(); g.ellipse(x, y, 1 + d.ring * 6, (1 + d.ring * 6) * .4, 0, 0, 7); g.stroke(); } }
+  for (const m of U.motes || []) { const p = iso(m.x, m.y); g.fillStyle = m.c; g.fillRect(Math.round(p.x - vx) - 1, Math.round(p.y - vy) + 6, 3, 1); g.fillRect(Math.round(p.x - vx), Math.round(p.y - vy) + 5, 1, 3); }
+}
+function drawUBats(g, vx, vy) {   // 蝙蝠飛在最上面
+  for (const b of ubats) { const p = iso(b.x, b.y), x = Math.round(p.x - vx), y = Math.round(p.y - vy) - 34, up = Math.sin(b.t * 28) > 0;
+    g.fillStyle = '#0e0a10'; g.fillRect(x - 1, y, 3, 2); g.fillRect(x - 4, y - (up ? 2 : -1), 3, 1); g.fillRect(x + 2, y - (up ? 2 : -1), 3, 1); g.fillStyle = '#ff5a5a'; g.fillRect(x, y, 1, 1); }
+}
+// 釣魚畫面（第三人稱）的洞穴天花板
+function drawCaveSky(g, lw, hz, t, reg) {
+  const gr = g.createLinearGradient(0, 0, 0, hz); gr.addColorStop(0, '#050408'); gr.addColorStop(1, reg === 'ulava' ? '#3a1408' : reg === 'ucrystal' ? '#1a1030' : '#0a1420'); g.fillStyle = gr; g.fillRect(0, 0, lw, hz);
+  g.fillStyle = '#16121a'; for (let i = 0; i < 16; i++) { const x = hash(i, 90) * lw | 0, h = 6 + hash(i, 91) * hz * .45 | 0, w = 3 + hash(i, 92) * 5 | 0; for (let k = 0; k < h; k++) g.fillRect(x - Math.max(1, Math.round(w * (1 - k / h))), k, Math.max(1, Math.round(w * (1 - k / h))) * 2, 1); }   // 鐘乳石
+  g.fillStyle = '#1e1a22'; for (let x = 0; x < lw; x += 2) { const h = 6 + Math.sin(x * .07) * 4 + Math.sin(x * .19 + 1) * 3; g.fillRect(x, hz - h | 0, 2, h + 1 | 0); }   // 遠方的岩壁
+  if (reg === 'ucrystal') for (let i = 0; i < 10; i++) { const x = hash(i, 93) * lw | 0, y = hz - 4 - hash(i, 94) * 10 | 0, c = ['#b07aff', '#6ae0ff', '#ff8ad8'][i % 3]; g.fillStyle = c; g.fillRect(x, y - 5, 2, 5); g.fillStyle = 'rgba(255,255,255,.7)'; if (Math.sin(t * 3 + i) > .6) g.fillRect(x, y - 5, 1, 1); }
+  if (reg === 'ulava') { g.fillStyle = `rgba(255,110,40,${.25 + Math.sin(t * 2) * .08})`; g.fillRect(0, hz - 10, lw, 10); }
+  for (let i = 0; i < 4; i++) { const ph = (t * .7 + i * .29) % 1, x = hash(i, Math.floor(t * .7 + i * .29), 95) * lw | 0; g.fillStyle = 'rgba(160,210,255,.7)'; g.fillRect(x, ph * hz | 0, 1, 2); }   // 水滴
+}
+function drawCaveVignette(g, lw, lh) {   // 地底釣魚畫面四周暗下來，只有提燈照的中間亮
+  const r = Math.max(lw, lh), gr = g.createRadialGradient(lw * .48, lh * .6, r * .1, lw * .48, lh * .6, r * .55);
+  gr.addColorStop(0, 'rgba(0,0,6,0)'); gr.addColorStop(.6, 'rgba(0,0,6,.45)'); gr.addColorStop(1, 'rgba(0,0,6,.9)'); g.fillStyle = gr; g.fillRect(0, 0, lw, lh);
 }
 const hexA = (hex, a) => { const n = parseInt(hex.slice(1), 16); return `rgba(${n >> 16},${n >> 8 & 255},${n & 255},${a})`; };
 // ── 讀取畫面：提燈下樓梯（回地面就倒過來往上爬）──
@@ -2425,9 +2584,9 @@ function update(dt) {
     if (state.onBoat) { p.x = b.x; p.y = b.y; }
   }
   // 大浪會把船推來推去
-  if (state.onBoat && wx.wave > .3) { const tt = performance.now() / 1000; b.vx += Math.sin(tt * .37) * wx.wave * .9 * dt; b.vy += Math.cos(tt * .29) * wx.wave * .9 * dt; }
+  if (state.onBoat && !UNDER && wx.wave > .3) { const tt = performance.now() / 1000; b.vx += Math.sin(tt * .37) * wx.wave * .9 * dt; b.vy += Math.cos(tt * .29) * wx.wave * .9 * dt; }
   updateWeather(dt);
-  if (UNDER) uFogTick(dt);
+  if (UNDER) { uFogTick(dt); uTick(dt); }
   else {
   updateDrift(dt);
   fogTick(dt); updateBoss(dt);
@@ -2484,7 +2643,7 @@ function drawIso(g, gf, t) {
   // 依深度排序的物件
   const objs = [];
   const near = o => Math.abs(o.x - pl.x) < R && Math.abs(o.y - pl.y) < R;
-  if (UNDER) for (const o of U.objs) { if (near(o)) objs.push({ k: o.x + o.y, f: G => drawUObj(G, o, vx, vy, t) }); }
+  if (UNDER) { drawUFx(g, vx, vy, t); for (const o of U.objs) { if (near(o)) objs.push({ k: o.x + o.y, f: G => drawUObj(G, o, vx, vy, t) }); } if (!state.onBoat && prog.raft) objs.push({ k: state.boat.x + state.boat.y, f: G => drawBoat(G, vx, vy, t) }); }
   else {
   for (const tr of trees) if (near(tr)) objs.push({ k: tr.x + tr.y, f: G => drawTree(G, tr, vx, vy, t) });
   for (const r of rocks) if (near(r)) objs.push({ k: r.x + r.y, f: G => drawRock(G, r, vx, vy) });
@@ -2505,7 +2664,7 @@ function drawIso(g, gf, t) {
   else { const p = iso(state.player.x, state.player.y); drawPerson(pgx, PC_X, PC_Y, t); cam.px = p.x - PC_X - vx; cam.py = p.y - LH - PC_Y - vy; }
   gf.imageSmoothingEnabled = false; gf.clearRect(0, 0, lw, lh);
   objs.sort((a, b) => a.k - b.k).forEach(o => o.f(o.k > focusK ? gf : g));
-  if (UNDER) drawUnderDark(g, gf, lw, lh, vx, vy, pl, t);   // 地底：在小畫布上蓋黑暗、挖出燈光
+  if (UNDER) { drawUBats(gf, vx, vy); drawUnderDark(g, gf, lw, lh, vx, vy, pl, t); }   // 地底：在小畫布上蓋黑暗、挖出燈光
 }
 // 時段色調與夜晚燈光：畫在最上面，主角也會被染色
 function drawIsoFx(g) {
@@ -2581,7 +2740,8 @@ function drawLighthouse(g, vx, vy, t) {
   g.fillStyle = '#d0403a'; g.fillRect(cx - 4, cy - 46, 8, 2); g.fillRect(cx - 2, cy - 48, 4, 2);
 }
 function drawBoat(g, vx, vy, t) {
-  const b = state.boat, p = iso(b.x, b.y), x = Math.round(p.x - vx), y = Math.round(p.y - vy + Math.sin(t * 2.4) * (1 + wx.wave * 2.5));
+  const b = state.boat, p = iso(b.x, b.y), x = Math.round(p.x - vx), y = Math.round(p.y - vy + Math.sin(t * 2.4) * (UNDER ? .6 : 1 + wx.wave * 2.5));
+  if (UNDER) { drawRaft(g, x, y, b.ang || 0, t); if (state.onBoat) drawPerson(g, x - 1, y - 3, t, true); return; }
   if (window.ART) { ART.drawBoat(g, x, y, b.ang, prog.boatLv || 0, t, state.onBoat && Math.hypot(b.vx, b.vy) > .5); if (state.onBoat) drawPerson(g, x - 1, y - 2, t, true); return; }
   const ca = Math.cos(b.ang), sa = Math.sin(b.ang);
   const R = (u, v) => [x + u * ca - v * sa * .6, y + u * sa * .5 + v * ca * .6];
@@ -2625,6 +2785,7 @@ function drawThird(g, t) {
   if (phase !== 'night') { g.fillStyle = 'rgba(255,255,255,.75)'; for (let i = 0; i < 4; i++) { const cx = ((hash(i, 7) * lw + t * 3 * (1 + i * .3)) % (lw + 40)) - 20, cy = hash(i, 8) * hz * .6 + 6; g.fillRect(cx | 0, cy | 0, 22, 4); g.fillRect((cx | 0) + 4, (cy | 0) - 3, 12, 4); } }
   if (skyDark > .02) { g.fillStyle = `rgba(80,88,104,${Math.min(.85, skyDark * 1.5)})`; g.fillRect(0, 0, lw, hz);
     g.fillStyle = `rgba(60,66,80,${Math.min(.8, skyDark * 1.3)})`; for (let i = 0; i < 7; i++) { const cx = ((hash(i, 17) * lw + t * (4 + wx.wind * 18) * (1 + i * .2)) % (lw + 60)) - 30, cy = hash(i, 18) * hz * .7; g.fillRect(cx | 0, cy | 0, 40, 8); g.fillRect((cx | 0) + 6, (cy | 0) - 5, 26, 6); } }
+  if (UNDER) drawCaveSky(g, lw, hz, t, reg);   // 地底：洞穴天花板取代天空
   // 遠景：依區域
   const far = { harbor: '#5a7a6a', deep: null, reef: '#e8d49a', lake: '#3a6a3a', river: '#5a6a5a', cold: '#e8f2fa', mangrove: '#2f5a3a', volcano: '#3a2e30', wreck: null, cave: '#2e2a30', lagoon: '#e8d49a', frozen: '#f0f8ff', bigriver: null, upriver: null }[reg];
   if (far) { g.fillStyle = phase === 'night' ? shade(far, -.6) : far; for (let x = 0; x < lw; x += 2) { const h = (Math.sin(x * .03 + 1) * .5 + Math.sin(x * .011) * .8 + 1.4) * (reg === 'lake' || reg === 'river' ? 9 : 5); g.fillRect(x, hz - h | 0, 2, h + 1 | 0); } }
@@ -2652,10 +2813,10 @@ function drawThird(g, t) {
   if (reg === 'frozen') { g.fillStyle = phase === 'night' ? '#8a9aaa' : '#ffffff'; for (let i = 0; i < 7; i++) { const x = hash(i, 33) * lw | 0, w = 14 + hash(i, 34) * 30 | 0, h = 14 + hash(i, 35) * 22 | 0; g.fillRect(x, hz - h, w, h); g.fillStyle = phase === 'night' ? '#6a7a8a' : '#d8eefa'; g.fillRect(x + w - 4, hz - h, 4, h); g.fillStyle = phase === 'night' ? '#8a9aaa' : '#ffffff'; } }
   if (reg === 'lake' || reg === 'river') { g.fillStyle = phase === 'night' ? '#1a2a1a' : '#2f6a2f'; for (let i = 0; i < 9; i++) { const x = hash(i, 20) * lw | 0; g.fillRect(x, hz - 16, 6, 10); g.fillRect(x + 2, hz - 20, 2, 6); } }
   // 水面
-  const wc = { harbor: '#3f8fd0', deep: '#1e3f7a', reef: '#3fc3c0', lake: '#3a9a7a', river: '#4fb0b8', cold: '#4a7aa8', mangrove: '#4a7a5a', volcano: '#4a3a56', wreck: '#1e3a5a', cave: '#2a4a5a', lagoon: '#3ad0c8', frozen: '#6a9ac8', bigriver: '#4a98a8', upriver: '#5ab4c4' }[reg];
-  const top = phase === 'day' ? shade(wc, .25) : shade(ph.sea, .1);
-  gr = g.createLinearGradient(0, hz, 0, lh); gr.addColorStop(0, top); gr.addColorStop(1, phase === 'night' ? shade(wc, -.65) : shade(wc, -.2)); g.fillStyle = gr; g.fillRect(0, hz, lw, lh - hz);
-  if (phase !== 'day') { g.fillStyle = phase === 'night' ? 'rgba(255,240,200,.25)' : 'rgba(255,200,120,.35)'; for (let k = 0; k < 10; k++) { const yy = hz + 2 + k * k * 1.2; g.fillRect(lw * .78 - 6 + Math.sin(t * 2 + k) * 3 | 0, yy | 0, 12 + k, 1); } }
+  const wc = { harbor: '#3f8fd0', deep: '#1e3f7a', reef: '#3fc3c0', lake: '#3a9a7a', river: '#4fb0b8', cold: '#4a7aa8', mangrove: '#4a7a5a', volcano: '#4a3a56', wreck: '#1e3a5a', cave: '#2a4a5a', lagoon: '#3ad0c8', frozen: '#6a9ac8', bigriver: '#4a98a8', upriver: '#5ab4c4' , ucave: '#1e4a5e', ulake: '#163a60', ucrystal: '#4a2a7a', ulava: '#e0561e'}[reg];
+  const top = UNDER ? shade(wc, -.05) : phase === 'day' ? shade(wc, .25) : shade(ph.sea, .1);
+  gr = g.createLinearGradient(0, hz, 0, lh); gr.addColorStop(0, top); gr.addColorStop(1, phase === 'night' || UNDER ? shade(wc, -.65) : shade(wc, -.2)); g.fillStyle = gr; g.fillRect(0, hz, lw, lh - hz);
+  if (phase !== 'day' && !UNDER) { g.fillStyle = phase === 'night' ? 'rgba(255,240,200,.25)' : 'rgba(255,200,120,.35)'; for (let k = 0; k < 10; k++) { const yy = hz + 2 + k * k * 1.2; g.fillRect(lw * .78 - 6 + Math.sin(t * 2 + k) * 3 | 0, yy | 0, 12 + k, 1); } }
   if (reg === 'reef') for (let i = 0; i < 18; i++) { const y = hz + 20 + hash(i, 40) * (lh - hz - 20), x = hash(i, 41) * lw; g.fillStyle = ['rgba(255,138,138,.45)', 'rgba(255,176,112,.45)', 'rgba(224,112,192,.45)'][i % 3]; g.fillRect(x | 0, y | 0, 4 + (y - hz) * .05 | 0, 2); }
   // 透視波紋線
   g.fillStyle = 'rgba(255,255,255,.35)';
@@ -2708,12 +2869,12 @@ function drawThird(g, t) {
   }
   // 前景：船頭或岸邊
   if (state.onBoat) { g.fillStyle = '#6a3e1e'; g.beginPath(); g.moveTo(0, lh); g.lineTo(lw * .1, lh * .82); g.lineTo(lw * .55, lh * .8); g.lineTo(lw * .7, lh); g.fill(); g.fillStyle = '#b07a46'; g.beginPath(); g.moveTo(0, lh); g.lineTo(lw * .12, lh * .86); g.lineTo(lw * .52, lh * .84); g.lineTo(lw * .64, lh); g.fill(); }
-  else { const col = fish.region === 'lake' || fish.region === 'river' ? '#5a9a3a' : '#c8a870'; g.fillStyle = col; g.fillRect(0, lh * .9 | 0, lw * .5 | 0, lh); g.fillStyle = shade(col, -.25); g.fillRect(0, lh * .9 | 0, lw * .5 | 0, 2); }
+  else { const col = UNDER ? (fish.region === 'ulava' ? '#3a2420' : '#3a3438') : fish.region === 'lake' || fish.region === 'river' ? '#5a9a3a' : '#c8a870'; g.fillStyle = col; g.fillRect(0, lh * .9 | 0, lw * .5 | 0, lh); g.fillStyle = shade(col, -.25); g.fillRect(0, lh * .9 | 0, lw * .5 | 0, 2); }   // 地底的岸邊是岩石
   // 釣到魚：正面把魚捧高
   if (showOff && window.ART && ART.drawTrophy) {
     const st = Math.max(3, Math.round(lh / 105));
     ART.drawTrophy(g, Math.round(lw / 2), Math.round(lh * 1.02), st, trophyFish, t, fish.state === 'result' ? 1 : fish.t / .45, RAR[fish.catch.def.rarity].color);
-    if (phase === 'night') { g.fillStyle = 'rgba(10,16,50,.25)'; g.fillRect(0, 0, lw, lh); }
+    if (UNDER) drawCaveVignette(g, lw, lh); else if (phase === 'night') { g.fillStyle = 'rgba(10,16,50,.25)'; g.fillRect(0, 0, lw, lh); }
     return;
   }
   // 主角背影（第三人稱）
@@ -2738,7 +2899,7 @@ function drawThird(g, t) {
   g.strokeStyle = 'rgba(255,255,255,.75)'; g.lineWidth = 1; g.beginPath(); g.moveTo(tipX, tipY);
   const sag = fish.state === 'reel' ? 4 * (1 - fish.tension / 100) : 14; g.quadraticCurveTo((tipX + fx) / 2, Math.max(tipY, fy) + sag, fx, fy - 6); g.stroke();
   // 時段色調
-  if (phase === 'night') { g.fillStyle = 'rgba(10,16,50,.25)'; g.fillRect(0, 0, lw, lh); }
+  if (UNDER) drawCaveVignette(g, lw, lh); else if (phase === 'night') { g.fillStyle = 'rgba(10,16,50,.25)'; g.fillRect(0, 0, lw, lh); }
 }
 const lerp = (a, b, k) => a + (b - a) * k;
 
@@ -2791,7 +2952,7 @@ function frame(now) {
   // 暈船：整個畫面跟著搖晃（釣魚視角晃得更明顯），再蓋一層淡綠色
   const sk = sickAmount(), cw = cv.width, ch = cv.height;
   const amp = sk * (.45 + .55 * viewMix);
-  const roll = state.onBoat ? wx.wave * .7 : 0;   // 在船上時畫面跟著浪輕輕搖
+  const roll = state.onBoat && !UNDER ? wx.wave * .7 : 0;   // 在船上時畫面跟著浪輕輕搖
   const sway = sk > 0 || roll > .02 ? { ang: Math.sin(t * 1.3) * .05 * amp + Math.sin(t * 1.1) * .02 * roll, dx: Math.sin(t * .7) * cw * .015 * amp, dy: Math.sin(t * .9 + 1) * ch * .02 * amp + Math.sin(t * 1.5) * ch * .008 * roll, z: 1 + .18 * amp + .06 * roll } : null;
   const base = () => { ctx.setTransform(1, 0, 0, 1, 0, 0); if (sway) { ctx.translate(cw / 2 + sway.dx, ch / 2 + sway.dy); ctx.rotate(sway.ang); ctx.scale(sway.z, sway.z); ctx.translate(-cw / 2, -ch / 2); } };
   if (sway) { ctx.fillStyle = '#1b2a44'; ctx.fillRect(0, 0, cw, ch); }
@@ -2832,7 +2993,7 @@ document.addEventListener('visibilitychange', () => { if (!document.hidden) chec
 load(); initFog(); uFogInit(); applyGear(); applyLook(); updateHud(); drawMini(); setInterval(save, 10000); addEventListener('pagehide', save);
 if (resumeUnder) enterUnder(resumeUnder); else toast('歡迎來到漁港鎮！走到碼頭盡頭「上船」出海，或在水邊直接「拋竿」', 3200);
 if (params.get('demo') === 'boat') { state.onBoat = true; }
-window.__game = { state, fish, FISH, docks, BUILDINGS, prog, ACH, save, applyGear, openBuilding, checkAch, openDex, startCast, hook }; window.__walk = walkable; window.__pick = pickFish; window.__drifts = drifts; window.__regionAt = regionAt; window.__boatable = boatable; window.__islands = ISLANDS; window.__openFishDetail = openFishDetail; window.__aq = () => aq; window.__drawAq = drawAquarium; window.__tile = at; window.__adv = { SPOTS, fogPct, revealAt, isRevealed, discover, giveMap, digTreasure, openQuests, genQuest, get boss() { return boss; }, set boss(v) { boss = v; }, set bossCD(v) { bossCD = v; }, GEAR, drawTreasureMap }; window.__contextB = contextB; window.__uzone = (x, y) => (UNDER ? landOf : (U.landOf || landOf))[y * N + x]; window.__uzc = UZC.map(c => c); window.__ustairs = () => U.stairs; window.__world = () => world; window.__checkUpdate = checkUpdate; window.__actx = () => actx; window.__contest = { nextContestKey, contestAt, runContest, openGuild, contestTable, startCeremony, get cut() { return cut; } };   // 給測試用
+window.__game = { state, fish, FISH, docks, BUILDINGS, prog, ACH, save, applyGear, openBuilding, checkAch, openDex, startCast, hook }; window.__walk = walkable; window.__pick = pickFish; window.__drifts = drifts; window.__regionAt = regionAt; window.__boatable = boatable; window.__islands = ISLANDS; window.__openFishDetail = openFishDetail; window.__aq = () => aq; window.__drawAq = drawAquarium; window.__tile = at; window.__adv = { SPOTS, fogPct, revealAt, isRevealed, discover, giveMap, digTreasure, openQuests, genQuest, get boss() { return boss; }, set boss(v) { boss = v; }, set bossCD(v) { bossCD = v; }, GEAR, drawTreasureMap }; window.__contextB = contextB; window.__uzone = (x, y) => (UNDER ? landOf : (U.landOf || landOf))[y * N + x]; window.__uzc = UZC.map(c => c); window.__ustairs = () => U.stairs; window.__ucamp = () => U.camp; window.__ulair = () => U.lair; window.__lairActive = lairActive; window.__openCamp = openCamp; window.__world = () => world; window.__checkUpdate = checkUpdate; window.__actx = () => actx; window.__contest = { nextContestKey, contestAt, runContest, openGuild, contestTable, startCeremony, get cut() { return cut; } };   // 給測試用
 requestAnimationFrame(frame);
 </script>
 </body>
