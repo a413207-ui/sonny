@@ -202,13 +202,13 @@
 <div class="overlay" id="fishDetail"><div class="card" id="fishDetailCard"></div></div>
 <div class="overlay" id="badgePop"><div class="card" id="badgeCard"></div></div>
 
-<script src="data/fish.js?v=2026.10.29-73"></script>
-<script src="art.js?v=2026.10.29-73"></script>
-<script src="music.js?v=2026.10.29-73"></script>
+<script src="data/fish.js?v=2026.10.29-74"></script>
+<script src="art.js?v=2026.10.29-74"></script>
+<script src="music.js?v=2026.10.29-74"></script>
 <script>
 'use strict';
 // 版本號：每次更新都要改（也要改上面三個 script 的 ?v=），遊戲會用它檢查網站上有沒有新版
-const BUILD = '2026.10.29-73';
+const BUILD = '2026.10.29-74';
 // ════════════════ 基本設定 ════════════════
 const FISH = window.FISH_DATA || [];
 const N = 160, TW = 32, TH = 16, LH = 4;         // 地圖格數、等角格寬高、陸地高度
@@ -887,7 +887,7 @@ function startCast() {
   const w = waterAhead(o.x, o.y, state.player.fx, state.player.fy);
   if (!w) return toast('前面沒有水，換個方向試試');
   state.player.fx = w.fx; state.player.fy = w.fy;
-  Object.assign(fish, { state: 'cast', t: 0, region: regionAt(w.x, w.y), fx: w.x, fy: w.y, nibbles: [], d: 100, dMax: 100, tension: 0, struggle: false, swap: 0, boss: false, dash: 0, warn: 0 });
+  Object.assign(fish, { state: 'cast', t: 0, region: regionAt(w.x, w.y), fx: w.x, fy: w.y, nibbles: [], d: 100, dMax: 100, tension: 0, struggle: false, swap: 0, boss: false, dash: 0, warn: 0, rod: 0, lure: 0, moved: 0, lured: 0, side: 1, fishX: 0, push: 0 });
   const wait = rand(2.2, 6.5) / (1 + state.rod.luck * .2) * (WEATHER[weather].bite || 1);
   fish.biteAt = .7 + wait;
   if (boss && Math.hypot(w.x - boss.x, w.y - boss.y) < 2.8) { fish.boss = true; fish.biteAt = .7 + rand(1.5, 3); toast('🎣 拋到巨大魚影旁邊了…屏住呼吸！', 2500); return; }
@@ -949,7 +949,15 @@ const fmtW = w => w < 1 ? Math.round(w * 1000) + ' g' : w.toFixed(2) + ' kg';
 function updateFishing(dt) {
   if (!fish.state) return;
   fish.t += dt;
+  // 🎣 搖桿擺竿：竿尖跟著搖桿，浮標慢慢被拖過去
+  const prevRod = fish.rod || 0; fish.rod = prevRod + ((fish.stick || 0) - prevRod) * Math.min(1, dt * 8);
+  if (fish.state === 'cast' || fish.state === 'wait' || fish.state === 'bite') fish.lure = clamp((fish.lure || 0) + (fish.rod - (fish.lure || 0)) * Math.min(1, dt * 1.6), -1, 1);
   if (fish.state === 'cast' && fish.t > .7) fish.state = 'wait';
+  // 等魚時輕輕擺竿逗魚：每擺一段，魚就早一點咬（最多提早 1.6 秒）
+  if (fish.state === 'wait') {
+    fish.moved += Math.abs(fish.rod - prevRod);
+    if (fish.moved > .8 && fish.lured < 1.6 && fish.biteAt - fish.t > .8) { fish.moved = 0; fish.lured += .4; fish.biteAt -= .4; fish.nib = .25; if (fish.lured === .4) toast('浮標晃呀晃…好像有魚被吸引過來了'); }
+  }
   if (fish.state === 'wait') {
     for (let i = 0; i < fish.nibbles.length; i++) if (fish.t > fish.nibbles[i]) { fish.nibbles.splice(i, 1); fish.nib = .35; buzz(15); SFX.nibble(); }
     if (fish.nib > 0) fish.nib -= dt;
@@ -958,9 +966,14 @@ function updateFishing(dt) {
     fish.biteT += dt; if (fish.biteT > .9 + state.rod.power * .1 - (state.sickOn ? .2 : 0)) fail('沒拉到…魚跑掉了');
   } else if (fish.state === 'reel') {
     fish.swap -= dt;
-    if (fish.swap <= 0) { const sp = fish.swapPow || fish.power; fish.struggle = !fish.struggle; fish.swap = fish.struggle ? rand(.5, 1.3) * sp : rand(.6, 1.6) / sp; if (fish.struggle) buzz(35); }
+    if (fish.swap <= 0) { const sp = fish.swapPow || fish.power; fish.struggle = !fish.struggle; fish.swap = fish.struggle ? rand(.5, 1.3) * sp : rand(.6, 1.6) / sp; if (fish.struggle) { buzz(35); if (Math.random() < .6) fish.side = -fish.side; } }
+    // 魚往左右衝，往「反方向」壓竿：張力漲得慢、收線快；跟著魚同方向反而更吃力
+    fish.fishX += ((fish.side || 1) * (fish.struggle ? .9 : .35) - fish.fishX) * Math.min(1, dt * 2.5);
+    fish.push = -(fish.side || 1) * fish.rod;   // >0 壓對方向
+    const pk = fish.push > 0 ? 1 - .35 * fish.push : 1 + .3 * -fish.push, rk = fish.push > 0 ? 1 + .2 * fish.push : 1;
+    if (!prog.rodTip && fish.t > .8) { prog.rodTip = 1; toast('🕹️ 小技巧：魚往哪邊衝，搖桿就往反方向壓竿！', 3200); }
     const rp = state.rod.power;
-    if (holding) { fish.d -= (fish.struggle ? 6 : 19) * rp * dt; fish.tension += (fish.struggle ? 62 * fish.power : 16 * fish.power) * dt / rp * (1 + wx.wave * .15); }
+    if (holding) { fish.d -= (fish.struggle ? 6 : 19) * rp * rk * dt; fish.tension += (fish.struggle ? 62 * fish.power : 16 * fish.power) * pk * dt / rp * (1 + wx.wave * .15); }
     else { fish.tension -= 45 * dt; fish.d += (fish.struggle ? 9 : 3) * fish.power * dt; }
     if (fish.boss) {   // 巨物：每隔幾秒衝刺一次，衝刺時還按著收線，張力會暴衝
       if (fish.dash > 0) { fish.dash -= dt; fish.d += 14 * dt; if (holding) fish.tension += 95 * dt; }
@@ -1073,7 +1086,7 @@ function showNextBadge() {
   document.getElementById('badgeBook').onclick = () => { badgeQueue.length = 0; pop.classList.remove('show'); openDex('ach'); };
 }
 const SAVE_KEY = 'bay-fishing-save-v1';
-const prog = { dex: {}, ach: {}, catches: 0, region: {}, time: {}, rar: {}, maxW: 0, earned: 0, rodIdx: 0, boatLv: 0, bait: 0, pills: 0, look: null, closet: [], wxc: {}, drift: 0, contest: {}, contestN: 0, contestBest: 0, contestWins: 0, aquarium: [], found: {}, maps: [], dug: 0, boss: 0, quests: [], questDone: 0, rep: 0, gear: {}, explore: 0, fog: null, prints: [] };
+const prog = { dex: {}, ach: {}, catches: 0, region: {}, time: {}, rar: {}, maxW: 0, earned: 0, rodIdx: 0, boatLv: 0, bait: 0, pills: 0, look: null, closet: [], wxc: {}, drift: 0, contest: {}, contestN: 0, contestBest: 0, contestWins: 0, aquarium: [], found: {}, maps: [], dug: 0, boss: 0, quests: [], questDone: 0, rep: 0, gear: {}, explore: 0, fog: null, prints: [], rodTip: 0 };
 function save() {
   try { prog.fog = fogPack(); prog.fogN = N; localStorage.setItem(SAVE_KEY, JSON.stringify({ v: 1, mapV: 3, coins: state.coins, bag: state.bag, prog, pos: { x: state.player.x, y: state.player.y, bx: state.boat.x, by: state.boat.y, onBoat: state.onBoat } })); } catch (e) {}
 }
@@ -1991,6 +2004,7 @@ function update(dt) {
   if (keys['arrowleft'] || keys['a']) ix -= 1; if (keys['arrowright'] || keys['d']) ix += 1;
   if (keys['arrowup'] || keys['w']) iy -= 1; if (keys['arrowdown'] || keys['s']) iy += 1;
   const mag = Math.min(1, Math.hypot(ix, iy));
+  fish.stick = fish.state ? clamp(ix, -1, 1) : 0;   // 釣魚時搖桿左右＝擺動釣竿
   const locked = fish.state || document.querySelector('.overlay.show');
   const p = state.player, b = state.boat;
   if (!locked && mag > .15) {
@@ -2248,7 +2262,7 @@ function drawThird(g, t) {
   if (wx.wave > .05) { g.fillStyle = `rgba(255,255,255,${.25 + wx.wave * .3})`; for (let i = 0; i < 40 * wx.wave; i++) { const z = hash(i, 61), y = hz + (lh - hz) * z * z + Math.sin(t * 2 + i) * 2, x = ((hash(i, 62) * lw + t * (10 + 25 * z) * (1 + wx.wind)) % (lw + 30)) - 15; g.fillRect(x | 0, y | 0, 4 + z * 12 | 0, 1 + (z * 2 | 0)); } }
   // 浮標（越收線越靠近）
   const near = fish.state === 'reel' ? Math.max(0, 1 - fish.d / ((fish.dMax || 100) + 10)) : 0;
-  const fy0 = hz + (lh - hz) * (.28 + near * .45), fx0 = lw * (.56 - near * .1);
+  const fy0 = hz + (lh - hz) * (.28 + near * .45), fx0 = lw * (.56 - near * .1 + (fish.state === 'reel' ? (fish.fishX || 0) * .2 * (1 - near * .5) : (fish.lure || 0) * .2));
   if (fish.boss && ['cast', 'wait', 'bite'].includes(fish.state)) { g.fillStyle = 'rgba(8,14,32,.38)'; g.beginPath(); g.ellipse(fx0 + Math.sin(t * .8) * 8, fy0 + 7, 30, 6, 0, 0, 7); g.fill(); }
   let bob = Math.sin(t * 3) * 1.2 * (1 + wx.wave * 2.5), sink = 0;
   if (fish.state === 'cast') { const k = Math.min(1, fish.t / .7); bob = -Math.sin(k * Math.PI) * 30; }
@@ -2276,6 +2290,17 @@ function drawThird(g, t) {
     g.fillStyle = '#3a2a18'; g.fillRect(ex - 1, ey - 1, u * 2 + 2, u * 5 + 2); g.fillRect(ex - 1, ey + u * 6 - 1, u * 2 + 2, u * 2 + 2);
     g.fillStyle = '#ffd040'; g.fillRect(ex, ey, u * 2, u * 5); g.fillRect(ex, ey + u * 6, u * 2, u * 2);
   }
+  // 拉魚時：魚衝的方向（紅箭頭）＋該往哪壓竿（綠箭頭），壓對了有「✓」
+  if (fish.state === 'reel' && fish.struggle) {
+    const u = Math.max(2, Math.round(lh / 120)), ay = Math.round(fy0) - 10 - u * 4, sd = fish.side || 1;
+    const arrow = (x, dir, c) => { g.fillStyle = c; g.beginPath(); g.moveTo(x + dir * u * 4, ay); g.lineTo(x, ay - u * 2.5); g.lineTo(x, ay - u); g.lineTo(x - dir * u * 3, ay - u); g.lineTo(x - dir * u * 3, ay + u); g.lineTo(x, ay + u); g.lineTo(x, ay + u * 2.5); g.closePath(); g.fill(); };
+    const hx0 = clamp(fx, u * 22, lw - u * 22);   // 提示不要超出畫面
+    arrow(clamp(fx + sd * u * 7, u * 5, lw - u * 5), sd, 'rgba(255,90,70,.95)');
+    const ok = fish.push > .35;
+    g.font = `bold ${u * 5}px sans-serif`; g.textAlign = 'center'; g.lineWidth = 3; g.strokeStyle = '#2a1a10';
+    const msg = ok ? '✓ 壓得好！' : (sd > 0 ? '← 往左壓竿' : '往右壓竿 →');
+    g.strokeText(msg, hx0, ay - u * 4); g.fillStyle = ok ? '#8aff8a' : '#ffe08a'; g.fillText(msg, hx0, ay - u * 4); g.textAlign = 'left';
+  }
   // 前景：船頭或岸邊
   if (state.onBoat) { g.fillStyle = '#6a3e1e'; g.beginPath(); g.moveTo(0, lh); g.lineTo(lw * .1, lh * .82); g.lineTo(lw * .55, lh * .8); g.lineTo(lw * .7, lh); g.fill(); g.fillStyle = '#b07a46'; g.beginPath(); g.moveTo(0, lh); g.lineTo(lw * .12, lh * .86); g.lineTo(lw * .52, lh * .84); g.lineTo(lw * .64, lh); g.fill(); }
   else { const col = fish.region === 'lake' || fish.region === 'river' ? '#5a9a3a' : '#c8a870'; g.fillStyle = col; g.fillRect(0, lh * .9 | 0, lw * .5 | 0, lh); g.fillStyle = shade(col, -.25); g.fillRect(0, lh * .9 | 0, lw * .5 | 0, 2); }
@@ -2302,7 +2327,7 @@ function drawThird(g, t) {
   }
   // 釣竿與釣線
   const bend = fish.state === 'reel' ? (fish.tension / 100) * 0.5 + (fish.struggle ? .15 : 0) : fish.state === 'bite' ? .2 : 0;
-  const tipX = lerp(hx + lw * .22, fx, bend * .5), tipY = lerp(by - lh * .55, fy, bend * .6);
+  const tipX = lerp(hx + lw * (.22 + (fish.rod || 0) * .24), fx, bend * .5), tipY = lerp(by - lh * (.55 - Math.abs(fish.rod || 0) * .08), fy, bend * .6);
   g.strokeStyle = '#6a4224'; g.lineWidth = Math.max(1, s * .8); g.beginPath(); g.moveTo(hx, hy); g.quadraticCurveTo(hx + (tipX - hx) * .5, hy + (tipY - hy) * .3, tipX, tipY); g.stroke();
   g.strokeStyle = 'rgba(255,255,255,.75)'; g.lineWidth = 1; g.beginPath(); g.moveTo(tipX, tipY);
   const sag = fish.state === 'reel' ? 4 * (1 - fish.tension / 100) : 14; g.quadraticCurveTo((tipX + fx) / 2, Math.max(tipY, fy) + sag, fx, fy - 6); g.stroke();
