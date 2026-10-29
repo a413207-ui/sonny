@@ -33,6 +33,10 @@
   .card { background: #fff8e6; border: 4px solid #6b4a2a; border-radius: 14px; padding: 14px 16px; width: min(92vw, 380px); max-height: 86vh; overflow: auto; box-shadow: 0 6px 0 #6b4a2a; text-align: center; }
   .card h3 { margin: 10px 0 4px; font-size: 15px; text-align: left; }
   .list { max-height: 52vh; overflow: auto; text-align: left; }
+  .museumGrid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 4px; max-height: 38vh; overflow: auto; }
+  .plq { background: #f4e8cc; border: 2px solid #c8a070; border-radius: 6px; padding: 2px; text-align: center; cursor: pointer; }
+  .museumGrid .plq canvas { width: 100%; height: auto; image-rendering: pixelated; margin: 0; } .plq small { display: block; font-size: 10px; line-height: 1.2; }
+  .plq.empty { background: #e0d4b8; border-style: dashed; cursor: default; opacity: .8; }
   .row.trk.now { background: #fff1c8; border-radius: 8px; }
   .row canvas.rodIcon { width: 60px !important; height: 30px !important; flex: none; margin-right: -2px; }
   .row canvas.rodIcon + span { flex: 1; }
@@ -210,13 +214,13 @@
 <div class="overlay" id="fishDetail"><div class="card" id="fishDetailCard"></div></div>
 <div class="overlay" id="badgePop"><div class="card" id="badgeCard"></div></div>
 
-<script src="data/fish.js?v=2026.10.29-79"></script>
-<script src="art.js?v=2026.10.29-79"></script>
-<script src="music.js?v=2026.10.29-79"></script>
+<script src="data/fish.js?v=2026.10.29-80"></script>
+<script src="art.js?v=2026.10.29-80"></script>
+<script src="music.js?v=2026.10.29-80"></script>
 <script>
 'use strict';
 // 版本號：每次更新都要改（也要改上面三個 script 的 ?v=），遊戲會用它檢查網站上有沒有新版
-const BUILD = '2026.10.29-79';
+const BUILD = '2026.10.29-80';
 // ════════════════ 基本設定 ════════════════
 const FISH = window.FISH_DATA || [];
 const N = 160, TW = 32, TH = 16, LH = 4;         // 地圖格數、等角格寬高、陸地高度
@@ -391,6 +395,16 @@ for (const [di, def] of [[1, { id: 'tailorA', name: '森林服飾店', wall: '#e
   let x = pos.x + Math.floor(w / 2), y = pos.y + h; const tx = d.x0, ty = d.y0;
   while (x !== tx || y !== ty) { const t = at(x, y); if (SHOP_LAND.has(t)) { set(x, y, T.STONE); shopPaths.push([x, y]); } if (x !== tx) x += Math.sign(tx - x); else y += Math.sign(ty - y); }
 }
+// 🏘️ 柳河鎮：大河中游西岸的小鎮（石板廣場、食堂、博物館、民房、河邊小碼頭）
+const RTOWN = { x: 16.5, y: 82, rx: 6.5, ry: 7.5 };
+for (let y = 72; y < 92; y++) for (let x = 8; x < 26; x++) { const t = at(x, y); if ((t === T.GRASS || t === T.SAND) && landOf[y * N + x] === CONT + 1 && ell(x, y, RTOWN.x, RTOWN.y, RTOWN.rx, RTOWN.ry) + (hash(x, y, 800) - .5) * .25 < 1) set(x, y, T.STONE); }
+{ let x = 16; while (!WATER.has(at(x + 1, 82))) { if (at(x, 82) === T.GRASS || at(x, 82) === T.SAND) set(x, 82, T.STONE); x++; } set(x + 1, 82, T.DOCK); }   // 河邊的小碼頭
+BUILDINGS.push(
+  { id: 'restaurant', name: '柳河食堂', sign: '🍳', x: 11, y: 76, w: 3, h: 2, hgt: 16, wall: '#f4e8d0', roof: '#b8402a' },
+  { id: 'museum', name: '大河博物館', sign: '🏛️', x: 16, y: 75, w: 3, h: 3, hgt: 20, wall: '#ece6dc', roof: '#6a7a8a' },
+  { id: 'house1', deco: true, name: '', sign: '', x: 10, y: 84, w: 2, h: 2, hgt: 12, wall: '#f0e0c8', roof: '#4a7aa0' },
+  { id: 'house2', deco: true, name: '', sign: '', x: 13, y: 88, w: 2, h: 2, hgt: 12, wall: '#f4ecd8', roof: '#c87a3a' },
+  { id: 'house3', deco: true, name: '', sign: '', x: 16, y: 85, w: 2, h: 2, hgt: 12, wall: '#e8e4d8', roof: '#5a8a4a' });
 BUILDINGS.push({ id: 'mine', name: '地底洞窟', sign: '⛏️', x: 14, y: 150, w: 3, h: 2, hgt: 20, wall: '#6a6268', roof: '#4a4448' });   // 大河上游、源頭湖東邊的山壁（地下世界入口）
 for (const b of BUILDINGS) {
   for (let y = b.y; y < b.y + b.h; y++) for (let x = b.x; x < b.x + b.w; x++) { set(x, y, T.STONE); block[y * N + x] = 1; }
@@ -413,7 +427,7 @@ for (let y = 1; y < N - 1; y++) for (let x = 1; x < N - 1; x++) {
   } else if (tt === T.GRASS && is && is.name === '溪谷山島' && !nearWater && nz(is, x, y, 13) < .07) { block[i] = 1; rocks.push({ x: x + .5, y: y + .5 }); }
 }
 for (const [x, y] of [[13, 149], [15, 149], [17, 149], [17, 150], [18, 151], [13, 150]]) { const i = y * N + x; if (!WATER.has(tile[i]) && !block[i]) { block[i] = 1; rocks.push({ x: x + .5, y: y + .5 }); } }   // 洞口旁的岩石
-for (const [x, y] of [[97, 66], [102, 59], [103, 68], [93, 67], [109, 62], [98, 74]]) if (at(x, y) === T.STONE && !block[y * N + x]) { block[y * N + x] = 1; lamps.push({ x: x + .5, y: y + .5 }); }
+for (const [x, y] of [[97, 66], [102, 59], [103, 68], [93, 67], [109, 62], [98, 74], [15, 80], [20, 80], [13, 83], [19, 84]]) if (at(x, y) === T.STONE && !block[y * N + x]) { block[y * N + x] = 1; lamps.push({ x: x + .5, y: y + .5 }); }
 const walkable = (x, y) => { const xi = Math.floor(x), yi = Math.floor(y); if (xi < 0 || yi < 0 || xi >= N || yi >= N) return false; const t = tile[yi * N + xi]; return !WATER.has(t) && !block[yi * N + xi]; };
 let ICEBREAK = false;   // 有破冰船頭：船可以開過浮冰和冰層
 const boatable = (x, y) => { const xi = Math.floor(x), yi = Math.floor(y); if (xi < 1 || yi < 1 || xi >= N - 1 || yi >= N - 1) return false; const t = tile[yi * N + xi]; return BOATABLE.has(t) || (ICEBREAK && t === T.ICE); };
@@ -795,7 +809,7 @@ if (window.BGM) BGM.onTrack = name => toast('🎵 ' + name, 2200);
 const MODE_KEY = 'bay-fishing-music-mode';
 let musMode = 'auto';   // auto＝自動配樂、all＝全部輪播、數字＝單曲循環第幾首
 try { musMode = localStorage.getItem(MODE_KEY) || 'auto'; } catch (e) {}
-const ISL_MOOD = { 漁港鎮: 'harbor', 金鱗島: 'festival', 冰晶島: 'cold', 火山島: 'volcano', 紅樹林島: 'mangrove', 大河平原: 'river', 翠湖森林島: 'river', 溪谷山島: 'river', 珊瑚小島: 'reef', 無人島: 'reef' };
+const ISL_MOOD = { 柳河鎮: 'harbor', 漁港鎮: 'harbor', 金鱗島: 'festival', 冰晶島: 'cold', 火山島: 'volcano', 紅樹林島: 'mangrove', 大河平原: 'river', 翠湖森林島: 'river', 溪谷山島: 'river', 珊瑚小島: 'reef', 無人島: 'reef' };
 const REG_MOOD = { harbor: 'harbor', deep: 'deep', wreck: 'deep', cave: 'deep', reef: 'reef', lagoon: 'reef', cold: 'cold', frozen: 'cold', volcano: 'volcano', mangrove: 'mangrove', lake: 'river', river: 'river', bigriver: 'river', upriver: 'river' };
 function musicMood() {   // 現在的場合：時段、天氣、所在地
   if (UNDER) { const z = landOf[Math.floor(state.player.y) * N + Math.floor(state.player.x)]; return { phase: 'under', place: z === 3 ? 'crystal' : z === 4 ? 'lava' : 'under', storm: false }; }   // 地底：依區域放地底的歌
@@ -896,6 +910,7 @@ function updateSick(dt) {
     d = (base + sp * 1.2) * (phase === 'night' ? 1.2 : 1) * (1 + wx.wave * 1.5);
   } else d = -8;
   if (state.pillT > 0) { state.pillT = Math.max(0, state.pillT - dt); d = Math.min(d, -6); }
+  if (buffOn('calm')) d = Math.min(d, -6);   // 🍲 鮮魚湯：不會暈
   state.sick = clamp(state.sick + d * dt, 0, 100);
   if (!state.sickOn && state.sick >= SICK_ON) { state.sickOn = true; SFX.sick(); buzz([200, 100, 200]); toast(prog.pills > 0 ? '🤢 你暈船了！點左上角「暈船」吃藥，或上岸休息' : '🤢 你暈船了！畫面會晃，上岸休息就會好', 3000); }
   else if (state.sickOn && state.sick <= SICK_OFF) { state.sickOn = false; toast('😌 不暈了，舒服多了'); }
@@ -924,7 +939,7 @@ function waterAhead(ox, oy, fx, fy) {
   for (let a = 0; a < 8; a++) { const dx = Math.cos(a * Math.PI / 4), dy = Math.sin(a * Math.PI / 4); hit = tryDir(dx, dy); if (hit) return { ...hit, fx: dx, fy: dy }; }
   return null;
 }
-function nearBuilding() { const p = state.player; if (UNDER) return null; return BUILDINGS.find(b => Math.hypot(b.door[0] - p.x, b.door[1] - p.y) < 1.3); }
+function nearBuilding() { const p = state.player; if (UNDER) return null; return BUILDINGS.find(b => !b.deco && Math.hypot(b.door[0] - p.x, b.door[1] - p.y) < 1.3); }
 function landingSpot() {
   const b = state.boat;
   for (let r = 1; r <= 1.6; r += .3) for (let a = 0; a < 16; a++) { const x = b.x + Math.cos(a * Math.PI / 8) * r, y = b.y + Math.sin(a * Math.PI / 8) * r; if (walkable(x, y)) return { x: Math.floor(x) + .5, y: Math.floor(y) + .5 }; }
@@ -985,7 +1000,7 @@ function startCast() {
   if (UNDER && regionAt(w.x, w.y) === 'ulava' && !prog.heatLine) { toast('🔥 一般釣線一碰到岩漿就燒斷了！到營地買「耐熱釣線」', 3000); buzz(80); return; }
   state.player.fx = w.fx; state.player.fy = w.fy;
   Object.assign(fish, { state: 'cast', t: 0, region: regionAt(w.x, w.y), fx: w.x, fy: w.y, nibbles: [], d: 100, dMax: 100, tension: 0, struggle: false, swap: 0, boss: false, dash: 0, warn: 0, rod: 0, lure: 0, moved: 0, lured: 0, side: 1, fishX: 0, push: 0, slackT: 0, slackWarn: 0 });
-  const wait = rand(2.2, 6.5) / (1 + state.rod.luck * .2) * (UNDER ? 1.15 : (WEATHER[weather].bite || 1));   // 地底沒有天氣，魚也比較謹慎
+  const wait = rand(2.2, 6.5) / (1 + state.rod.luck * .2) * (buffOn('bite') ? .7 : 1) * (UNDER ? 1.15 : (WEATHER[weather].bite || 1));   // 地底沒有天氣，魚也比較謹慎
   fish.biteAt = .7 + wait;
   if (UNDER && lairActive() && Math.hypot(w.x - U.lair.x, w.y - U.lair.y) < 2.4) { fish.boss = true; fish.biteAt = .7 + rand(2, 3.5); toast('🐉 龍穴冒出巨大的泡泡……有東西在下面！', 2800); buzz([80, 40, 80]); return; }
   if (!UNDER && boss && Math.hypot(w.x - boss.x, w.y - boss.y) < 2.8) { fish.boss = true; fish.biteAt = .7 + rand(1.5, 3); toast('🎣 拋到巨大魚影旁邊了…屏住呼吸！', 2500); return; }
@@ -997,10 +1012,10 @@ function pickFish(region) {
   // 有天氣限定魚可以釣時，35% 機會從牠們裡面挑
   const special = pool.filter(f => f.weather); if (special.length && Math.random() < .35) pool = special;
   const byR = {}; for (const f of pool) (byR[f.rarity] = byR[f.rarity] || []).push(f);
-  const rs = Object.keys(byR); let tot = 0; const wts = rs.map(r => { const w = RAR[r].w * (r === 'common' ? 1 : 1 + state.rod.luck * .3); tot += w; return w; });
+  const rs = Object.keys(byR); let tot = 0; const wts = rs.map(r => { const w = RAR[r].w * (r === 'common' ? 1 : 1 + (state.rod.luck + (buffOn('luck') ? 1.5 : 0)) * .3); tot += w; return w; });
   let u = Math.random() * tot, r = rs[0]; for (let i = 0; i < rs.length; i++) { u -= wts[i]; if (u <= 0) { r = rs[i]; break; } }
   const list = byR[r]; const def = list[Math.floor(Math.random() * list.length)];
-  const k = Math.pow(Math.random(), 2.2);
+  const k = Math.pow(Math.random(), buffOn('big') ? 1.5 : 2.2);   // 🍛 大物：比較容易釣到大的
   const w = def.weightKg[0] + (def.weightKg[1] - def.weightKg[0]) * k;
   const l = clamp(def.lengthCm[0] + (def.lengthCm[1] - def.lengthCm[0]) * Math.cbrt(k) * rand(.94, 1.06), def.lengthCm[0], def.lengthCm[1]);
   return { def, weight: w, length: l, price: Math.round(def.price * (.6 + .8 * k)), k };
@@ -1074,7 +1089,7 @@ function updateFishing(dt) {
     const pk = fish.push > 0 ? 1 - .35 * fish.push : 1 + .3 * -fish.push, rk = fish.push > 0 ? 1 + .2 * fish.push : 1;
     if (!prog.rodTip && fish.t > .8) { prog.rodTip = 1; toast('🕹️ 小技巧：魚往哪邊衝，搖桿就往反方向壓竿！', 3200); }
     const rp = state.rod.power;
-    if (holding) { fish.d -= (fish.struggle ? 6 : 17) * rp * rk * dt; fish.tension += (fish.struggle ? 90 * fish.power : 24 * fish.power) * pk * dt / rp * (1 + wx.wave * .15); }
+    if (holding) { fish.d -= (fish.struggle ? 6 : 17) * rp * rk * dt; fish.tension += (fish.struggle ? 90 * fish.power : 24 * fish.power) * pk * (buffOn('steady') ? .8 : 1) * dt / rp * (1 + wx.wave * .15); }
     else { fish.tension -= 45 * dt; fish.d += (fish.struggle ? 14 : 5) * fish.power * dt; }
     if (fish.struggle) fish.d += (fish.boss ? 6 : 10) * (fish.under ? 1.3 : 1) * fish.power * Math.max(0, 1 - fish.push) * dt;   // 掙扎時魚橫衝，沒壓竿就被拉遠
     // 線放太鬆（張力幾乎 0）超過 1.4 秒，魚會脫鉤
@@ -1171,6 +1186,12 @@ const ACH = [
   ['uquest5', '⛏️ 地底委託達人', '完成 5 張地底委託', s => (s.uquestDone || 0) >= 5],
   ['uall', '💎 地底魚博士', '地底的魚全部收集', s => FISH.filter(f => f.regions.some(r => UREG.has(r))).every(f => s.dex[f.id])],
   ['udragon', '🐉 地底龍王', '釣到傳說中的地底龍魚', s => !!s.dex.udragon],
+  ['cook1', '🍳 第一道料理', '在柳河食堂做一道料理', s => (s.cooked || 0) >= 1],
+  ['cook20', '👨‍🍳 柳河大廚', '做 20 道料理', s => (s.cooked || 0) >= 20],
+  ['serve10', '🛎️ 人氣食堂', '端 10 道料理給客人', s => (s.served || 0) >= 10],
+  ['museum1', '🏛️ 第一件館藏', '捐一條魚給大河博物館', s => Object.keys(s.museum || {}).length >= 1],
+  ['museumhall', '🏆 展區完成', '博物館任一個展區全部收藏', s => HALLS.some(h => hallFish(h).every(d => (s.museum || {})[d.id]))],
+  ['museumall', '🌟 博物館之友', '博物館收藏所有的魚', s => FISH.every(d => (s.museum || {})[d.id])],
   ['print1', '🖼️ 第一幅魚拓', '請魚拓師傅拓一幅魚拓', s => (s.prints || []).length >= 1],
   ['print10', '🎨 魚拓收藏家', '收藏 10 幅魚拓', s => (s.prints || []).length >= 10],
   ['printleg', '🏯 傳說魚拓', '把傳說魚拓成魚拓', s => (s.prints || []).some(p => FISH_BY_ID[p.id] && FISH_BY_ID[p.id].rarity === 'legendary')],
@@ -1178,7 +1199,7 @@ const ACH = [
 // 徽章等級：bronze 銅、silver 銀、gold 金、rainbow 彩虹（最難）
 const TIER = { first: 'bronze', c10: 'bronze', c50: 'silver', c200: 'gold', d10: 'bronze', d30: 'silver', d60: 'gold', dall: 'rainbow',
   r_harbor: 'bronze', r_lake: 'bronze', r_river: 'bronze', r_reef: 'silver', r_deep: 'silver', t_dawn: 'bronze', t_dusk: 'bronze', t_night: 'silver',
-  rare: 'silver', epic: 'gold', legend: 'gold', legend_all: 'rainbow', w10: 'silver', w100: 'gold', m1000: 'bronze', m10000: 'gold', rod: 'bronze', boat: 'bronze', style1: 'bronze', style10: 'gold', tailorall: 'gold', wx_rain: 'bronze', wx_typhoon: 'gold', wx_special: 'silver', drift10: 'silver', contest1: 'bronze', podium: 'silver', champion: 'gold', r_cold: 'silver', r_mangrove: 'bronze', r_volcano: 'silver', r_bigriver: 'bronze', r_upriver: 'silver', aq1: 'bronze', aqleg: 'silver', aq20: 'gold', explore50: 'silver', explore85: 'gold', spot1: 'bronze', spotall: 'rainbow', dig1: 'bronze', dig5: 'gold', boss1: 'silver', boss5: 'gold', quest1: 'bronze', quest10: 'gold', gearall: 'silver', under1: 'silver', uzones: 'silver', ufish1: 'bronze', ulava: 'silver', uquest5: 'gold', uall: 'gold', udragon: 'rainbow', print1: 'bronze', print10: 'silver', printleg: 'gold' };
+  rare: 'silver', epic: 'gold', legend: 'gold', legend_all: 'rainbow', w10: 'silver', w100: 'gold', m1000: 'bronze', m10000: 'gold', rod: 'bronze', boat: 'bronze', style1: 'bronze', style10: 'gold', tailorall: 'gold', wx_rain: 'bronze', wx_typhoon: 'gold', wx_special: 'silver', drift10: 'silver', contest1: 'bronze', podium: 'silver', champion: 'gold', r_cold: 'silver', r_mangrove: 'bronze', r_volcano: 'silver', r_bigriver: 'bronze', r_upriver: 'silver', aq1: 'bronze', aqleg: 'silver', aq20: 'gold', explore50: 'silver', explore85: 'gold', spot1: 'bronze', spotall: 'rainbow', dig1: 'bronze', dig5: 'gold', boss1: 'silver', boss5: 'gold', quest1: 'bronze', quest10: 'gold', gearall: 'silver', under1: 'silver', uzones: 'silver', ufish1: 'bronze', ulava: 'silver', uquest5: 'gold', uall: 'gold', udragon: 'rainbow', cook1: 'bronze', cook20: 'silver', serve10: 'silver', museum1: 'bronze', museumhall: 'gold', museumall: 'rainbow', print1: 'bronze', print10: 'silver', printleg: 'gold' };
 const TIER_NAME = { bronze: '銅', silver: '銀', gold: '金', rainbow: '彩虹' };
 const achParts = a => { const i = a[1].indexOf(' '); return { id: a[0], icon: a[1].slice(0, i), title: a[1].slice(i + 1), desc: a[2], tier: TIER[a[0]] || 'bronze' }; };
 const medalHtml = (b, got) => `<div class="medal ${got ? b.tier : 'lock'}"><i>${got ? b.icon : '？'}</i></div>`;
@@ -1200,7 +1221,7 @@ function showNextBadge() {
   document.getElementById('badgeBook').onclick = () => { badgeQueue.length = 0; pop.classList.remove('show'); openDex('ach'); };
 }
 const SAVE_KEY = 'bay-fishing-save-v1';
-const prog = { dex: {}, ach: {}, catches: 0, region: {}, time: {}, rar: {}, maxW: 0, earned: 0, rodIdx: 0, boatLv: 0, bait: 0, pills: 0, look: null, closet: [], wxc: {}, drift: 0, contest: {}, contestN: 0, contestBest: 0, contestWins: 0, aquarium: [], found: {}, maps: [], dug: 0, boss: 0, quests: [], questDone: 0, rep: 0, gear: {}, explore: 0, fog: null, prints: [], rodTip: 0, lamp: 0, mineOpen: 0, underVisit: 0, ufog: null, raft: 0, uraft: null, heatLine: 0, uquests: [], uquestDone: 0, uzones: 0, udragonAt: 0 };
+const prog = { dex: {}, ach: {}, catches: 0, region: {}, time: {}, rar: {}, maxW: 0, earned: 0, rodIdx: 0, boatLv: 0, bait: 0, pills: 0, look: null, closet: [], wxc: {}, drift: 0, contest: {}, contestN: 0, contestBest: 0, contestWins: 0, aquarium: [], found: {}, maps: [], dug: 0, boss: 0, quests: [], questDone: 0, rep: 0, gear: {}, explore: 0, fog: null, prints: [], rodTip: 0, lamp: 0, mineOpen: 0, underVisit: 0, ufog: null, raft: 0, uraft: null, heatLine: 0, uquests: [], uquestDone: 0, uzones: 0, udragonAt: 0, dishes: {}, buffs: {}, orders: [], cooked: 0, served: 0, museum: {} };
 function savePos() {   // 在地底時，地面位置記洞口，另外記地底的位置
   if (!UNDER) return { x: state.player.x, y: state.player.y, bx: state.boat.x, by: state.boat.y, onBoat: state.onBoat };
   const b = mineB(); if (prog.raft && state.boat.x > 0) prog.uraft = { x: state.boat.x, y: state.boat.y };
@@ -1263,7 +1284,7 @@ function showPanel(html) {
   document.getElementById('closePanel').onclick = () => panelEl().classList.remove('show');
 }
 const FISH_BY_ID = Object.fromEntries(FISH.map(f => [f.id, f]));
-function openBuilding(b) { if (/^tailor/.test(b.id)) return openTailor(b); ({ shop: openShop, market: openMarket, home: openHome, board: openDex, tailorA: () => openTailor(b), tailorB: () => openTailor(b), guild: () => openGuild(), aquarium: () => openAquarium(), quests: () => openQuests(), gyotaku: () => openGyotaku(), mine: () => openMine() })[b.id](); }
+function openBuilding(b) { if (/^tailor/.test(b.id)) return openTailor(b); ({ shop: openShop, market: openMarket, home: openHome, board: openDex, tailorA: () => openTailor(b), tailorB: () => openTailor(b), guild: () => openGuild(), aquarium: () => openAquarium(), quests: () => openQuests(), gyotaku: () => openGyotaku(), mine: () => openMine(), restaurant: () => openRestaurant(), museum: () => { museumPick = false; openMuseum(); } })[b.id](); }
 function openMarket() {
   const total = state.bag.reduce((a, f) => a + f.price, 0);
   const rows = bagListHtml((f, i) => { const d = FISH_BY_ID[f.id]; return `<div class="row"><span><b style="color:${RAR[d.rarity].color}">${d.name}</b> ${fmtW(f.w)}・${f.l} cm</span><button data-sell="${i}">賣 🪙${f.price}</button></div>`; });
@@ -1362,6 +1383,7 @@ function openBag() {
     <h3>🐟 魚簍（${state.bag.length} 條・總值 🪙${total}）</h3>${state.bag.length > 1 ? sortBarHtml() : ''}<div class="list" style="max-height:34vh">${list || '<p>魚簍是空的，去釣魚吧！</p>'}</div>
     <h3>🧭 探險</h3><div style="text-align:left;font-size:13px;line-height:1.7">地圖探索度 <b>${fogPct()}%</b>・隱藏地點 ${Object.keys(prog.found).length} / ${SPOTS.length}${Object.keys(prog.found).length ? '（' + SPOTS.filter(s => prog.found[s.id]).map(s => s.icon + s.name).join('、') + '）' : ''}<br>探險裝備：${GEAR.filter(g => prog.gear[g.id]).map(g => g.icon + g.name).join('、') || '還沒有（釣具店有賣）'}</div>
     <h3>🗺️ 藏寶圖（${prog.maps.length} / ${TMAP_MAX}）</h3><div>${prog.maps.map((m, i) => `<canvas class="tmap" width="128" height="80" data-tmap="${i}"></canvas>`).join('') || '<p style="font-size:13px">還沒有藏寶圖。開船撈漂流瓶、木箱，有機會撿到！</p>'}</div>
+    <h3>🍱 料理</h3><div>${RECIPES.filter(r => prog.dishes[r.id] > 0).map(r => `<button data-beat="${r.id}" style="margin:2px">${r.icon}${r.name} ×${prog.dishes[r.id]}（吃）</button>`).join('') || '<p style="font-size:13px">還沒有料理。到大河平原柳河鎮的🍳柳河食堂做菜。</p>'}</div>
     <h3>🧰 道具</h3><div style="text-align:left;font-size:13px;line-height:1.8">🪙 金幣 ${state.coins}　🪱 魚餌 ${prog.bait}　💊 暈船藥 ${prog.pills || 0}<br>🎣 ${RODS[prog.rodIdx].name}　⛵ ${BOATS[prog.boatLv].name}</div>
     <h3>💫 狀態</h3><div style="text-align:left;font-size:13px;line-height:1.7">
       ${state.pillT > 0 ? `💊 防暈中，還有 ${Math.ceil(state.pillT)} 秒` : `${state.sickOn ? '🤢 暈船中' : sickPct >= SICK_WARN ? '😵 有點頭暈' : '😊 精神很好'}（暈眩 ${sickPct}%）<div class="meterS"><div style="width:${sickPct}%;background:${state.sickOn ? '#8ab04a' : '#7ac04a'}"></div></div>`}
@@ -1369,6 +1391,7 @@ function openBag() {
       🏆 ${contestDayName(ck)} 20:00 評比大賽：${entry ? `已報名（${FISH_BY_ID[entry.id].name}）` : '還沒報名（到金鱗島的釣魚協會）'}</div>`);
   paintFishCanvases(); wireSortBar(openBag);
   document.querySelectorAll('[data-tmap]').forEach(c => { drawTreasureMap(c, prog.maps[+c.dataset.tmap]); c.onclick = () => openTreasureMap(+c.dataset.tmap); });
+  document.querySelectorAll('[data-beat]').forEach(el => el.onclick = () => { eatDish(el.dataset.beat); openBag(); });
 }
 document.getElementById('bagBtn').addEventListener('click', openBag);
 
@@ -1651,6 +1674,150 @@ function drawBossShadow(g, vx, vy, t) {
   g.fillStyle = `rgba(8,14,32,${Math.min(.45, boss.life / 4)})`;
   g.beginPath(); g.ellipse(x, y + 8, 26 * s, 8 * s, -.35, 0, 7); g.fill();
   g.beginPath(); g.moveTo(x + 20, y + 2); g.lineTo(x + 34 + tail, y - 4); g.lineTo(x + 32 - tail, y + 8); g.fill();
+}
+
+// ════════════════ 🏘️ 柳河鎮：🍳 柳河食堂（料理）＋ 🏛️ 大河博物館（捐贈）════════════════
+const FRESH_R = new Set(['lake', 'river', 'bigriver', 'upriver', 'mangrove']), SEA_R = new Set(['harbor', 'deep', 'reef', 'cold', 'volcano', 'wreck', 'cave', 'lagoon', 'frozen']);
+const RAR_ORDER = ['common', 'uncommon', 'rare', 'epic', 'legendary'], rarAtLeast = (f, r) => RAR_ORDER.indexOf(f.rarity) >= RAR_ORDER.indexOf(r);
+// 料理效果（可以同時有好幾種，各自倒數）
+const BUFFS = {
+  bite: { icon: '⚡', name: '快咬', desc: '咬鉤等待 -30%' },
+  calm: { icon: '😌', name: '防暈', desc: '不會暈船' },
+  luck: { icon: '🍀', name: '幸運', desc: '稀有魚更容易上鉤' },
+  steady: { icon: '🧘', name: '穩線', desc: '收線時張力漲得慢 20%' },
+  big: { icon: '📏', name: '大物', desc: '釣到的魚比較大' },
+  glow: { icon: '🔦', name: '明燈', desc: '地底提燈範圍變大' },
+};
+const buffOn = k => (prog.buffs && prog.buffs[k] || 0) > Date.now();
+// need：每一格是「n 條符合條件的魚」；條件：rar 最低稀有度、reg 區域類別、shape 外形、exact 指定稀有度
+const RECIPES = [
+  { id: 'fry', icon: '🍤', name: '酥炸小魚拼盤', need: [{ n: 3, exact: 'common', label: '普通魚' }], buffs: ['bite'], mins: 8, price: 90 },
+  { id: 'soup', icon: '🍲', name: '鮮魚湯', need: [{ n: 2, reg: 'fresh', label: '淡水魚' }], buffs: ['calm'], mins: 10, price: 160 },
+  { id: 'skewer', icon: '🍢', name: '烤魚串', need: [{ n: 2, rar: 'uncommon', label: '少見以上的魚' }], buffs: ['steady'], mins: 8, price: 260 },
+  { id: 'curry', icon: '🍛', name: '海鮮咖哩', need: [{ n: 1, shape: ['crab', 'squid'], label: '蟹或章魚、魷魚' }, { n: 1, label: '任何魚' }], buffs: ['big'], mins: 10, price: 320 },
+  { id: 'glowpot', icon: '🫕', name: '螢光燉鍋', need: [{ n: 2, reg: 'under', label: '地底魚' }], buffs: ['glow'], mins: 15, price: 420 },
+  { id: 'sashimi', icon: '🍣', name: '生魚片', need: [{ n: 1, reg: 'sea', rar: 'rare', label: '稀有以上的海魚' }], buffs: ['luck'], mins: 10, price: 600 },
+  { id: 'bento', icon: '🍱', name: '豪華漁夫便當', need: [{ n: 1, rar: 'epic', label: '史詩以上的魚' }], buffs: ['luck', 'steady'], mins: 12, price: 1600 },
+  { id: 'feast', icon: '🐲', name: '傳說海宴', need: [{ n: 1, rar: 'legendary', label: '傳說魚' }], buffs: ['bite', 'calm', 'luck', 'steady', 'big', 'glow'], mins: 15, price: 6000 },
+];
+const RECIPE_BY = Object.fromEntries(RECIPES.map(r => [r.id, r]));
+function fitsNeed(f, q) {
+  const d = FISH_BY_ID[f.id]; if (!d) return false;
+  if (q.exact && d.rarity !== q.exact) return false;
+  if (q.rar && !rarAtLeast(d, q.rar)) return false;
+  if (q.shape && !q.shape.includes(d.shape)) return false;
+  if (q.reg === 'fresh' && !d.regions.some(r => FRESH_R.has(r))) return false;
+  if (q.reg === 'sea' && !d.regions.some(r => SEA_R.has(r))) return false;
+  if (q.reg === 'under' && !d.regions.some(r => UREG.has(r))) return false;
+  return true;
+}
+function pickIngredients(rc) {   // 從魚簍挑最便宜、又符合的魚；不夠就回傳 null
+  const used = new Set(), out = [];
+  for (const q of rc.need) {   // 條件嚴的先挑（任何魚放最後）
+    const cand = state.bag.map((f, i) => [f, i]).filter(([f, i]) => !used.has(i) && fitsNeed(f, q)).sort((a, b) => a[0].price - b[0].price);
+    if (cand.length < q.n) return null;
+    for (const [, i] of cand.slice(0, q.n)) { used.add(i); out.push(i); }
+  }
+  return out;
+}
+function eatDish(id) {
+  const rc = RECIPE_BY[id]; if (!rc || !(prog.dishes[id] > 0)) return;
+  prog.dishes[id]--; const until = Date.now() + rc.mins * 60000;
+  for (const k of rc.buffs) prog.buffs[k] = Math.max(prog.buffs[k] || 0, until);
+  if (rc.buffs.includes('calm')) { state.sick = 0; state.sickOn = false; }
+  SFX.pickup(); buzz([30, 30, 60]); toast(`${rc.icon} 吃了${rc.name}！${rc.buffs.map(k => BUFFS[k].icon + BUFFS[k].name).join('、')} ${rc.mins} 分鐘`, 3000);
+  applyGear(); save(); updateHud();
+}
+const ORDER_WHO = ['旅行中的畫家', '河邊的老船夫', '放學的小朋友', '來釣魚的觀光客', '博物館館長', '郵差阿伯', '新婚夫妻', '隔壁村的廚師'];
+function genOrder() {
+  const unlocked = RECIPES.filter(r => r.id !== 'feast' && (r.id !== 'glowpot' || prog.mineOpen));
+  const rc = unlocked[Math.floor(Math.random() * unlocked.length)];
+  return { id: 'o' + Date.now().toString(36) + Math.floor(Math.random() * 1e4), who: ORDER_WHO[Math.floor(Math.random() * ORDER_WHO.length)], dish: rc.id, reward: Math.round(rc.price * 1.6 / 10) * 10 + 50 };
+}
+let restTab = 'cook';
+function openRestaurant(tab) {
+  if (tab) restTab = tab;
+  if (!prog.orders) prog.orders = [];
+  while (prog.orders.length < 3) prog.orders.push(genOrder());
+  const tabs = `<div class="slots" style="justify-content:center"><button data-rtab="cook" class="${restTab === 'cook' ? 'on' : ''}">🍳 做料理</button><button data-rtab="order" class="${restTab === 'order' ? 'on' : ''}">🛎️ 客人點菜</button></div>`;
+  let body;
+  if (restTab === 'cook') {
+    body = RECIPES.map(rc => {
+      const ing = pickIngredients(rc), have = prog.dishes[rc.id] || 0;
+      const used = ing ? ing.map(i => FISH_BY_ID[state.bag[i].id].name).join('、') : '';
+      return `<div class="row" style="align-items:flex-start"><span>${rc.icon} <b>${rc.name}</b>${have ? `　<small>手上有 ${have} 份</small>` : ''}<br><small>材料：${rc.need.map(q => `${q.label} ×${q.n}`).join('＋')}<br>效果：${rc.buffs.map(k => BUFFS[k].icon + BUFFS[k].desc).join('、')}（${rc.mins} 分鐘）</small>${ing ? `<br><small style="color:#3a7a3a">會用：${used}</small>` : ''}</span>
+        <span style="display:flex;flex-direction:column;gap:4px;align-items:flex-end">${ing ? `<button data-cook="${rc.id}">烹調</button>` : '<em>材料不夠</em>'}${have ? `<button data-eat="${rc.id}" style="background:#d8f0c8">吃掉</button>` : ''}</span></div>`;
+    }).join('');
+  } else {
+    body = prog.orders.map((o, i) => { const rc = RECIPE_BY[o.dish], have = prog.dishes[o.dish] || 0;
+      return `<div class="row"><span><b>${o.who}</b>：「我想吃 ${rc.icon}${rc.name}！」<br><small>付 🪙${o.reward}（直接賣魚約 🪙${Math.round(rc.price * .55)}）</small></span><span style="display:flex;flex-direction:column;gap:4px;align-items:flex-end">${have ? `<button data-serve="${i}">端上桌</button>` : '<em>還沒做</em>'}<button data-oskip="${i}" style="font-size:11px;padding:2px 6px;background:#f3e6c8">換一位</button></span></div>`; }).join('');
+  }
+  const act = Object.keys(BUFFS).filter(buffOn).map(k => `${BUFFS[k].icon}${BUFFS[k].name} ${fmtLeft(prog.buffs[k])}`).join('　');
+  showPanel(`<h2>🍳 柳河食堂</h2><p style="text-align:left;margin:4px 0"><b>阿柳師傅</b>：「${restTab === 'cook' ? '把魚交給我，做成料理吃下去，釣魚會更順喔！' : '客人在等了！做好的料理端上去，比直接賣魚賺更多。'}」<br><small>你有 🪙${state.coins}・做過 ${prog.cooked || 0} 道・端過 ${prog.served || 0} 道${act ? '<br>效果中：' + act : ''}</small></p>${tabs}<div class="list" style="max-height:50vh">${body}</div>`);
+  document.querySelectorAll('[data-rtab]').forEach(el => el.onclick = () => openRestaurant(el.dataset.rtab));
+  document.querySelectorAll('[data-cook]').forEach(el => el.onclick = () => {
+    const rc = RECIPE_BY[el.dataset.cook], ing = pickIngredients(rc); if (!ing) return;
+    ing.sort((a, b) => b - a).forEach(i => state.bag.splice(i, 1));
+    prog.dishes[rc.id] = (prog.dishes[rc.id] || 0) + 1; prog.cooked = (prog.cooked || 0) + 1;
+    tone(220, 180, .4, .08, 'sawtooth'); setTimeout(() => SFX.pickup(), 350); buzz(40);
+    toast(`${rc.icon} 阿柳師傅做好了「${rc.name}」！可以自己吃，也能端給客人`, 3000); checkAch(); save(); updateHud(); openRestaurant();
+  });
+  document.querySelectorAll('[data-eat]').forEach(el => el.onclick = () => { eatDish(el.dataset.eat); openRestaurant(); });
+  document.querySelectorAll('[data-serve]').forEach(el => el.onclick = () => {
+    const i = +el.dataset.serve, o = prog.orders[i]; if (!(prog.dishes[o.dish] > 0)) return;
+    prog.dishes[o.dish]--; state.coins += o.reward; prog.served = (prog.served || 0) + 1; prog.orders[i] = genOrder();
+    toast(`🛎️ ${o.who}：「好好吃！」付了 🪙${o.reward}`, 2600); SFX.pickup(); buzz(40); checkAch(); save(); updateHud(); openRestaurant();
+  });
+  document.querySelectorAll('[data-oskip]').forEach(el => el.onclick = () => { prog.orders[+el.dataset.oskip] = genOrder(); save(); openRestaurant(); });
+}
+const fmtLeft = until => { const s = Math.max(0, Math.ceil((until - Date.now()) / 1000)); return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`; };
+// ── 博物館：每種魚捐一條，三個展區 ──
+const HALLS = [
+  { id: 'sea', icon: '🌊', name: '海洋館', test: d => SEA_R.has(d.regions[0]) },
+  { id: 'fresh', icon: '🏞️', name: '淡水館', test: d => FRESH_R.has(d.regions[0]) },
+  { id: 'under', icon: '🕳️', name: '地底館', test: d => UREG.has(d.regions[0]) },
+];
+const hallOf = d => HALLS.find(h => h.test(d)) || HALLS[0];
+const hallFish = h => FISH.filter(d => hallOf(d) === h);
+let museumHall = 'sea', museumPick = false;
+function openMuseum(hall) {
+  if (hall) museumHall = hall;
+  const h = HALLS.find(x => x.id === museumHall), list = hallFish(h), got = list.filter(d => prog.museum[d.id]).length;
+  const total = Object.keys(prog.museum).length;
+  const tabs = `<div class="slots" style="justify-content:center">${HALLS.map(x => { const L = hallFish(x), n = L.filter(d => prog.museum[d.id]).length; return `<button data-hall="${x.id}" class="${x.id === museumHall ? 'on' : ''}">${x.icon}${x.name} ${n}/${L.length}</button>`; }).join('')}</div>`;
+  const canDonate = state.bag.map((f, i) => [f, i]).filter(([f]) => !prog.museum[f.id]);
+  let body;
+  if (museumPick) {
+    body = canDonate.length ? `<p class="hint">點一條魚捐給博物館（每種只收一條，捐了就不會回來）</p><div class="list" style="max-height:46vh">${canDonate.map(([f, i]) => fishRow(f, i, true)).join('')}</div>` : '<p>魚簍裡沒有博物館還沒收藏的魚。</p>';
+    body += '<p><button id="mBack">← 回展區</button></p>';
+  } else {
+    body = `<div class="meterS" style="margin:4px 0 8px"><div style="width:${got / list.length * 100}%;background:#c8902a"></div></div>
+      <div class="museumGrid">${list.map(d => prog.museum[d.id] ? `<div class="plq" data-mfish="${d.id}"><canvas width="64" height="32" data-fpic="${d.id}"></canvas><small>${d.name}</small></div>` : `<div class="plq empty"><canvas width="64" height="32" data-mshadow="${d.id}"></canvas><small>${prog.dex[d.id] ? '可捐贈' : '？？？'}</small></div>`).join('')}</div>
+      <p id="mInfo" class="hint">點展示中的魚，聽館長介紹。</p>
+      <p><button id="mDonate" ${canDonate.length ? '' : 'disabled'}>🎁 捐贈魚簍裡的魚（${canDonate.length} 條可捐）</button></p>`;
+  }
+  showPanel(`<h2>🏛️ 大河博物館</h2><p style="text-align:left;margin:4px 0"><b>河野館長</b>：「${total ? `已經收藏 ${total} 種了，謝謝你！` : '這座博物館還空空的……可以把你釣到的魚捐給我們嗎？'}」<br><small>全館 ${total} / ${FISH.length} 種・每個展區收藏一半和全部時有獎勵</small></p>${tabs}${body}`);
+  paintFishCanvases();
+  // 還沒收藏的魚只畫剪影（先畫在暫存畫布，圖片晚一點載入時才不會變回彩色）
+  const shadows = () => document.querySelectorAll('[data-mshadow]').forEach(c => { const tmp = document.createElement('canvas'); tmp.width = 64; tmp.height = 32; drawFishTo(tmp, FISH_BY_ID[c.dataset.mshadow]); const g = c.getContext('2d'); g.clearRect(0, 0, 64, 32); g.drawImage(tmp, 0, 0); g.globalCompositeOperation = 'source-in'; g.fillStyle = prog.dex[c.dataset.mshadow] ? '#8a7a5a' : '#4a4038'; g.fillRect(0, 0, 64, 32); g.globalCompositeOperation = 'source-over'; });
+  shadows(); setTimeout(shadows, 600);
+  document.querySelectorAll('[data-hall]').forEach(el => el.onclick = () => { museumPick = false; openMuseum(el.dataset.hall); });
+  document.querySelectorAll('[data-mfish]').forEach(el => el.onclick = () => { const d = FISH_BY_ID[el.dataset.mfish], m = prog.museum[d.id]; document.getElementById('mInfo').innerHTML = `<b>${d.name}</b>（${RAR[d.rarity].name}）：${d.desc}<br><small>出沒：${d.regions.map(r => REGION_NAME[r]).join('、')}・展示標本 ${fmtW(m.w)}、${m.l} cm・${fmtDate(m.at)} 捐贈</small>`; });
+  const db = document.getElementById('mDonate'); if (db) db.onclick = () => { museumPick = true; openMuseum(); };
+  const bb = document.getElementById('mBack'); if (bb) bb.onclick = () => { museumPick = false; openMuseum(); };
+  document.querySelectorAll('[data-pick]').forEach(el => el.onclick = () => donateFish(+el.dataset.pick));
+}
+function donateFish(i) {
+  const f = state.bag[i]; if (!f || prog.museum[f.id]) return;
+  const d = FISH_BY_ID[f.id], h = hallOf(d), L = hallFish(h), before = L.filter(x => prog.museum[x.id]).length;
+  state.bag.splice(i, 1); prog.museum[f.id] = { w: f.w, l: f.l, at: Date.now() };
+  const thanks = Math.max(20, Math.round(f.price * .5)); state.coins += thanks;
+  let msg = `🏛️ 「${d.name}」放進${h.name}了！館長送你 🪙${thanks} 謝禮`;
+  const after = before + 1, half = Math.ceil(L.length / 2);
+  if (before < half && after >= half) { state.coins += 1000; msg += `・${h.name}收藏過半，獎勵 🪙1000！`; }
+  if (after === L.length) { state.coins += 5000; msg += `・🎉 ${h.name}全部收藏完成，獎勵 🪙5000！`; }
+  toast(msg, 3600); SFX.pickup(); buzz([30, 30, 60]); checkAch(); save(); updateHud();
+  museumHall = h.id; museumPick = state.bag.some(x => !prog.museum[x.id]); openMuseum();
 }
 
 // ════════════════ 📋 委託板 ════════════════
@@ -2074,7 +2241,9 @@ function openDex(tab = 'dex') {
     <div class="tabs"><button id="tDex" class="${tab === 'dex' ? 'on' : ''}">魚類圖鑑 ${s.dexN}/${FISH.length}</button><button id="tAch" class="${tab === 'ach' ? 'on' : ''}">🏅 徽章收集冊 ${Object.keys(prog.ach).length}/${ACH.length}</button></div>
     <div class="list">${body}</div><p id="dexInfo" style="min-height:2.4em"></p>`);
   document.getElementById('tDex').onclick = () => openDex('dex'); document.getElementById('tAch').onclick = () => openDex('ach');
-  document.querySelectorAll('[data-pic]').forEach(c => { const f = FISH_BY_ID[c.dataset.pic]; drawFishTo(c, f); if (!prog.dex[f.id]) { const g = c.getContext('2d'); g.globalCompositeOperation = 'source-in'; g.fillStyle = '#5a5048'; g.fillRect(0, 0, 64, 32); } });
+  // 還沒釣到的魚畫剪影：先畫在暫存畫布，圖片晚載入時才不會在圖鑑裡變回彩色（劇透）
+  const dexPics = () => document.querySelectorAll('[data-pic]').forEach(c => { const f = FISH_BY_ID[c.dataset.pic]; if (prog.dex[f.id]) return drawFishTo(c, f); const tmp = document.createElement('canvas'); tmp.width = 64; tmp.height = 32; drawFishTo(tmp, f); const g = c.getContext('2d'); g.clearRect(0, 0, 64, 32); g.drawImage(tmp, 0, 0); g.globalCompositeOperation = 'source-in'; g.fillStyle = '#5a5048'; g.fillRect(0, 0, 64, 32); g.globalCompositeOperation = 'source-over'; });
+  dexPics(); setTimeout(dexPics, 600);
   document.querySelectorAll('[data-badge]').forEach(el => el.onclick = () => { const b = achParts(ACH.find(a => a[0] === el.dataset.badge)), got = prog.ach[b.id]; document.getElementById('dexInfo').innerHTML = got ? `${b.icon} <b>${b.title}</b>（${TIER_NAME[b.tier]}徽章）：${b.desc}<br><small>${fmtDate(got)} 獲得</small>` : `🔒 還沒拿到的${TIER_NAME[b.tier]}徽章。條件：${b.desc}`; });
   document.querySelectorAll('[data-fish]').forEach(el => el.onclick = () => openFishDetail(el.dataset.fish));
 }
@@ -2093,7 +2262,7 @@ function toggleMap() {
   g.font = 'bold 13px sans-serif'; g.textAlign = 'center'; g.lineWidth = 3;
   const label = (t, x, y, col = '#fff') => { const p = mapPos(x, y, sc); g.strokeStyle = '#000a'; g.strokeText(t, p.x, p.y + oy); g.fillStyle = col; g.fillText(t, p.x, p.y + oy); };
   for (const is of ISLANDS) if (isRevealed(is.cx, is.cy) && (!is.hidden || prog.found.lagoon)) label(is.name, is.cx, is.cy + 1, '#fff3c0');
-  for (const [t2, x2, y2, c2] of [['深海', 136, 70, '#a8c8ff'], ['深海', 62, 92, '#a8c8ff'], ['❄️冰川海域', 122, 12, '#e0f4ff'], ['🛶大河', 22, 84, '#c8f0ff'], ['⛰️上游', 18, 128, '#c8f0ff']]) if (isRevealed(x2, y2)) label(t2, x2, y2, c2);
+  for (const [t2, x2, y2, c2] of [['深海', 136, 70, '#a8c8ff'], ['深海', 62, 92, '#a8c8ff'], ['❄️冰川海域', 122, 12, '#e0f4ff'], ['🛶大河', 26, 70, '#c8f0ff'], ['🏘️柳河鎮', 16, 83, '#fff3c0'], ['⛰️上游', 18, 128, '#c8f0ff']]) if (isRevealed(x2, y2)) label(t2, x2, y2, c2);
   for (const s of SPOTS) if (s.id !== 'lagoon' && prog.found[s.id]) label(s.icon + s.name, s.x, s.y + 1, '#ffe680');
   sonarMarks(g, (x2, y2) => { const q = mapPos(x2, y2, sc); return { x: q.x, y: q.y + oy }; }, 1.6);
   const pl = state.onBoat ? state.boat : state.player, p = mapPos(pl.x, pl.y, sc);
@@ -2130,7 +2299,7 @@ const U = { tile: null, block: null, landOf: null, objs: [], lava: [], stairs: n
 const OVERW = {}; let world = 'over', UNDER = false;
 const MINE_NEED = 50, LAMP_PRICE = 800;   // 打開洞口：圖鑑 50 種＋探險燈
 const MINER_LOOK = { hat: 'helmet', hair: 'short_black', glasses: 'none', beard: 'full', top: 'vest_explorer', pants: 'khaki' }, MINER_NAME = '岩田隊長';
-const lampR = () => [44, 44, 58, 72][prog.lamp || 1] || 44;   // 提燈照亮的半徑（像素），營地可以升級
+const lampR = () => ([44, 44, 58, 72][prog.lamp || 1] || 44) + (buffOn('glow') ? 18 : 0);   // 提燈照亮的半徑（像素），營地可以升級
 function genUnder() {
   if (U.tile) return;
   const ut = new Uint8Array(N * N).fill(T.UWALL), ub = new Uint8Array(N * N).fill(1), ul = new Uint8Array(N * N);
@@ -2551,7 +2720,8 @@ function areaName() {
   const o = state.onBoat ? state.boat : state.player, xi = Math.floor(o.x), yi = Math.floor(o.y);
   if (UNDER) { const z = UZONE[landOf[yi * N + xi]]; return z ? z.name : '⛏️ 地底通道'; }
   if (state.onBoat) { const s = spotAt(o.x, o.y); if (s && prog.found[s.id]) return s.cond && !s.cond() ? `${s.name}（漲潮中，清晨才進得去）` : s.icon + ' ' + s.name; return REGION_NAME[REGION_OF[at(xi, yi)]] || (at(xi, yi) === T.ICE ? '冰層' : '海上'); }
-  const is = ISLANDS[landOf[yi * N + xi] - 1]; return is ? is.name : (at(xi, yi) === T.DOCK ? '碼頭' : '岸邊');
+  const is = ISLANDS[landOf[yi * N + xi] - 1]; if (is && is.custom && ell(xi, yi, RTOWN.x, RTOWN.y, RTOWN.rx + 1.5, RTOWN.ry + 1.5) < 1) return '柳河鎮';
+  return is ? is.name : (at(xi, yi) === T.DOCK ? '碼頭' : '岸邊');
 }
 function update(dt) {
   let ix = jv.x, iy = jv.y;
@@ -2614,6 +2784,7 @@ function updateHud() {
   if (state.pillT > 0) { const r = Math.ceil(state.pillT); st = `💊 防暈中 ${Math.floor(r / 60)}:${String(r % 60).padStart(2, '0')}`; }
   else if (state.sickOn) st = '🤢 暈船' + (prog.pills > 0 ? `（點我吃藥 💊${prog.pills}）` : '');
   else if (state.sick >= SICK_WARN) st = '😵 有點頭暈';
+  const bf = Object.keys(BUFFS).filter(buffOn).map(k => BUFFS[k].icon + fmtLeft(prog.buffs[k])).join(' '); if (bf) st = st ? st + '　' + bf : '🍽️ ' + bf;   // 料理效果倒數
   sc.hidden = !st; sc.textContent = st; sc.classList.toggle('sick', state.sickOn || state.sick >= SICK_WARN);
   btnB.textContent = b ? b.label : ''; btnB.style.visibility = b ? 'visible' : 'hidden';
   const bars = document.getElementById('bars'); bars.classList.toggle('show', fish.state === 'reel');
@@ -2967,7 +3138,7 @@ function frame(now) {
   if (viewMix < .5 && !state.onBoat && !UNDER) {
     const pl = state.player, vx = cam.vx + cam.fx, vy = cam.vy + cam.fy;
     ctx.font = `bold ${12 * DPR}px sans-serif`; ctx.textAlign = 'center'; ctx.lineWidth = 3 * DPR;
-    for (const b of BUILDINGS) { if (Math.hypot(b.door[0] - pl.x, b.door[1] - pl.y) > 6) continue; const p = iso(b.x + b.w / 2, b.y + b.h / 2); const sx = (p.x - vx) * PIX * DPR, sy = (p.y - vy - LH - b.hgt - 14) * PIX * DPR; ctx.strokeStyle = '#3a2a18'; ctx.strokeText(b.sign + ' ' + b.name, sx, sy); ctx.fillStyle = '#fff6dd'; ctx.fillText(b.sign + ' ' + b.name, sx, sy); }
+    for (const b of BUILDINGS) { if (b.deco || Math.hypot(b.door[0] - pl.x, b.door[1] - pl.y) > 6) continue; const p = iso(b.x + b.w / 2, b.y + b.h / 2); const sx = (p.x - vx) * PIX * DPR, sy = (p.y - vy - LH - b.hgt - 14) * PIX * DPR; ctx.strokeStyle = '#3a2a18'; ctx.strokeText(b.sign + ' ' + b.name, sx, sy); ctx.fillStyle = '#fff6dd'; ctx.fillText(b.sign + ' ' + b.name, sx, sy); }
   }
   drawCut(dt);
   drawAquarium(dt);

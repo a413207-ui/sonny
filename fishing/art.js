@@ -442,6 +442,19 @@ window.ART = (() => {
       awning('#c85a8a', '#fff0f6');
       sign(x0 + .7, (sx, sy) => { px(sx, sy - 5, 1, 2, '#3a3a40'); px(sx - 4, sy - 3, 9, 1, '#3a3a40'); px(sx - 4, sy - 2, 1, 1, '#3a3a40'); px(sx + 4, sy - 2, 1, 1, '#3a3a40'); });
       const [mx, my] = P(xR + .3, yF + .3, 0); px(mx, my - 4, 1, 4, '#5a3a1e'); px(mx - 3, my - 12, 7, 8, '#3ab0c0'); px(mx - 1, my - 15, 3, 3, '#e8d8c0'); px(mx - 2, my - 9, 1, 1, '#ff8aa0'); px(mx + 1, my - 7, 1, 1, '#ff8aa0');
+    } else if (b.id === 'restaurant') {   // 柳河食堂：紅白雨遮、冒煙的鍋子招牌、門口的桌椅
+      awning('#c8402a', '#fff4e4');
+      sign(x0 + .7, (sx, sy) => { px(sx - 4, sy - 3, 9, 4, '#3a3a40'); px(sx - 3, sy - 2, 7, 2, '#6a6a72'); px(sx - 5, sy - 3, 1, 1, '#3a3a40'); px(sx + 5, sy - 3, 1, 1, '#3a3a40'); for (let i = 0; i < 2; i++) { const ph = (t * .8 + i / 2) % 1; px(sx - 2 + i * 3, sy - 5 - ph * 3 | 0, 1, 2, `rgba(255,255,255,${.8 * (1 - ph)})`); } });
+      const [cx, cy] = P(xR + .45, yF + .35, 0); px(cx - 5, cy - 7, 11, 2, '#8a5a30'); px(cx - 1, cy - 5, 2, 5, '#6a4224'); px(cx - 7, cy - 4, 2, 4, '#b07a46'); px(cx + 6, cy - 4, 2, 4, '#b07a46'); px(cx - 2, cy - 9, 4, 2, '#f4f0e8'); px(cx - 1, cy - 10, 2, 1, '#e0806a');   // 桌上的一盤魚
+      const [ox, oy] = P(x0 + w * .75, y0 + .5, hgt + 6); px(ox - 2, oy - 6, 4, 7, '#2a1e14'); px(ox - 1, oy - 5, 2, 6, '#a8564a'); for (let i = 0; i < 3; i++) { const ph = (t * .5 + i / 3) % 1; g.fillStyle = `rgba(240,240,240,${.6 * (1 - ph)})`; g.fillRect(ox - 1 + Math.sin(ph * 6 + i) * 2 | 0, oy - 8 - ph * 12 | 0, 3, 2); }   // 廚房煙囪
+    } else if (b.id === 'museum') {   // 大河博物館：白色石柱、三角山牆、魚的旗幟
+      for (let i = 0; i < 4; i++) { const u = x0 + .3 + i * (w - .6) / 3; const [bx, by] = P(u, yF + .05, 0), [tx, ty] = P(u, yF + .05, hgt - 2); px(bx - 2, ty, 4, by - ty, '#f4f0e8'); px(bx - 2, ty, 1, by - ty, '#d8d0c4'); px(bx - 3, ty - 1, 6, 2, '#e8e0d4'); px(bx - 3, by - 2, 6, 2, '#e8e0d4'); }
+      const A = P(x0, yF, hgt), B2 = P(xR, yF, hgt), C = P(x0 + w / 2, yF, hgt + 9); quad([A, B2, C], '#e8e0d4'); line(A, C, '#b8b0a4'); line(B2, C, '#b8b0a4');
+      const [fx, fy] = P(x0 + w / 2, yF, hgt + 3); px(fx - 4, fy - 2, 6, 3, '#3a7ad0'); px(fx + 2, fy - 3, 2, 5, '#3a7ad0'); px(fx - 3, fy - 1, 1, 1, '#ffffff');   // 山牆上的魚徽章
+      for (const u of [x0 - .1, xR + .1]) { const [gx, gy] = P(u, yF + .2, 0); px(gx, gy - 20, 1, 20, '#5a3a1e'); px(gx + 1, gy - 20, 6, 8, '#c8402a'); px(gx + 2, gy - 17, 4, 2, '#ffd040'); }   // 兩邊的旗子
+    } else if (/^house/.test(b.id)) {   // 柳河鎮的民房：窗台花箱、晒魚架
+      const [fx, fy] = P(x0 + .5, yF, 0); px(fx - 3, fy - 7, 7, 2, '#6a4224'); for (let i = 0; i < 3; i++) px(fx - 2 + i * 2, fy - 8, 1, 1, ['#ff8aa0', '#fff3a0', '#b0c8ff'][(i + b.x) % 3]);
+      const [rx, ry] = P(xR + .35, yF + .2, 0); px(rx - 5, ry - 12, 1, 12, '#5a3a1e'); px(rx + 5, ry - 12, 1, 12, '#5a3a1e'); px(rx - 5, ry - 12, 11, 1, '#5a3a1e'); for (let i = 0; i < 3; i++) { px(rx - 3 + i * 3, ry - 11, 1, 4, '#8aa0a8'); px(rx - 4 + i * 3, ry - 8, 3, 1, '#8aa0a8'); }   // 晒魚架
     } else if (b.id === 'tailorC') {   // 雪國毛帽店：藍白雨遮、毛帽招牌、屋頂積雪、門口的雪人
       awning('#3a6ac0', '#f4f8ff');
       sign(x0 + .7, (sx, sy) => { px(sx - 3, sy - 4, 7, 3, '#7a5034'); px(sx - 4, sy - 2, 2, 3, '#efe6d6'); px(sx + 3, sy - 2, 2, 3, '#efe6d6'); px(sx - 2, sy - 5, 5, 1, '#efe6d6'); });
