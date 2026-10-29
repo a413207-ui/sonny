@@ -89,6 +89,8 @@ window.ART = (() => {
     bandana_green: { name: '綠色頭巾', price: 140, shop: 'tailorE', style: 'bandana', h: '#3a8a3a', H: '#6ac06a' },
     bandana_red: { name: '紅色頭巾', price: 140, shop: 'tailorD', style: 'bandana', h: '#c83a2a', H: '#f06a5a' },
     kasa: { name: '斗笠', price: 200, shop: 'tailorF', style: 'kasa', h: '#c8a860', H: '#e8cc88' },
+    kid_cap: { name: '小志的紅棒球帽', price: 9999, shop: 'friend', style: 'cap', h: '#d0402a', H: '#f06a4a' },
+    old_captain: { name: '老船長帽', price: 9999, shop: 'friend', style: 'captain', h: '#24305a', H: '#3a4a80' },
     helmet: { name: '礦工安全帽', price: 9999, shop: 'mine', style: 'helmet', h: '#e8b020', H: '#ffd040' },   // 地下世界委託獎勵（之後開放）
     headband: { name: '必勝頭帶', price: 120, shop: 'tailorF', style: 'headband', h: '#f4f0e8', H: '#e03a2a' },
   });
@@ -103,6 +105,8 @@ window.ART = (() => {
     bun_pink: { name: '包包頭（粉）', price: 220, shop: 'tailorF', style: 'bun', d: '#f0a0c0', D: '#c87090' },
   });
   Object.assign(WARDROBE.glasses, {
+    artist_glass: { name: '畫家的紅框眼鏡', price: 9999, shop: 'friend', style: 'round', G: '#d03a6a' },
+    scholar_glass: { name: '博士的金框眼鏡', price: 9999, shop: 'friend', style: 'round', G: '#d8a020' },
     crystal_glass: { name: '水晶眼鏡', price: 9999, shop: 'mine', style: 'round', G: '#8affff' },   // 地底委託獎勵
     goggles: { name: '雪地護目鏡', price: 240, shop: 'tailorC', style: 'goggles', G: '#ff9a3a' },
     shades_red: { name: '紅色墨鏡', price: 220, shop: 'tailorD', style: 'sunc', G: '#c8202a' },
@@ -113,6 +117,8 @@ window.ART = (() => {
     stubble: { name: '鬍渣', price: 100, shop: 'tailorE', style: 'stubble' },
   });
   Object.assign(WARDROBE.top, {
+    grandma_knit: { name: '阿嬤的手織毛衣', price: 9999, shop: 'friend', y: '#c86a8a', Y: '#9a4a66', L: '#e898b0', w: '#fff2c8', z: '#fff2c8', pattern: 'dots' },
+    postman: { name: '郵差制服', price: 9999, shop: 'friend', y: '#2a7a4a', Y: '#1a5a34', L: '#4a9a6a', w: '#ffd040' },
     miner_suit: { name: '礦工工作服', price: 9999, shop: 'mine', y: '#3a5a8a', Y: '#24406a', L: '#5a7ab0', w: '#ffd040', z: '#ffd040', pattern: 'stripe' },   // 地底委託獎勵
     parka_blue: { name: '羽絨外套（藍）', price: 320, shop: 'tailorC', y: '#3a6ac0', Y: '#244a8a', L: '#6a9ae0', w: '#f4f0e8' },
     sweater_snow: { name: '雪花毛衣', price: 280, shop: 'tailorC', y: '#c03a3a', Y: '#8a2424', L: '#e06a6a', w: '#f4f0e8', z: '#ffffff', pattern: 'dots' },
@@ -314,6 +320,12 @@ window.ART = (() => {
     if (back) drawRod();
     g.drawImage(img, x - 6, top);
     if (!back) drawRod();
+  }
+  // 居民（NPC）：用任何外型組出地圖小人，走路動畫跟主角一樣
+  const npcFrames = look => buildLook(look).person;
+  function drawNPC(g, P, x, y, { back, flip, frame }) {
+    const img = P[(back ? 'back' : 'front') + (flip ? 'Flip' : '')][frame || 0];
+    g.fillStyle = 'rgba(0,0,0,.22)'; g.fillRect(x - 5, y - 1, 10, 2); g.drawImage(img, x - 6, y - 18);
   }
   // 畫背影：bx,by＝腳底中心（螢幕像素），s＝放大倍率；回傳手的位置
   function drawThirdPerson(g, bx, by, s, pose) {
@@ -537,5 +549,5 @@ window.ART = (() => {
     drawRod(g, id, cvs.width * .15, cvs.height * .88, cvs.width * .9, cvs.height * .1, Math.max(1.5, cvs.height / 22), 1);
   }
 
-  return { ROD_LOOK, drawRod, drawRodIcon, PAL, sprite, flipped, shade: shadeHex, drawPerson, drawThirdPerson, drawTrophy, drawBobber, drawBoat, decorateBuilding, WARDROBE, SLOT_NAME, DEFAULT_LOOK, setLook, previewFront };
+  return { npcFrames, drawNPC, ROD_LOOK, drawRod, drawRodIcon, PAL, sprite, flipped, shade: shadeHex, drawPerson, drawThirdPerson, drawTrophy, drawBobber, drawBoat, decorateBuilding, WARDROBE, SLOT_NAME, DEFAULT_LOOK, setLook, previewFront };
 })();

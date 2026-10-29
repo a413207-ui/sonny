@@ -214,13 +214,13 @@
 <div class="overlay" id="fishDetail"><div class="card" id="fishDetailCard"></div></div>
 <div class="overlay" id="badgePop"><div class="card" id="badgeCard"></div></div>
 
-<script src="data/fish.js?v=2026.10.29-80"></script>
-<script src="art.js?v=2026.10.29-80"></script>
-<script src="music.js?v=2026.10.29-80"></script>
+<script src="data/fish.js?v=2026.10.29-81"></script>
+<script src="art.js?v=2026.10.29-81"></script>
+<script src="music.js?v=2026.10.29-81"></script>
 <script>
 'use strict';
 // 版本號：每次更新都要改（也要改上面三個 script 的 ?v=），遊戲會用它檢查網站上有沒有新版
-const BUILD = '2026.10.29-80';
+const BUILD = '2026.10.29-81';
 // ════════════════ 基本設定 ════════════════
 const FISH = window.FISH_DATA || [];
 const N = 160, TW = 32, TH = 16, LH = 4;         // 地圖格數、等角格寬高、陸地高度
@@ -968,7 +968,8 @@ function contextB() {
   }
   const tm = prog.maps.find(m => Math.hypot(m.x - p.x, m.y - p.y) < 1.1); if (tm) return { label: '挖寶', fn: () => digTreasure(tm) };
   if (Math.hypot(state.boat.x - p.x, state.boat.y - p.y) < 1.8) return { label: '上船', fn: () => { state.onBoat = true; toast('⛵ 用搖桿開船，到不同海域釣不同的魚'); } };
-  const b = nearBuilding(); if (b) return { label: '進入', fn: () => openBuilding(b) };
+  const b = nearBuilding(); if (b) return { label: '進入', fn: () => openBuilding(b) };   // 門口優先進門
+  const rn = nearResident(); if (rn) return { label: '聊天', fn: () => openResident(rn) };
   const spot = boatSpotNear(p.x, p.y); if (spot) return { label: '叫船', fn: () => callBoat(spot) };   // 船跑遠了：站在水邊就能把船叫過來
   return null;
 }
@@ -1186,6 +1187,9 @@ const ACH = [
   ['uquest5', '⛏️ 地底委託達人', '完成 5 張地底委託', s => (s.uquestDone || 0) >= 5],
   ['uall', '💎 地底魚博士', '地底的魚全部收集', s => FISH.filter(f => f.regions.some(r => UREG.has(r))).every(f => s.dex[f.id])],
   ['udragon', '🐉 地底龍王', '釣到傳說中的地底龍魚', s => !!s.dex.udragon],
+  ['res5', '🤝 柳河鎮的朋友', '和一位居民變成 5 顆心', s => RESIDENTS.some(r => Math.floor(((s.res || {})[r.id] || {}).p / 5 || 0) >= 5)],
+  ['res10', '💞 知心好友', '和一位居民變成 10 顆心', s => RESIDENTS.some(r => Math.floor(((s.res || {})[r.id] || {}).p / 5 || 0) >= 10)],
+  ['resall', '🏘️ 柳河鎮的大家', '和所有居民都變成 10 顆心', s => RESIDENTS.every(r => Math.floor(((s.res || {})[r.id] || {}).p / 5 || 0) >= 10)],
   ['cook1', '🍳 第一道料理', '在柳河食堂做一道料理', s => (s.cooked || 0) >= 1],
   ['cook20', '👨‍🍳 柳河大廚', '做 20 道料理', s => (s.cooked || 0) >= 20],
   ['serve10', '🛎️ 人氣食堂', '端 10 道料理給客人', s => (s.served || 0) >= 10],
@@ -1199,7 +1203,7 @@ const ACH = [
 // 徽章等級：bronze 銅、silver 銀、gold 金、rainbow 彩虹（最難）
 const TIER = { first: 'bronze', c10: 'bronze', c50: 'silver', c200: 'gold', d10: 'bronze', d30: 'silver', d60: 'gold', dall: 'rainbow',
   r_harbor: 'bronze', r_lake: 'bronze', r_river: 'bronze', r_reef: 'silver', r_deep: 'silver', t_dawn: 'bronze', t_dusk: 'bronze', t_night: 'silver',
-  rare: 'silver', epic: 'gold', legend: 'gold', legend_all: 'rainbow', w10: 'silver', w100: 'gold', m1000: 'bronze', m10000: 'gold', rod: 'bronze', boat: 'bronze', style1: 'bronze', style10: 'gold', tailorall: 'gold', wx_rain: 'bronze', wx_typhoon: 'gold', wx_special: 'silver', drift10: 'silver', contest1: 'bronze', podium: 'silver', champion: 'gold', r_cold: 'silver', r_mangrove: 'bronze', r_volcano: 'silver', r_bigriver: 'bronze', r_upriver: 'silver', aq1: 'bronze', aqleg: 'silver', aq20: 'gold', explore50: 'silver', explore85: 'gold', spot1: 'bronze', spotall: 'rainbow', dig1: 'bronze', dig5: 'gold', boss1: 'silver', boss5: 'gold', quest1: 'bronze', quest10: 'gold', gearall: 'silver', under1: 'silver', uzones: 'silver', ufish1: 'bronze', ulava: 'silver', uquest5: 'gold', uall: 'gold', udragon: 'rainbow', cook1: 'bronze', cook20: 'silver', serve10: 'silver', museum1: 'bronze', museumhall: 'gold', museumall: 'rainbow', print1: 'bronze', print10: 'silver', printleg: 'gold' };
+  rare: 'silver', epic: 'gold', legend: 'gold', legend_all: 'rainbow', w10: 'silver', w100: 'gold', m1000: 'bronze', m10000: 'gold', rod: 'bronze', boat: 'bronze', style1: 'bronze', style10: 'gold', tailorall: 'gold', wx_rain: 'bronze', wx_typhoon: 'gold', wx_special: 'silver', drift10: 'silver', contest1: 'bronze', podium: 'silver', champion: 'gold', r_cold: 'silver', r_mangrove: 'bronze', r_volcano: 'silver', r_bigriver: 'bronze', r_upriver: 'silver', aq1: 'bronze', aqleg: 'silver', aq20: 'gold', explore50: 'silver', explore85: 'gold', spot1: 'bronze', spotall: 'rainbow', dig1: 'bronze', dig5: 'gold', boss1: 'silver', boss5: 'gold', quest1: 'bronze', quest10: 'gold', gearall: 'silver', under1: 'silver', uzones: 'silver', ufish1: 'bronze', ulava: 'silver', uquest5: 'gold', uall: 'gold', udragon: 'rainbow', res5: 'bronze', res10: 'silver', resall: 'gold', cook1: 'bronze', cook20: 'silver', serve10: 'silver', museum1: 'bronze', museumhall: 'gold', museumall: 'rainbow', print1: 'bronze', print10: 'silver', printleg: 'gold' };
 const TIER_NAME = { bronze: '銅', silver: '銀', gold: '金', rainbow: '彩虹' };
 const achParts = a => { const i = a[1].indexOf(' '); return { id: a[0], icon: a[1].slice(0, i), title: a[1].slice(i + 1), desc: a[2], tier: TIER[a[0]] || 'bronze' }; };
 const medalHtml = (b, got) => `<div class="medal ${got ? b.tier : 'lock'}"><i>${got ? b.icon : '？'}</i></div>`;
@@ -1221,7 +1225,7 @@ function showNextBadge() {
   document.getElementById('badgeBook').onclick = () => { badgeQueue.length = 0; pop.classList.remove('show'); openDex('ach'); };
 }
 const SAVE_KEY = 'bay-fishing-save-v1';
-const prog = { dex: {}, ach: {}, catches: 0, region: {}, time: {}, rar: {}, maxW: 0, earned: 0, rodIdx: 0, boatLv: 0, bait: 0, pills: 0, look: null, closet: [], wxc: {}, drift: 0, contest: {}, contestN: 0, contestBest: 0, contestWins: 0, aquarium: [], found: {}, maps: [], dug: 0, boss: 0, quests: [], questDone: 0, rep: 0, gear: {}, explore: 0, fog: null, prints: [], rodTip: 0, lamp: 0, mineOpen: 0, underVisit: 0, ufog: null, raft: 0, uraft: null, heatLine: 0, uquests: [], uquestDone: 0, uzones: 0, udragonAt: 0, dishes: {}, buffs: {}, orders: [], cooked: 0, served: 0, museum: {} };
+const prog = { dex: {}, ach: {}, catches: 0, region: {}, time: {}, rar: {}, maxW: 0, earned: 0, rodIdx: 0, boatLv: 0, bait: 0, pills: 0, look: null, closet: [], wxc: {}, drift: 0, contest: {}, contestN: 0, contestBest: 0, contestWins: 0, aquarium: [], found: {}, maps: [], dug: 0, boss: 0, quests: [], questDone: 0, rep: 0, gear: {}, explore: 0, fog: null, prints: [], rodTip: 0, lamp: 0, mineOpen: 0, underVisit: 0, ufog: null, raft: 0, uraft: null, heatLine: 0, uquests: [], uquestDone: 0, uzones: 0, udragonAt: 0, dishes: {}, buffs: {}, orders: [], cooked: 0, served: 0, museum: {}, res: {} };
 function savePos() {   // 在地底時，地面位置記洞口，另外記地底的位置
   if (!UNDER) return { x: state.player.x, y: state.player.y, bx: state.boat.x, by: state.boat.y, onBoat: state.onBoat };
   const b = mineB(); if (prog.raft && state.boat.x > 0) prog.uraft = { x: state.boat.x, y: state.boat.y };
@@ -1252,7 +1256,7 @@ const SLOTS = ['hat', 'hair', 'glasses', 'beard', 'top', 'pants'];
 const owns = (slot, id) => (WR[slot][id] && WR[slot][id].price === 0) || prog.closet.includes(slot + ':' + id);
 function applyLook() { if (!prog.look) prog.look = { ...ART.DEFAULT_LOOK }; if (window.ART) ART.setLook(prog.look); }
 function drawPreview(cvs, look) { const g = cvs.getContext('2d'); g.imageSmoothingEnabled = false; g.clearRect(0, 0, cvs.width, cvs.height); g.drawImage(ART.previewFront(look), 0, 0, cvs.width, cvs.height); }
-const SHOP_OF = { tailorA: '到翠湖森林島的🎩森林服飾店買', tailorB: '到溪谷山島的👕山谷造型屋買', tailorC: '到冰晶島的🧣雪國毛帽店買', tailorD: '到火山島的🎸熔岩龐克屋買', tailorE: '到紅樹林島的🧭叢林探險屋買', tailorF: '到大河平原的👘河畔和風屋買', treasure: '藏寶圖挖寶才拿得到', mine: '地底營地的委託獎勵（完成地底委託拿到）' };
+const SHOP_OF = { tailorA: '到翠湖森林島的🎩森林服飾店買', tailorB: '到溪谷山島的👕山谷造型屋買', tailorC: '到冰晶島的🧣雪國毛帽店買', tailorD: '到火山島的🎸熔岩龐克屋買', tailorE: '到紅樹林島的🧭叢林探險屋買', tailorF: '到大河平原的👘河畔和風屋買', treasure: '藏寶圖挖寶才拿得到', mine: '地底營地的委託獎勵（完成地底委託拿到）', friend: '柳河鎮居民 10 顆心的友情禮物' };
 function applyGear() {
   const r = RODS[prog.rodIdx] || RODS[0]; state.rod = { power: r.power, luck: r.luck + (prog.bait > 0 ? 1 : 0), name: r.name };
   state.boatSpeed = UNDER ? 4.5 : (BOATS[prog.boatLv] || BOATS[0]).speed;   // 地底木筏比較慢
@@ -1818,6 +1822,136 @@ function donateFish(i) {
   if (after === L.length) { state.coins += 5000; msg += `・🎉 ${h.name}全部收藏完成，獎勵 🪙5000！`; }
   toast(msg, 3600); SFX.pickup(); buzz([30, 30, 60]); checkAch(); save(); updateHud();
   museumHall = h.id; museumPick = state.bag.some(x => !prog.museum[x.id]); openMuseum();
+}
+
+// ════════════════ 🧑‍🤝‍🧑 柳河鎮的居民：會走動、聊天、收禮物，好感度高了會回禮 ════════════════
+// likes：喜歡的魚（fitsNeed 的條件）；loves：最愛的那一種魚；gifts：好感 2／5／8／10 顆心時的回禮
+const RESIDENTS = [
+  { id: 'grandma', name: '林阿嬤', look: { hat: 'none', hair: 'gray', glasses: 'round', beard: 'none', top: 'hoodie_green', pants: 'khaki' }, home: 'house1', night: false,
+    likes: { reg: 'fresh', label: '淡水魚' }, loves: 'koi', loveName: '錦鯉',
+    lines: ['年輕人，今天有釣到魚嗎？', '我年輕的時候，大河裡的魚多到用手就撈得到喔。', '聽說翠湖的月影鯉，只有月光灑在湖面上才看得到。', '鮮魚湯最補了，暈船的時候喝一碗就好。', '博物館那個河野館長，從小就愛蒐集魚。'],
+    gifts: [['bait', 5], ['dish', 'soup'], ['coins', 1500], ['outfit', 'top', 'grandma_knit']] },
+  { id: 'kid', name: '小志', look: { hat: 'cap_blue', hair: 'short_black', glasses: 'none', beard: 'none', top: 'raincoat_red', pants: 'shorts_red' }, home: 'house2', night: false,
+    likes: { exact: 'common', label: '普通的小魚' }, loves: 'crucian', loveName: '鯽魚',
+    lines: ['哥哥／姊姊，教我釣魚好不好！', '我昨天看到河裡有一條好大的影子！', '聽說地底下有一條龍，是真的嗎？', '我長大要當全世界最厲害的釣客！', '浮標整個沉下去再拉竿喔，我阿公說的。'],
+    gifts: [['bait', 3], ['coins', 500], ['pills', 3], ['outfit', 'hat', 'kid_cap']] },
+  { id: 'boatman', name: '阿海伯', look: { hat: 'straw', hair: 'gray', glasses: 'none', beard: 'white', top: 'sailor', pants: 'black' }, home: 'pier', night: true,
+    likes: { reg: 'sea', label: '海裡的魚' }, loves: 'yellowtail', loveName: '青甘',
+    lines: ['大河我划了五十年，哪裡有魚我閉著眼睛都知道。', '颱風天別出海……不過聽說颱風天有特別的魚。', '魚往哪邊衝，竿子就往反方向壓，記住了！', '晚上的河最安靜，最適合釣魚。', '起大浪的時候容易暈船，帶顆暈船藥再出門。'],
+    gifts: [['bait', 8], ['pills', 3], ['coins', 2000], ['outfit', 'hat', 'old_captain']] },
+  { id: 'painter', name: '美玲', look: { hat: 'beanie_pink', hair: 'long_red', glasses: 'none', beard: 'none', top: 'hawaii', pants: 'jeans' }, home: 'house3', night: false,
+    likes: { rar: 'rare', label: '稀有又漂亮的魚' }, loves: 'gem_scale', loveName: '寶石鱗魚',
+    lines: ['你看那條河，夕陽照下來的時候最美了。', '我想畫一幅全部都是魚的大壁畫！', '魚拓師傅的作品好有味道，我好想學。', '聽說地底有一種魚，每片鱗都是不同顏色的寶石……', '黃昏的時候來找我，天空的顏色最好看。'],
+    gifts: [['coins', 800], ['dish', 'sashimi'], ['coins', 2500], ['outfit', 'glasses', 'artist_glass']] },
+  { id: 'postman', name: '郵差阿德', look: { hat: 'cap_blue', hair: 'short_brown', glasses: 'none', beard: 'mustache', top: 'hoodie_green', pants: 'khaki' }, home: 'house2', night: false,
+    likes: { shape: ['crab', 'squid'], label: '螃蟹、章魚、魷魚' }, loves: 'octopus', loveName: '章魚',
+    lines: ['📮 今天也有好多信要送！', '金鱗島每天晚上 8 點有釣魚評比大賽，別忘了報名！', '最近天氣變化很快，出門前看一下天氣喔。', '漁港鎮的委託板常常有好康的工作。', '我送信經過大河上游，看到一個冒煙的洞口……'],
+    gifts: [['bait', 5], ['coins', 1000], ['dish', 'curry'], ['outfit', 'top', 'postman']] },
+  { id: 'scholar', name: '吳博士', look: { hat: 'none', hair: 'gray', glasses: 'round', beard: 'mustache', top: 'black_jacket', pants: 'black' }, home: 'museum', night: false,
+    likes: { reg: 'under', label: '地底的魚' }, loves: 'olm', loveName: '洞螈',
+    lines: ['我在研究地底生物，你在洞窟裡看過會發光的魚嗎？', '博物館的地底館還有好多空位呢。', '魚的身體構造真是太奇妙了！', '熔岩河的魚能在那麼燙的地方活下來，真不可思議。', '聽說龍穴只有在冒泡的時候，地底龍魚才會出現。'],
+    gifts: [['coins', 800], ['dish', 'glowpot'], ['coins', 3000], ['outfit', 'glasses', 'scholar_glass']] },
+];
+const RES_BY = Object.fromEntries(RESIDENTS.map(r => [r.id, r]));
+const HEART_AT = [2, 5, 8, 10], resPts = id => ((prog.res || {})[id] || {}).p || 0, resHeart = id => Math.min(10, Math.floor(resPts(id) / 5));
+const todayKey = () => new Date().toDateString();
+// 居民的位置（不存檔，每次重新在鎮上找位置）
+const townTiles = [];
+for (let y = 72; y < 92; y++) for (let x = 8; x < 26; x++) if (at(x, y) === T.STONE && walkable(x + .5, y + .5) && ell(x, y, RTOWN.x, RTOWN.y, RTOWN.rx, RTOWN.ry) < 1 && !BUILDINGS.some(b => !b.deco && Math.hypot(b.door[0] - x - .5, b.door[1] - y - .5) < 1.8)) townTiles.push([x + .5, y + .5]);   // 不在門口逗留
+const pierTile = (() => { for (let x = 16; x < 26; x++) if (at(x, 82) === T.DOCK) return [x - .5, 82.5]; return [20.5, 82.5]; })();
+const resNPC = RESIDENTS.map((r, i) => { const [x, y] = townTiles[Math.floor(hash(i, 3, 810) * townTiles.length)]; return { r, x, y, tx: x, ty: y, wait: rand(1, 4), walk: 0, fx: 0, fy: 1, say: '', sayT: 0, frames: null }; });
+const resAwake = n => phase !== 'night' || n.r.night;
+function updateResidents(dt) {
+  if (UNDER) return;
+  const pl = state.player;
+  for (const n of resNPC) {
+    if (!resAwake(n)) continue;
+    if (n.sayT > 0) n.sayT -= dt;
+    if (Math.hypot(n.x - pl.x, n.y - pl.y) < 1.4 && !state.onBoat) { n.fx = pl.x - n.x; n.fy = pl.y - n.y; n.walk = 0; continue; }   // 主角靠近就停下來看著你
+    if (n.wait > 0) { n.wait -= dt; continue; }
+    const dx = n.tx - n.x, dy = n.ty - n.y, d = Math.hypot(dx, dy);
+    if (d < .1) {   // 到了：休息一下，再挑下一個地方（阿海伯晚上待在碼頭）
+      n.wait = rand(2, 6);
+      const [x, y] = n.r.home === 'pier' && (phase === 'night' || Math.random() < .5) ? pierTile : townTiles[Math.floor(Math.random() * townTiles.length)];
+      if (Math.hypot(x - n.x, y - n.y) < 7) { n.tx = x; n.ty = y; } continue;
+    }
+    const sp = 1.3 * dt, nx = n.x + dx / d * sp, ny = n.y + dy / d * sp;
+    if (walkable(nx, ny)) { n.x = nx; n.y = ny; n.fx = dx; n.fy = dy; n.walk += dt * 8; } else { n.tx = n.x; n.ty = n.y; }
+    // 偶爾自言自語（主角在附近才會說）
+    if (n.sayT <= 0 && Math.hypot(n.x - pl.x, n.y - pl.y) < 7 && Math.random() < dt / 12) { n.say = n.r.lines[Math.floor(Math.random() * n.r.lines.length)]; n.sayT = 4; }
+  }
+}
+function drawResident(g, n, vx, vy, t) {
+  if (!n.frames) n.frames = ART.npcFrames(n.r.look);
+  const p = iso(n.x, n.y), x = Math.round(p.x - vx), y = Math.round(p.y - vy - LH), s = iso(n.fx, n.fy), sdx = s.x - OX, sdy = s.y - OY;
+  const ph = Math.sin(n.walk), moving = n.wait <= 0 && Math.abs(ph) > .35;
+  ART.drawNPC(g, n.frames, x, y - (moving && ph < 0 ? 1 : 0), { back: sdy < -.1, flip: sdx < 0, frame: !moving ? 0 : ph > 0 ? 1 : 2 });
+  if (resHeart(n.r.id) >= 5) { g.fillStyle = '#ff6a8a'; g.fillRect(x - 1, y - 23, 3, 2); g.fillRect(x, y - 21, 1, 1); }   // 好朋友頭上有小愛心
+}
+const nearResident = () => { const p = state.player; return UNDER || state.onBoat ? null : resNPC.find(n => resAwake(n) && Math.hypot(n.x - p.x, n.y - p.y) < 1.4); };
+const heartsHtml = id => { const h = resHeart(id); return '❤️'.repeat(h) + '🤍'.repeat(10 - h); };
+function addResPts(id, n) {
+  if (!prog.res) prog.res = {}; const R = prog.res[id] = prog.res[id] || { p: 0 }, before = resHeart(id);
+  R.p = Math.min(50, R.p + n); const after = resHeart(id), r = RES_BY[id];
+  for (let k = 0; k < HEART_AT.length; k++) if (before < HEART_AT[k] && after >= HEART_AT[k]) giveResGift(r, r.gifts[k], HEART_AT[k]);
+  checkAch();
+}
+function giveResGift(r, g, hearts) {
+  let what = '';
+  if (g[0] === 'bait') { prog.bait += g[1]; what = `🪱 魚餌 ×${g[1]}`; }
+  else if (g[0] === 'pills') { prog.pills = (prog.pills || 0) + g[1]; what = `💊 暈船藥 ×${g[1]}`; }
+  else if (g[0] === 'coins') { state.coins += g[1]; what = `🪙${g[1]}`; }
+  else if (g[0] === 'dish') { prog.dishes[g[1]] = (prog.dishes[g[1]] || 0) + 1; what = `${RECIPE_BY[g[1]].icon}${RECIPE_BY[g[1]].name}`; }
+  else if (g[0] === 'outfit') { if (!prog.closet.includes(g[1] + ':' + g[2])) prog.closet.push(g[1] + ':' + g[2]); what = `限定服飾「${WR[g[1]][g[2]].name}」（回小屋換穿）`; }
+  setTimeout(() => { toast(`💝 ${r.name}和你變成 ${hearts} 顆心的朋友了！送你 ${what}`, 4200); SFX.badge(); buzz([40, 40, 40, 40, 200]); }, 600);
+}
+function openResident(n, mode) {
+  const r = n.r, R = (prog.res || {})[r.id] || { p: 0 }, today = todayKey();
+  if (!mode && R.talk !== today) { addResPts(r.id, 1); prog.res[r.id].talk = today; }   // 每天第一次聊天 +1
+  const h = resHeart(r.id);
+  const line = mode === 'gift' ? '' : h >= 8 ? `我們是好朋友了！${r.lines[Math.floor(Math.random() * r.lines.length)]}` : r.lines[Math.floor(Math.random() * r.lines.length)];
+  const pv = '<canvas id="resPv" width="16" height="26" class="pv" style="width:64px;height:104px;flex:none"></canvas>';
+  const gifted = ((prog.res || {})[r.id] || {}).gift === today;
+  const hint = h >= 2 ? `（${r.name}喜歡${r.likes.label}${h >= 5 ? `，最愛「${r.loveName}」` : ''}）` : '（多聊幾次，就知道他喜歡什麼了）';
+  let body;
+  if (mode === 'gift') {
+    const rows = bagView().map(([f, i]) => fishRow(f, i, true)).join('');
+    body = `<p class="hint">送一條魚給${r.name}（一天一次）${hint}</p><div class="list" style="max-height:44vh">${rows || '<p>魚簍是空的。</p>'}</div><p><button id="resBack">← 返回</button></p>`;
+  } else {
+    body = `<p style="text-align:center">${gifted ? '<em>今天已經送過禮物了</em>' : `<button id="resGift" ${state.bag.length ? '' : 'disabled'}>🎁 送魚</button>`}</p><p class="hint">${hint}</p>
+      <p class="hint">好感 2／5／8／10 顆心時會收到回禮，10 顆心有限定服飾。</p>`;
+  }
+  showPanel(`<h2>💬 ${r.name}</h2><div style="display:flex;gap:10px;align-items:center;text-align:left;margin-bottom:6px">${pv}<p style="margin:0">${line ? `「${line}」<br>` : ''}<small>${heartsHtml(r.id)}</small></p></div>${body}`);
+  const c = document.getElementById('resPv'); if (c) { const g = c.getContext('2d'); g.imageSmoothingEnabled = false; g.drawImage(ART.previewFront(r.look), 0, 0); }
+  paintFishCanvases();
+  const gb = document.getElementById('resGift'); if (gb) gb.onclick = () => openResident(n, 'gift');
+  const bb = document.getElementById('resBack'); if (bb) bb.onclick = () => openResident(n, 'back');
+  document.querySelectorAll('[data-pick]').forEach(el => el.onclick = () => {
+    const i = +el.dataset.pick, f = state.bag[i]; if (!f) return;
+    const d = FISH_BY_ID[f.id], love = f.id === r.loves, like = fitsNeed(f, r.likes);
+    state.bag.splice(i, 1); prog.res[r.id].gift = today;
+    const pts = love ? 8 : like ? 4 : 2;
+    const say = love ? `哇！是${d.name}！我最喜歡這個了，謝謝你！！` : like ? `${d.name}！我很喜歡，謝謝你！` : `謝謝你的${d.name}。`;
+    n.say = say; n.sayT = 4; toast(`💝 ${r.name}：「${say}」`, 3000); SFX.pickup(); buzz(40);
+    addResPts(r.id, pts); save(); updateHud(); openResident(n, 'back');
+  });
+}
+// 居民頭上的對話泡泡（高解析度文字，畫在建築名稱那一層）
+function drawResBubbles(ctx, vx, vy) {
+  if (UNDER || viewMix > .5) return;
+  ctx.font = `bold ${11 * DPR}px sans-serif`; ctx.textAlign = 'center';
+  for (const n of resNPC) {
+    if (!resAwake(n)) continue;
+    const dist = Math.hypot(n.x - state.player.x, n.y - state.player.y);
+    if (n.sayT <= 0 && dist < 3.2) { const q = iso(n.x, n.y), nx = (q.x - vx) * PIX * DPR, ny = (q.y - vy - LH - 22) * PIX * DPR; ctx.lineWidth = 3 * DPR; ctx.strokeStyle = '#3a2a18'; ctx.strokeText(n.r.name, nx, ny); ctx.fillStyle = '#fff6dd'; ctx.fillText(n.r.name, nx, ny); }   // 靠近時顯示名字
+    if (n.sayT <= 0 || dist > 9) continue;
+    const p = iso(n.x, n.y), sx = (p.x - vx) * PIX * DPR, sy = (p.y - vy - LH - 30) * PIX * DPR, txt = n.say.length > 16 ? n.say.slice(0, 15) + '…' : n.say;
+    const w = ctx.measureText(txt).width + 14 * DPR, h = 20 * DPR;
+    ctx.globalAlpha = Math.min(1, n.sayT * 2); ctx.fillStyle = '#fffaf0'; ctx.strokeStyle = '#3a2a18'; ctx.lineWidth = 2 * DPR;
+    ctx.beginPath(); ctx.roundRect(sx - w / 2, sy - h, w, h, 6 * DPR); ctx.fill(); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(sx - 4 * DPR, sy); ctx.lineTo(sx, sy + 6 * DPR); ctx.lineTo(sx + 4 * DPR, sy); ctx.fill();
+    ctx.fillStyle = '#3a2a18'; ctx.fillText(txt, sx, sy - 6 * DPR); ctx.globalAlpha = 1;
+  }
 }
 
 // ════════════════ 📋 委託板 ════════════════
@@ -2720,7 +2854,8 @@ function areaName() {
   const o = state.onBoat ? state.boat : state.player, xi = Math.floor(o.x), yi = Math.floor(o.y);
   if (UNDER) { const z = UZONE[landOf[yi * N + xi]]; return z ? z.name : '⛏️ 地底通道'; }
   if (state.onBoat) { const s = spotAt(o.x, o.y); if (s && prog.found[s.id]) return s.cond && !s.cond() ? `${s.name}（漲潮中，清晨才進得去）` : s.icon + ' ' + s.name; return REGION_NAME[REGION_OF[at(xi, yi)]] || (at(xi, yi) === T.ICE ? '冰層' : '海上'); }
-  const is = ISLANDS[landOf[yi * N + xi] - 1]; if (is && is.custom && ell(xi, yi, RTOWN.x, RTOWN.y, RTOWN.rx + 1.5, RTOWN.ry + 1.5) < 1) return '柳河鎮';
+  if (ell(xi, yi, RTOWN.x, RTOWN.y, RTOWN.rx + 1.5, RTOWN.ry + 1.5) < 1) return '柳河鎮';
+  const is = ISLANDS[landOf[yi * N + xi] - 1];
   return is ? is.name : (at(xi, yi) === T.DOCK ? '碼頭' : '岸邊');
 }
 function update(dt) {
@@ -2764,6 +2899,7 @@ function update(dt) {
   if (!state.onBoat && !UNDER) for (const m of prog.maps) if (!treasureHinted.has(m.id) && Math.hypot(m.x - p.x, m.y - p.y) < 4) { treasureHinted.add(m.id); toast('🗺️ 藏寶圖上的地方……好像就在這附近！', 2600); }
   contestTick(dt);
   updateSick(dt);
+  updateResidents(dt);
   updateFishing(dt);
   const target = fish.state && fish.state !== 'cast' ? 1 : fish.state === 'cast' ? Math.min(1, fish.t / .5) : 0;
   viewMix += (target - viewMix) * Math.min(1, dt * 6);
@@ -2826,6 +2962,7 @@ function drawIso(g, gf, t) {
   if (near(volcano)) objs.push({ k: volcano.x + volcano.y + 1.5, f: G => drawVolcano(G, vx, vy, t) });
   for (const d of drifts) if (near(d)) objs.push({ k: d.x + d.y, f: G => drawDrift(G, d, vx, vy, t) });
   if (!state.onBoat) objs.push({ k: state.boat.x + state.boat.y, f: G => drawBoat(G, vx, vy, t) });
+  for (const n of resNPC) if (resAwake(n) && near(n)) objs.push({ k: n.x + n.y, f: G => drawResident(G, n, vx, vy, t) });
   { const mb = mineB(); if (mb && near(mb)) objs.push({ k: mb.door[0] + 1.7 + mb.door[1] - .3, f: G => drawMiner(G, vx, vy, t) }); }
   }
   // 主角（在船上就是整艘船）不貼齊像素格，畫在自己的圖層，鏡頭跟著它平滑移動
@@ -3139,6 +3276,7 @@ function frame(now) {
     const pl = state.player, vx = cam.vx + cam.fx, vy = cam.vy + cam.fy;
     ctx.font = `bold ${12 * DPR}px sans-serif`; ctx.textAlign = 'center'; ctx.lineWidth = 3 * DPR;
     for (const b of BUILDINGS) { if (b.deco || Math.hypot(b.door[0] - pl.x, b.door[1] - pl.y) > 6) continue; const p = iso(b.x + b.w / 2, b.y + b.h / 2); const sx = (p.x - vx) * PIX * DPR, sy = (p.y - vy - LH - b.hgt - 14) * PIX * DPR; ctx.strokeStyle = '#3a2a18'; ctx.strokeText(b.sign + ' ' + b.name, sx, sy); ctx.fillStyle = '#fff6dd'; ctx.fillText(b.sign + ' ' + b.name, sx, sy); }
+    drawResBubbles(ctx, vx, vy);
   }
   drawCut(dt);
   drawAquarium(dt);
@@ -3164,7 +3302,7 @@ document.addEventListener('visibilitychange', () => { if (!document.hidden) chec
 load(); initFog(); uFogInit(); applyGear(); applyLook(); updateHud(); drawMini(); setInterval(save, 10000); addEventListener('pagehide', save);
 if (resumeUnder) enterUnder(resumeUnder); else toast('歡迎來到漁港鎮！走到碼頭盡頭「上船」出海，或在水邊直接「拋竿」', 3200);
 if (params.get('demo') === 'boat') { state.onBoat = true; }
-window.__game = { state, fish, FISH, docks, BUILDINGS, prog, ACH, save, applyGear, openBuilding, checkAch, openDex, startCast, hook }; window.__walk = walkable; window.__pick = pickFish; window.__drifts = drifts; window.__regionAt = regionAt; window.__boatable = boatable; window.__islands = ISLANDS; window.__openFishDetail = openFishDetail; window.__aq = () => aq; window.__drawAq = drawAquarium; window.__tile = at; window.__adv = { SPOTS, fogPct, revealAt, isRevealed, discover, giveMap, digTreasure, openQuests, genQuest, get boss() { return boss; }, set boss(v) { boss = v; }, set bossCD(v) { bossCD = v; }, GEAR, drawTreasureMap }; window.__contextB = contextB; window.__uzone = (x, y) => (UNDER ? landOf : (U.landOf || landOf))[y * N + x]; window.__uzc = UZC.map(c => c); window.__ustairs = () => U.stairs; window.__ucamp = () => U.camp; window.__ulair = () => U.lair; window.__lairActive = lairActive; window.__openCamp = openCamp; window.__world = () => world; window.__checkUpdate = checkUpdate; window.__actx = () => actx; window.__contest = { nextContestKey, contestAt, runContest, openGuild, contestTable, startCeremony, get cut() { return cut; } };   // 給測試用
+window.__game = { state, fish, FISH, docks, BUILDINGS, prog, ACH, save, applyGear, openBuilding, checkAch, openDex, startCast, hook }; window.__walk = walkable; window.__pick = pickFish; window.__drifts = drifts; window.__regionAt = regionAt; window.__boatable = boatable; window.__islands = ISLANDS; window.__openFishDetail = openFishDetail; window.__aq = () => aq; window.__drawAq = drawAquarium; window.__tile = at; window.__adv = { SPOTS, fogPct, revealAt, isRevealed, discover, giveMap, digTreasure, openQuests, genQuest, get boss() { return boss; }, set boss(v) { boss = v; }, set bossCD(v) { bossCD = v; }, GEAR, drawTreasureMap }; window.__contextB = contextB; window.__uzone = (x, y) => (UNDER ? landOf : (U.landOf || landOf))[y * N + x]; window.__uzc = UZC.map(c => c); window.__ustairs = () => U.stairs; window.__ucamp = () => U.camp; window.__res = resNPC; window.__openResident = openResident; window.__ulair = () => U.lair; window.__lairActive = lairActive; window.__openCamp = openCamp; window.__world = () => world; window.__checkUpdate = checkUpdate; window.__actx = () => actx; window.__contest = { nextContestKey, contestAt, runContest, openGuild, contestTable, startCeremony, get cut() { return cut; } };   // 給測試用
 requestAnimationFrame(frame);
 </script>
 </body>
