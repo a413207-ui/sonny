@@ -359,6 +359,13 @@ window.ART = (() => {
       awning('#c85a8a', '#fff0f6');
       sign(x0 + .7, (sx, sy) => { px(sx, sy - 5, 1, 2, '#3a3a40'); px(sx - 4, sy - 3, 9, 1, '#3a3a40'); px(sx - 4, sy - 2, 1, 1, '#3a3a40'); px(sx + 4, sy - 2, 1, 1, '#3a3a40'); });
       const [mx, my] = P(xR + .3, yF + .3, 0); px(mx, my - 4, 1, 4, '#5a3a1e'); px(mx - 3, my - 12, 7, 8, '#3ab0c0'); px(mx - 1, my - 15, 3, 3, '#e8d8c0'); px(mx - 2, my - 9, 1, 1, '#ff8aa0'); px(mx + 1, my - 7, 1, 1, '#ff8aa0');
+    } else if (b.id === 'gyotaku') {   // 魚拓工坊：深色暖簾、掛在牆上的魚拓、門口的墨缸
+      sign(x0 + .7, (sx, sy) => { px(sx - 4, sy - 4, 8, 4, '#f4ecd8'); px(sx - 3, sy - 3, 5, 2, '#1a1612'); px(sx + 2, sy - 4, 1, 4, '#1a1612'); });
+      const n = 4, a0 = x0 + .2, a1 = x0 + w * .55;   // 暖簾（門口的布簾）
+      for (let i = 0; i < n; i++) { const u0 = a0 + (a1 - a0) * i / n, u1 = a0 + (a1 - a0) * (i + .85) / n; quad([P(u0, yF, hgt - 3), P(u1, yF, hgt - 3), P(u1, yF, hgt - 9), P(u0, yF, hgt - 9)], '#2a3a5a'); }
+      { const [cx, cy] = P((a0 + a1) / 2, yF, hgt - 6); px(cx - 1, cy - 1, 3, 2, '#f4ecd8'); }
+      const [fx, fy] = P(xR, yF - .9, hgt - 4); px(fx - 4, fy - 6, 7, 9, '#5a3a20'); px(fx - 3, fy - 5, 5, 7, '#f4ecd8'); px(fx - 2, fy - 3, 3, 2, '#1a1612');   // 牆上的魚拓
+      const [jx, jy] = P(x0 + w * .78, yF + .4, 0); px(jx - 3, jy - 5, 7, 5, '#2a1e14'); px(jx - 2, jy - 6, 5, 2, '#1a1612');   // 墨缸
     } else if (b.id === 'aquarium') {   // 水族館：藍色雨遮、魚招牌、正面大玻璃（裡面有魚游）
       awning('#2a78b0', '#e8f6ff');
       sign(x0 + 1.5, (sx, sy) => { px(sx - 3, sy - 4, 5, 3, '#3a9ad8'); px(sx + 2, sy - 5, 2, 5, '#3a9ad8'); px(sx - 2, sy - 3, 1, 1, '#fff'); });

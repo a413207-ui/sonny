@@ -126,6 +126,8 @@
   .sortBar { display: flex; flex-wrap: wrap; gap: 4px; justify-content: center; margin: 2px 0 6px; }
   .sortBar button { font-size: 12px; padding: 3px 8px; border: 2px solid #8a6a3a; border-radius: 12px; background: #fff8e6; box-shadow: none; font-weight: 700; color: #4a2e12; }
   .sortBar button.on { background: #ffb840; }
+  .gyoWall { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; max-height: 52vh; overflow: auto; }
+  .gyoWall canvas { width: 100%; height: auto; aspect-ratio: 3 / 4; cursor: pointer; }
   .grpHead { text-align: left; font-size: 12px; font-weight: 800; color: #6b5034; background: #f3e6c8; border-radius: 6px; padding: 2px 8px; margin-top: 6px; }
   .bagRow canvas { width: 48px; height: 24px; image-rendering: pixelated; flex: none; }
   .bagRow .r { margin-left: auto; text-align: right; white-space: nowrap; font-size: 12px; color: #6b5034; }
@@ -200,13 +202,13 @@
 <div class="overlay" id="fishDetail"><div class="card" id="fishDetailCard"></div></div>
 <div class="overlay" id="badgePop"><div class="card" id="badgeCard"></div></div>
 
-<script src="data/fish.js?v=2026.10.29-72"></script>
-<script src="art.js?v=2026.10.29-72"></script>
-<script src="music.js?v=2026.10.29-72"></script>
+<script src="data/fish.js?v=2026.10.29-73"></script>
+<script src="art.js?v=2026.10.29-73"></script>
+<script src="music.js?v=2026.10.29-73"></script>
 <script>
 'use strict';
 // 版本號：每次更新都要改（也要改上面三個 script 的 ?v=），遊戲會用它檢查網站上有沒有新版
-const BUILD = '2026.10.29-72';
+const BUILD = '2026.10.29-73';
 // ════════════════ 基本設定 ════════════════
 const FISH = window.FISH_DATA || [];
 const N = 160, TW = 32, TH = 16, LH = 4;         // 地圖格數、等角格寬高、陸地高度
@@ -353,6 +355,7 @@ const BUILDINGS = [
   { id: 'board', name: '圖鑑館', x: 106, y: 65, w: 2, h: 2, hgt: 15, wall: '#efe0d0', roof: '#9a5ab0', sign: '📖' },
   { id: 'aquarium', name: '水族館', x: 98, y: 62, w: 3, h: 2, hgt: 18, wall: '#e4f2fa', roof: '#2a78b0', sign: '🐠' },
   { id: 'quests', name: '委託板', x: 97, y: 58, w: 1, h: 1, hgt: 12, wall: '#c8a070', roof: '#8a5a30', sign: '📋' },
+  { id: 'gyotaku', name: '魚拓工坊', x: 93, y: 58, w: 2, h: 2, hgt: 15, wall: '#efe6d6', roof: '#4a3a30', sign: '🖌️' },   // 廣場左上，委託板旁邊
 ];
 // 服飾店：放在其他島的碼頭附近（翠湖森林島、溪谷山島），並鋪一條石板路接到碼頭
 function placeShop(dock, w, h) {
@@ -1041,11 +1044,14 @@ const ACH = [
   ['quest1', '📋 熱心幫忙', '完成一張委託', s => (s.questDone || 0) >= 1],
   ['quest10', '🤝 漁村好朋友', '完成 10 張委託', s => (s.questDone || 0) >= 10],
   ['gearall', '🧰 探險家裝備', '買齊三樣探險裝備', s => GEAR.every(g => (s.gear || {})[g.id])],
+  ['print1', '🖼️ 第一幅魚拓', '請魚拓師傅拓一幅魚拓', s => (s.prints || []).length >= 1],
+  ['print10', '🎨 魚拓收藏家', '收藏 10 幅魚拓', s => (s.prints || []).length >= 10],
+  ['printleg', '🏯 傳說魚拓', '把傳說魚拓成魚拓', s => (s.prints || []).some(p => FISH_BY_ID[p.id] && FISH_BY_ID[p.id].rarity === 'legendary')],
 ];
 // 徽章等級：bronze 銅、silver 銀、gold 金、rainbow 彩虹（最難）
 const TIER = { first: 'bronze', c10: 'bronze', c50: 'silver', c200: 'gold', d10: 'bronze', d30: 'silver', d60: 'gold', dall: 'rainbow',
   r_harbor: 'bronze', r_lake: 'bronze', r_river: 'bronze', r_reef: 'silver', r_deep: 'silver', t_dawn: 'bronze', t_dusk: 'bronze', t_night: 'silver',
-  rare: 'silver', epic: 'gold', legend: 'gold', legend_all: 'rainbow', w10: 'silver', w100: 'gold', m1000: 'bronze', m10000: 'gold', rod: 'bronze', boat: 'bronze', style1: 'bronze', style10: 'gold', wx_rain: 'bronze', wx_typhoon: 'gold', wx_special: 'silver', drift10: 'silver', contest1: 'bronze', podium: 'silver', champion: 'gold', r_cold: 'silver', r_mangrove: 'bronze', r_volcano: 'silver', r_bigriver: 'bronze', r_upriver: 'silver', aq1: 'bronze', aqleg: 'silver', aq20: 'gold', explore50: 'silver', explore85: 'gold', spot1: 'bronze', spotall: 'rainbow', dig1: 'bronze', dig5: 'gold', boss1: 'silver', boss5: 'gold', quest1: 'bronze', quest10: 'gold', gearall: 'silver' };
+  rare: 'silver', epic: 'gold', legend: 'gold', legend_all: 'rainbow', w10: 'silver', w100: 'gold', m1000: 'bronze', m10000: 'gold', rod: 'bronze', boat: 'bronze', style1: 'bronze', style10: 'gold', wx_rain: 'bronze', wx_typhoon: 'gold', wx_special: 'silver', drift10: 'silver', contest1: 'bronze', podium: 'silver', champion: 'gold', r_cold: 'silver', r_mangrove: 'bronze', r_volcano: 'silver', r_bigriver: 'bronze', r_upriver: 'silver', aq1: 'bronze', aqleg: 'silver', aq20: 'gold', explore50: 'silver', explore85: 'gold', spot1: 'bronze', spotall: 'rainbow', dig1: 'bronze', dig5: 'gold', boss1: 'silver', boss5: 'gold', quest1: 'bronze', quest10: 'gold', gearall: 'silver', print1: 'bronze', print10: 'silver', printleg: 'gold' };
 const TIER_NAME = { bronze: '銅', silver: '銀', gold: '金', rainbow: '彩虹' };
 const achParts = a => { const i = a[1].indexOf(' '); return { id: a[0], icon: a[1].slice(0, i), title: a[1].slice(i + 1), desc: a[2], tier: TIER[a[0]] || 'bronze' }; };
 const medalHtml = (b, got) => `<div class="medal ${got ? b.tier : 'lock'}"><i>${got ? b.icon : '？'}</i></div>`;
@@ -1067,7 +1073,7 @@ function showNextBadge() {
   document.getElementById('badgeBook').onclick = () => { badgeQueue.length = 0; pop.classList.remove('show'); openDex('ach'); };
 }
 const SAVE_KEY = 'bay-fishing-save-v1';
-const prog = { dex: {}, ach: {}, catches: 0, region: {}, time: {}, rar: {}, maxW: 0, earned: 0, rodIdx: 0, boatLv: 0, bait: 0, pills: 0, look: null, closet: [], wxc: {}, drift: 0, contest: {}, contestN: 0, contestBest: 0, contestWins: 0, aquarium: [], found: {}, maps: [], dug: 0, boss: 0, quests: [], questDone: 0, rep: 0, gear: {}, explore: 0, fog: null };
+const prog = { dex: {}, ach: {}, catches: 0, region: {}, time: {}, rar: {}, maxW: 0, earned: 0, rodIdx: 0, boatLv: 0, bait: 0, pills: 0, look: null, closet: [], wxc: {}, drift: 0, contest: {}, contestN: 0, contestBest: 0, contestWins: 0, aquarium: [], found: {}, maps: [], dug: 0, boss: 0, quests: [], questDone: 0, rep: 0, gear: {}, explore: 0, fog: null, prints: [] };
 function save() {
   try { prog.fog = fogPack(); prog.fogN = N; localStorage.setItem(SAVE_KEY, JSON.stringify({ v: 1, mapV: 3, coins: state.coins, bag: state.bag, prog, pos: { x: state.player.x, y: state.player.y, bx: state.boat.x, by: state.boat.y, onBoat: state.onBoat } })); } catch (e) {}
 }
@@ -1122,7 +1128,7 @@ function showPanel(html) {
   document.getElementById('closePanel').onclick = () => panelEl().classList.remove('show');
 }
 const FISH_BY_ID = Object.fromEntries(FISH.map(f => [f.id, f]));
-function openBuilding(b) { ({ shop: openShop, market: openMarket, home: openHome, board: openDex, tailorA: () => openTailor(b), tailorB: () => openTailor(b), guild: () => openGuild(), aquarium: () => openAquarium(), quests: () => openQuests() })[b.id](); }
+function openBuilding(b) { ({ shop: openShop, market: openMarket, home: openHome, board: openDex, tailorA: () => openTailor(b), tailorB: () => openTailor(b), guild: () => openGuild(), aquarium: () => openAquarium(), quests: () => openQuests(), gyotaku: () => openGyotaku() })[b.id](); }
 function openMarket() {
   const total = state.bag.reduce((a, f) => a + f.price, 0);
   const rows = bagListHtml((f, i) => { const d = FISH_BY_ID[f.id]; return `<div class="row"><span><b style="color:${RAR[d.rarity].color}">${d.name}</b> ${fmtW(f.w)}・${f.l} cm</span><button data-sell="${i}">賣 🪙${f.price}</button></div>`; });
@@ -1527,6 +1533,111 @@ function questMatch(q) {
   if (q.type === 'drift') return (prog.drift || 0) - q.start >= q.n ? 'ok' : null;
   const ok = state.bag.map((f, i) => [f, i]).filter(([f]) => f.id === q.fid && (!q.minW || f.w >= q.minW)).sort((a, b) => a[0].price - b[0].price);
   return ok.length ? ok[0][1] : null;
+}
+// ════════════════ 🖌️ 魚拓工坊：把釣到的魚交給魚拓師傅，拓成一幅掛軸魚拓收藏 ════════════════
+const MASTER_LOOK = { hat: 'beanie_pink', hair: 'gray', glasses: 'round', beard: 'white', top: 'black_jacket', pants: 'khaki' };
+const MASTER_NAME = '墨田師傅';
+const INKS = {
+  ink: { name: '墨黑', k: 1, paper: '#f4ecd8', ink: '#1a1612', text: '#2a2018', desc: '最傳統的黑墨，看得到每一片鱗。' },
+  indigo: { name: '藍染', k: 1.5, paper: '#f2efe6', ink: '#1e3a6a', text: '#1e2a40', desc: '用藍染的顏料拓，清爽又有海的感覺。' },
+  vermilion: { name: '朱紅', k: 1.5, paper: '#f6efe0', ink: '#b8281e', text: '#5a1a14', desc: '喜氣的朱紅色，適合大魚。' },
+  gold: { name: '金箔', k: 3, paper: '#1e2a44', ink: '#e8c050', text: '#f0d890', desc: '深藍紙配金墨，傳說魚最配。' },
+};
+const GYO_FEE = { common: 30, uncommon: 60, rare: 120, epic: 250, legendary: 500 };
+const MASTER_LINES = ['嗯…讓我看看這條魚的鱗片。', '好魚就該留下來。交給我吧。', '墨要慢慢上，急不得。', '釣魚的人最懂魚，拓魚的人最懂鱗。', '這條魚的眼神不錯，拓起來會很有精神。'];
+const gyoFee = (f, ink) => Math.round(GYO_FEE[FISH_BY_ID[f.id].rarity] * INKS[ink].k);
+// 畫一幅掛軸魚拓（canvas 直式，3:4）
+function drawPrint(cvs, pr, prog01 = 1) {
+  const g = cvs.getContext('2d'), W = cvs.width, H = cvs.height, I = INKS[pr.ink] || INKS.ink, def = FISH_BY_ID[pr.id];
+  g.clearRect(0, 0, W, H);
+  // 掛軸：上下木軸、裱框、紙
+  g.fillStyle = '#5a3a20'; g.fillRect(W * .04, 0, W * .92, H * .05); g.fillRect(W * .04, H * .95, W * .92, H * .05);
+  g.fillStyle = '#8a6a4a'; g.fillRect(W * .08, H * .04, W * .84, H * .92);
+  g.fillStyle = I.paper; g.fillRect(W * .12, H * .07, W * .76, H * .86);
+  for (let i = 0; i < 70; i++) { g.fillStyle = pr.ink === 'gold' ? 'rgba(255,255,255,.04)' : 'rgba(120,90,50,.06)'; g.fillRect(W * .12 + hash(i, 1) * W * .76, H * .07 + hash(i, 2) * H * .86, 1 + hash(i, 3) * W * .08, 1); }   // 紙纖維
+  // 魚：先把魚的形狀印成墨色，再打上斑駁和鱗紋
+  const fw = W * .66, fh = fw / 2, fx = W * .17, fy = H * .3;
+  const src = document.createElement('canvas'); src.width = 64; src.height = 32; drawFishTo(src, def);
+  const ink = document.createElement('canvas'); ink.width = Math.round(fw); ink.height = Math.round(fh);
+  const k = ink.getContext('2d'); k.imageSmoothingEnabled = true; k.drawImage(src, 0, 0, ink.width, ink.height);
+  k.globalCompositeOperation = 'source-in';
+  if (pr.ink === 'gold') { const gr = k.createLinearGradient(0, 0, ink.width, ink.height); gr.addColorStop(0, '#f8e08a'); gr.addColorStop(.5, '#d8a830'); gr.addColorStop(1, '#f4d070'); k.fillStyle = gr; } else k.fillStyle = I.ink;
+  k.fillRect(0, 0, ink.width, ink.height);
+  k.globalCompositeOperation = 'destination-out';
+  const seed = (pr.at || 1) % 997;
+  for (let i = 0; i < 260; i++) { k.fillStyle = `rgba(0,0,0,${.15 + hash(i, seed) * .35})`; k.fillRect(hash(i, seed + 1) * ink.width, hash(i, seed + 2) * ink.height, 1 + hash(i, seed + 3) * 2, 1); }   // 墨的斑駁
+  k.strokeStyle = 'rgba(0,0,0,.28)'; k.lineWidth = 1;
+  const sc = Math.max(4, ink.width / 22);
+  for (let y = sc / 2; y < ink.height; y += sc * .7) for (let x = (Math.round(y / sc) % 2) * sc / 2; x < ink.width; x += sc) { k.beginPath(); k.arc(x, y, sc * .45, .15 * Math.PI, .85 * Math.PI); k.stroke(); }   // 鱗紋
+  g.save(); g.globalAlpha = prog01; g.drawImage(ink, fx, fy); g.globalAlpha = prog01 * .25; g.drawImage(ink, fx + 1, fy + 1); g.restore();
+  if (prog01 < 1) return;
+  // 字：右邊直書魚名、下面寫大小與日期、紅色落款
+  g.fillStyle = I.text; g.textAlign = 'center';
+  const fs = Math.max(10, W * .085); g.font = `900 ${fs}px "Noto Serif TC","PMingLiU",serif`;
+  [...def.name].forEach((ch, i) => g.fillText(ch, W * .8, H * .14 + fs * (i + .8)));
+  g.font = `700 ${Math.max(8, W * .05)}px "Noto Serif TC",serif`;
+  g.fillText(`${fmtW(pr.w)}・${pr.l} cm`, W * .45, H * .68);
+  const d = new Date(pr.at || Date.now()); g.font = `${Math.max(7, W * .042)}px "Noto Serif TC",serif`; g.fillText(`${d.getFullYear()}年${d.getMonth() + 1}月${d.getDate()}日 釣`, W * .45, H * .74);
+  const sx = W * .2, sy = H * .78, ss = W * .12; g.fillStyle = '#c0281e'; g.fillRect(sx, sy, ss, ss); g.fillStyle = I.paper === '#1e2a44' ? '#1e2a44' : '#fff6ee';
+  g.font = `900 ${ss * .62}px "Noto Serif TC",serif`; g.textBaseline = 'middle'; g.fillText('釣', sx + ss / 2, sy + ss / 2 + 1); g.textBaseline = 'alphabetic';
+  g.fillStyle = I.text; g.font = `${Math.max(7, W * .038)}px "Noto Serif TC",serif`; g.fillText(`${MASTER_NAME}拓`, W * .62, H * .86);
+}
+let gyoPick = null, gyoInk = 'ink';
+function openGyotaku(tab = 'make') {
+  const masterPv = `<canvas id="gyoMaster" width="16" height="26" style="width:48px;height:78px;image-rendering:pixelated;flex:none"></canvas>`;
+  const say = MASTER_LINES[Math.floor(Math.random() * MASTER_LINES.length)];
+  const tabs = `<div class="tabs"><button id="gTabMake" class="${tab === 'make' ? 'on' : ''}">🖌️ 拓魚拓</button><button id="gTabWall" class="${tab === 'wall' ? 'on' : ''}">🖼️ 收藏牆（${prog.prints.length}）</button></div>`;
+  let body;
+  if (tab === 'wall') {
+    body = prog.prints.length ? `<div class="gyoWall">${prog.prints.map((p, i) => [p, i]).reverse().map(([p, i]) => `<canvas width="120" height="160" data-print="${i}"></canvas>`).join('')}</div>` : '<p>收藏牆還是空的。挑一條得意的魚，請師傅拓一幅吧！</p>';
+  } else if (!state.bag.length) body = '<p>魚簍是空的。釣到得意的魚再拿來吧！</p>';
+  else {
+    const sel = gyoPick !== null && state.bag[gyoPick];
+    body = `<h3>1. 選一條魚</h3>${state.bag.length > 1 ? sortBarHtml() : ''}<div class="list" style="max-height:26vh">${bagListHtml((f, i) => fishRow(f, i, true).replace('class="bagRow pick"', `class="bagRow pick ${gyoPick === i ? 'sel' : ''}"`))}</div>
+      <h3>2. 選墨色</h3><div class="sortBar">${Object.entries(INKS).map(([k, v]) => `<button data-ink="${k}" class="${gyoInk === k ? 'on' : ''}">${v.name}${sel ? `・🪙${gyoFee(sel, k)}` : ''}</button>`).join('')}</div><p class="hint" style="text-align:center">${INKS[gyoInk].desc}</p>
+      <div style="margin-top:6px;min-height:44px">${sel ? `<button id="gyoGo">請師傅拓「${FISH_BY_ID[sel.id].name}」（🪙${gyoFee(sel, gyoInk)}）</button><p class="hint" style="text-align:center">交給師傅的魚會變成魚拓，不會回到魚簍。</p>` : '<p class="hint" style="text-align:center">先點一條魚</p>'}</div>`;
+  }
+  showPanel(`<h2>🖌️ 魚拓工坊</h2><div style="display:flex;gap:10px;align-items:center;text-align:left;margin-bottom:6px">${masterPv}<p style="margin:0"><b>${MASTER_NAME}</b>：「${say}」<br><small>你有 🪙${state.coins}</small></p></div>${tabs}${body}`);
+  const mg2 = document.getElementById('gyoMaster').getContext('2d'); mg2.imageSmoothingEnabled = false; mg2.drawImage(ART.previewFront(MASTER_LOOK), 0, 0);
+  document.getElementById('gTabMake').onclick = () => openGyotaku('make'); document.getElementById('gTabWall').onclick = () => openGyotaku('wall');
+  paintFishCanvases(); wireSortBar(() => openGyotaku('make'));
+  document.querySelectorAll('[data-pick]').forEach(el => el.onclick = () => { gyoPick = +el.dataset.pick; openGyotaku('make'); });
+  document.querySelectorAll('[data-ink]').forEach(el => el.onclick = () => { gyoInk = el.dataset.ink; openGyotaku('make'); });
+  document.querySelectorAll('[data-print]').forEach(c => { drawPrint(c, prog.prints[+c.dataset.print]); c.onclick = () => viewPrint(+c.dataset.print); });
+  const go = document.getElementById('gyoGo'); if (go) go.onclick = () => {
+    const f = state.bag[gyoPick], fee = gyoFee(f, gyoInk);
+    if (state.coins < fee) { toast('錢不夠，先去魚市賣點魚吧'); buzz(120); return; }
+    state.coins -= fee; state.bag.splice(gyoPick, 1); gyoPick = null;
+    const pr = { id: f.id, w: f.w, l: f.l, at: f.at || Date.now(), made: Date.now(), ink: gyoInk };
+    prog.prints.push(pr); save(); updateHud(); makePrintAnim(prog.prints.length - 1);
+  };
+}
+function viewPrint(i, fresh) {
+  const pr = prog.prints[i], def = FISH_BY_ID[pr.id];
+  showPanel(`<h2>${fresh ? '✨ 魚拓完成了！' : '🖼️ ' + def.name}</h2><canvas id="printBig" width="300" height="400" style="width:min(70vw,260px);height:auto;aspect-ratio:3/4"></canvas>
+    <p>${def.name}・${fmtW(pr.w)}・${pr.l} cm・${INKS[pr.ink].name}<br><small>拓於 ${fmtDate(pr.made || pr.at)}</small></p><button id="printBack" style="background:#bfe6ff">回收藏牆</button>`);
+  drawPrint(document.getElementById('printBig'), pr);
+  document.getElementById('printBack').onclick = () => openGyotaku('wall');
+}
+function makePrintAnim(i) {   // 師傅上墨、壓紙：魚形慢慢浮現
+  const pr = prog.prints[i];
+  showPanel(`<h2>🖌️ ${MASTER_NAME}拓魚中…</h2><canvas id="printBig" width="300" height="400" style="width:min(70vw,260px);height:auto;aspect-ratio:3/4"></canvas><p>「上墨……覆紙……輕輕地拍……」</p>`);
+  const cvs = document.getElementById('printBig'), t0 = performance.now();
+  tone(300, 260, .25, .12, 'triangle'); setTimeout(() => tone(300, 260, .25, .12, 'triangle'), 450); setTimeout(() => tone(300, 260, .25, .12, 'triangle'), 900);
+  (function step() {
+    const k = Math.min(1, (performance.now() - t0) / 1600);
+    if (!document.body.contains(cvs)) return;
+    drawPrint(cvs, pr, k);
+    if (k < 1) requestAnimationFrame(step); else { SFX.caught(); buzz([40, 30, 40, 30, 160]); checkAch(); viewPrint(i, true); }
+  })();
+}
+// 魚拓師傅站在工坊門口
+function drawMaster(g, vx, vy, t) {
+  const b = BUILDINGS.find(x => x.id === 'gyotaku'); if (!b) return;
+  const p = iso(b.door[0] + 1.2, b.door[1] - .2), x = Math.round(p.x - vx), y = Math.round(p.y - vy - LH);
+  if (!drawMaster.img) drawMaster.img = ART.previewFront(MASTER_LOOK);
+  g.fillStyle = 'rgba(0,0,0,.2)'; g.fillRect(x - 5, y - 1, 10, 2);
+  g.drawImage(drawMaster.img, x - 6, y - 19 - (Math.sin(t * 2) > .95 ? 1 : 0), 12, 19.5);
 }
 function openQuests() {
   while (prog.quests.length < 3) prog.quests.push(genQuest());
@@ -1965,6 +2076,7 @@ function drawIso(g, gf, t) {
   for (const r of rocks) if (near(r)) objs.push({ k: r.x + r.y, f: G => drawRock(G, r, vx, vy) });
   for (const l of lamps) if (near(l)) objs.push({ k: l.x + l.y, f: G => drawLamp(G, l, vx, vy) });
   for (const sp of SPOTS) if (sp.draw && near(sp)) objs.push({ k: sp.x + sp.y, f: G => drawSpot(G, sp, vx, vy, t) });
+  { const gb = BUILDINGS.find(x => x.id === 'gyotaku'); if (gb && near(gb)) objs.push({ k: gb.door[0] + 1.2 + gb.door[1] - .2, f: G => drawMaster(G, vx, vy, t) }); }
   for (const b of BUILDINGS) if (near(b)) objs.push({ k: b.x + b.w + b.y + b.h - 1, f: G => drawBuilding(G, b, vx, vy) });
   objs.push({ k: lighthouse.x + lighthouse.y + 1, f: G => drawLighthouse(G, vx, vy, t) });
   if (near(volcano)) objs.push({ k: volcano.x + volcano.y + 1.5, f: G => drawVolcano(G, vx, vy, t) });
