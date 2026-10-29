@@ -214,13 +214,13 @@
 <div class="overlay" id="fishDetail"><div class="card" id="fishDetailCard"></div></div>
 <div class="overlay" id="badgePop"><div class="card" id="badgeCard"></div></div>
 
-<script src="data/fish.js?v=2026.10.29-82"></script>
-<script src="art.js?v=2026.10.29-82"></script>
-<script src="music.js?v=2026.10.29-82"></script>
+<script src="data/fish.js?v=2026.10.30-83"></script>
+<script src="art.js?v=2026.10.30-83"></script>
+<script src="music.js?v=2026.10.30-83"></script>
 <script>
 'use strict';
 // 版本號：每次更新都要改（也要改上面三個 script 的 ?v=），遊戲會用它檢查網站上有沒有新版
-const BUILD = '2026.10.29-82';
+const BUILD = '2026.10.30-83';
 // ════════════════ 基本設定 ════════════════
 const FISH = window.FISH_DATA || [];
 const N = 160, TW = 32, TH = 16, LH = 4;         // 地圖格數、等角格寬高、陸地高度
@@ -428,6 +428,10 @@ for (let y = 1; y < N - 1; y++) for (let x = 1; x < N - 1; x++) {
 }
 for (const [x, y] of [[13, 149], [15, 149], [17, 149], [17, 150], [18, 151], [13, 150]]) { const i = y * N + x; if (!WATER.has(tile[i]) && !block[i]) { block[i] = 1; rocks.push({ x: x + .5, y: y + .5 }); } }   // 洞口旁的岩石
 for (const [x, y] of [[97, 66], [102, 59], [103, 68], [93, 67], [109, 62], [98, 74], [15, 80], [20, 80], [13, 83], [19, 84]]) if (at(x, y) === T.STONE && !block[y * N + x]) { block[y * N + x] = 1; lamps.push({ x: x + .5, y: y + .5 }); }
+// 西南孤島的燈塔（燈塔守老燈伯住在這）：島的西岸，碼頭在另一邊
+const lighthouse2 = (() => { const is = ISLANDS[ISLAND_IDX('西南孤島')]; let x = Math.floor(is.cx), y = Math.floor(is.cy) - 1; while (!WATER.has(at(x - 1, y))) x--; x++; block[y * N + x] = 1;
+  for (let i = trees.length - 1; i >= 0; i--) if (Math.floor(trees[i].x) === x && Math.floor(trees[i].y) === y) trees.splice(i, 1); return { x, y, big: true }; })();
+const LIGHTHOUSES = [lighthouse, lighthouse2];
 const walkable = (x, y) => { const xi = Math.floor(x), yi = Math.floor(y); if (xi < 0 || yi < 0 || xi >= N || yi >= N) return false; const t = tile[yi * N + xi]; return !WATER.has(t) && !block[yi * N + xi]; };
 let ICEBREAK = false;   // 有破冰船頭：船可以開過浮冰和冰層
 const boatable = (x, y) => { const xi = Math.floor(x), yi = Math.floor(y); if (xi < 1 || yi < 1 || xi >= N - 1 || yi >= N - 1) return false; const t = tile[yi * N + xi]; return BOATABLE.has(t) || (ICEBREAK && t === T.ICE); };
@@ -3057,7 +3061,7 @@ function drawIso(g, gf, t) {
   for (const sp of SPOTS) if (sp.draw && near(sp)) objs.push({ k: sp.x + sp.y, f: G => drawSpot(G, sp, vx, vy, t) });
   { const gb = BUILDINGS.find(x => x.id === 'gyotaku'); if (gb && near(gb)) objs.push({ k: gb.door[0] + 1.2 + gb.door[1] - .2, f: G => drawMaster(G, vx, vy, t) }); }
   for (const b of BUILDINGS) if (near(b)) objs.push({ k: b.x + b.w + b.y + b.h - 1, f: G => drawBuilding(G, b, vx, vy) });
-  objs.push({ k: lighthouse.x + lighthouse.y + 1, f: G => drawLighthouse(G, vx, vy, t) });
+  for (const L of LIGHTHOUSES) if (near(L)) objs.push({ k: L.x + L.y + 1, f: G => drawLighthouse(G, vx, vy, t, L) });
   if (near(volcano)) objs.push({ k: volcano.x + volcano.y + 1.5, f: G => drawVolcano(G, vx, vy, t) });
   for (const d of drifts) if (near(d)) objs.push({ k: d.x + d.y, f: G => drawDrift(G, d, vx, vy, t) });
   if (!state.onBoat) objs.push({ k: state.boat.x + state.boat.y, f: G => drawBoat(G, vx, vy, t) });
@@ -3086,7 +3090,10 @@ function drawIsoFx(g) {
     const a = phase === 'night' ? .55 : .25;
     for (const l of lamps) glow(l.x, l.y - .8, 26, a);
     for (const b of BUILDINGS) glow(b.door[0], b.door[1] - .6, 20, a * .8);
-    glow(lighthouse.x + .5, lighthouse.y - 1.5, 40, a);
+    for (const L of LIGHTHOUSES) glow(L.x + .5, L.y - 1.5, L.big ? 52 : 40, a);
+    if (phase === 'night' || phase === 'dusk') { const L = lighthouse2, p = iso(L.x + .5, L.y + .5), bx = p.x - vx, by = p.y - vy - LH - 58, ang = performance.now() / 1000 * .9, len = 120;   // 西南燈塔的旋轉光束
+      const gr = g.createLinearGradient(bx, by, bx + Math.cos(ang) * len, by + Math.sin(ang) * len * .45); gr.addColorStop(0, `rgba(255,240,170,${a * .7})`); gr.addColorStop(1, 'rgba(255,240,170,0)'); g.fillStyle = gr;
+      g.beginPath(); g.moveTo(bx, by); g.lineTo(bx + Math.cos(ang - .12) * len, by + Math.sin(ang - .12) * len * .45); g.lineTo(bx + Math.cos(ang + .12) * len, by + Math.sin(ang + .12) * len * .45); g.closePath(); g.fill(); }
     glow(pl.x, pl.y, 22, a * .6);
     if (prog.gear.light && state.onBoat) glow(pl.x, pl.y, 70, phase === 'night' ? .5 : .25);   // 🔦 探照燈
     g.globalCompositeOperation = 'source-over';
@@ -3138,8 +3145,23 @@ function drawBuilding(g, b, vx, vy) {
   const [rx, ry] = P(b.x + b.w, b.y + .7); g.fillRect(rx - 3, ry - 11, 4, 4);
   if (window.ART) ART.decorateBuilding(g, b, P, phase === 'night' || phase === 'dusk', performance.now() / 1000);
 }
-function drawLighthouse(g, vx, vy, t) {
-  const { x, y } = lighthouse; const p = iso(x + .5, y + .5), cx = Math.round(p.x - vx), cy = Math.round(p.y - vy - LH);
+// 西南孤島的大燈塔：石砌底座、小木門、紅白塔身、陽台欄杆、會轉的燈
+function drawBigLighthouse(g, cx, cy, t) {
+  const px = (x, y, w, h, c) => { g.fillStyle = c; g.fillRect(x | 0, y | 0, w, h); };
+  g.fillStyle = 'rgba(0,0,0,.2)'; g.fillRect(cx - 11, cy - 1, 22, 3);
+  px(cx - 10, cy - 8, 20, 8, '#2a1e14'); px(cx - 9, cy - 7, 18, 7, '#9a9088'); for (let i = 0; i < 4; i++) px(cx - 9 + (i % 2) * 4, cy - 7 + i * 2, 18, 1, '#7a7068');   // 石砌底座
+  for (let k = 0; k < 8; k++) { const w = 14 - (k >> 1) * 2 - (k % 2); px(cx - w / 2 - 1, cy - 14 - k * 6, w + 2, 6, '#2a1e14'); px(cx - w / 2, cy - 14 - k * 6, w, 6, k % 2 ? '#f4f0e8' : '#d0403a'); px(cx - w / 2, cy - 14 - k * 6, 2, 6, k % 2 ? '#ffffff' : '#e86a5a'); }   // 紅白條紋塔身
+  px(cx - 2, cy - 12, 4, 5, '#5a3a1e'); px(cx - 1, cy - 11, 1, 1, '#ffd56a');   // 木門
+  px(cx - 3, cy - 30, 3, 3, '#3a5a7a'); px(cx, cy - 42, 3, 3, '#3a5a7a');   // 小窗
+  px(cx - 8, cy - 64, 16, 2, '#2a1e14'); for (let i = 0; i < 8; i++) px(cx - 7 + i * 2, cy - 67, 1, 3, '#3a3a40');   // 陽台欄杆
+  const lit = phase === 'night' || phase === 'dusk', on = lit || Math.sin(t * 2) > .5;
+  px(cx - 5, cy - 74, 10, 8, '#2a1e14'); px(cx - 4, cy - 73, 8, 6, on ? '#fff2a0' : '#c8e8ff');
+  if (on) { const k = Math.sin(t * .9 * 2); px(cx - 1 + Math.round(k * 2), cy - 72, 2, 4, '#ffffff'); }
+  px(cx - 6, cy - 77, 12, 3, '#d0403a'); px(cx - 4, cy - 80, 8, 3, '#d0403a'); px(cx - 1, cy - 83, 2, 3, '#3a3a40');   // 紅色屋頂和避雷針
+}
+function drawLighthouse(g, vx, vy, t, L = lighthouse) {
+  const { x, y } = L; const p = iso(x + .5, y + .5), cx = Math.round(p.x - vx), cy = Math.round(p.y - vy - LH);
+  if (L.big) return drawBigLighthouse(g, cx, cy, t);
   for (let k = 0; k < 6; k++) { g.fillStyle = k % 2 ? '#f4f0e8' : '#d0403a'; g.fillRect(cx - 5 + (k >> 1), cy - 6 - k * 6, 10 - (k >> 1) * 2, 6); }
   g.fillStyle = '#3a3a40'; g.fillRect(cx - 4, cy - 44, 8, 2);
   const lit = phase === 'night' || phase === 'dusk' || Math.sin(t * 3) > .6;
