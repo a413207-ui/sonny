@@ -29,6 +29,7 @@
   .card { background: #fff8e6; border: 4px solid #6b4a2a; border-radius: 14px; padding: 14px 16px; width: min(92vw, 380px); max-height: 86vh; overflow: auto; box-shadow: 0 6px 0 #6b4a2a; text-align: center; }
   .card h3 { margin: 10px 0 4px; font-size: 15px; text-align: left; }
   .list { max-height: 52vh; overflow: auto; text-align: left; }
+  .row.trk.now { background: #fff1c8; border-radius: 8px; }
   .row canvas.rodIcon { width: 60px !important; height: 30px !important; flex: none; margin-right: -2px; }
   .row canvas.rodIcon + span { flex: 1; }
   .row { display: flex; justify-content: space-between; align-items: center; gap: 8px; padding: 6px 4px; border-bottom: 1px dashed #c8b08a; font-size: 14px; }
@@ -204,13 +205,13 @@
 <div class="overlay" id="fishDetail"><div class="card" id="fishDetailCard"></div></div>
 <div class="overlay" id="badgePop"><div class="card" id="badgeCard"></div></div>
 
-<script src="data/fish.js?v=2026.10.29-76"></script>
-<script src="art.js?v=2026.10.29-76"></script>
-<script src="music.js?v=2026.10.29-76"></script>
+<script src="data/fish.js?v=2026.10.29-77"></script>
+<script src="art.js?v=2026.10.29-77"></script>
+<script src="music.js?v=2026.10.29-77"></script>
 <script>
 'use strict';
 // 版本號：每次更新都要改（也要改上面三個 script 的 ?v=），遊戲會用它檢查網站上有沒有新版
-const BUILD = '2026.10.29-76';
+const BUILD = '2026.10.29-77';
 // ════════════════ 基本設定 ════════════════
 const FISH = window.FISH_DATA || [];
 const N = 160, TW = 32, TH = 16, LH = 4;         // 地圖格數、等角格寬高、陸地高度
@@ -754,17 +755,73 @@ function audio() {
 // iPhone 規定要在玩家點畫面時才能打開聲音，所以第一次點擊時就先準備好
 addEventListener('pointerdown', () => { if (state.snd || state.music) audio(); if (state.music) startMusic(); }, { capture: true });
 addEventListener('pageshow', () => { if (actx && (state.snd || state.music)) audio(); });
-// ── 背景音樂：四首原創曲輪播（music.js），預設開；iPhone 要點一下畫面才會開始 ──
+// ── 背景音樂：13 首原創曲（music.js），預設開；iPhone 要點一下畫面才會開始 ──
+// 點「🎵 音樂」開音樂盒：自動配樂（依時段、天氣、所在地挑歌）／全部輪播／單曲循環
 const MUS_KEY = 'bay-fishing-music', musBtn = document.getElementById('mus');
 try { state.music = localStorage.getItem(MUS_KEY) !== 'off'; } catch (e) { state.music = true; }
 const musLabel = () => { musBtn.textContent = '🎵 音樂：' + (state.music ? '開' : '關'); };
 musLabel();
-function startMusic() { if (window.BGM && state.music && !document.hidden) BGM.start(audio); }
+function startMusic() {
+  if (!window.BGM || !state.music || document.hidden) return;
+  if (!startMusic.did && typeof chooseTrack === 'function') { startMusic.did = 1; BGM.play(chooseTrack(-1)); }   // 第一首就依場合挑
+  BGM.start(audio);
+}
 if (window.BGM) BGM.onTrack = name => toast('🎵 ' + name, 2200);
-musBtn.addEventListener('click', () => {
+const MODE_KEY = 'bay-fishing-music-mode';
+let musMode = 'auto';   // auto＝自動配樂、all＝全部輪播、數字＝單曲循環第幾首
+try { musMode = localStorage.getItem(MODE_KEY) || 'auto'; } catch (e) {}
+const ISL_MOOD = { 漁港鎮: 'harbor', 金鱗島: 'festival', 冰晶島: 'cold', 火山島: 'volcano', 紅樹林島: 'mangrove', 大河平原: 'river', 翠湖森林島: 'river', 溪谷山島: 'river', 珊瑚小島: 'reef', 無人島: 'reef' };
+const REG_MOOD = { harbor: 'harbor', deep: 'deep', wreck: 'deep', cave: 'deep', reef: 'reef', lagoon: 'reef', cold: 'cold', frozen: 'cold', volcano: 'volcano', mangrove: 'mangrove', lake: 'river', river: 'river', bigriver: 'river', upriver: 'river' };
+function musicMood() {   // 現在的場合：時段、天氣、所在地
+  const o = state.onBoat ? state.boat : state.player, xi = Math.floor(o.x), yi = Math.floor(o.y);
+  const is = !state.onBoat && ISLANDS[landOf[yi * N + xi] - 1];
+  const place = is ? ISL_MOOD[is.name] || 'sea' : REG_MOOD[regionAt(o.x, o.y)] || 'sea';
+  return { phase, place, storm: ['rain', 'storm', 'typhoon'].includes(weather) };
+}
+function moodScore(tr, m) {
+  const has = k => (tr.moods || []).includes(k);
+  let sc = (m.storm ? (has('storm') ? 6 : 0) : (has('storm') ? -9 : 0)) + (has(m.place) ? 3 : 0) + (has(m.phase) ? 2 : 0);
+  if (m.phase === 'night' && !has('night') && !has('cold') && !has('deep')) sc -= 2;   // 晚上不放太熱鬧的歌
+  if (m.phase !== 'night' && has('night') && !has(m.place)) sc -= 1;
+  return sc;
+}
+function chooseTrack(cur) {
+  const T = BGM.tracks;
+  if (/^\d+$/.test(musMode)) return +musMode % T.length;
+  if (musMode === 'all') return (cur + 1) % T.length;
+  const m = musicMood(), sc = T.map(tr => moodScore(tr, m)), best = Math.max(...sc);
+  const pool = T.map((_, i) => i).filter(i => sc[i] >= best - 1 && i !== cur);
+  const top = pool.filter(i => sc[i] === best);
+  const pick = (top.length ? top : pool.length ? pool : [cur]);
+  return pick[Math.floor(Math.random() * pick.length)];
+}
+if (window.BGM) BGM.chooser = chooseTrack;
+// 自動配樂：場合大變（進入暴風雨、開到火山海域…）時不等歌播完，直接換
+setInterval(() => {
+  if (!window.BGM || !BGM.isPlaying() || musMode !== 'auto' || fish.state === 'trophy' || fish.state === 'result') return;
+  const m = musicMood(), T = BGM.tracks, cur = BGM.index(), best = Math.max(...T.map(tr => moodScore(tr, m)));
+  if (moodScore(T[cur], m) <= best - 4) BGM.play(chooseTrack(cur));
+}, 5000);
+function openMusic() {
+  const T = window.BGM ? BGM.tracks : [], cur = window.BGM ? BGM.index() : -1;
+  const modeBtn = (k, label) => `<button data-mmode="${k}" class="${musMode === k ? 'on' : ''}">${label}</button>`;
+  const rows = T.map((tr, i) => `<div class="row trk ${i === cur && state.music ? 'now' : ''}"><span>${i === cur && state.music ? '🔊' : '🎵'} <b>${tr.name}</b><br><small>${tr.moods.map(k => MOOD_NAME[k]).join('・')}</small></span><button data-trk="${i}" class="${musMode === String(i) ? 'on' : ''}">${musMode === String(i) ? '單曲中' : '▶ 播放'}</button></div>`).join('');
+  showPanel(`<h2>🎵 音樂盒</h2><p><button id="musOnOff">${state.music ? '🔇 關掉音樂' : '🎵 打開音樂'}</button></p>
+    <div class="slots" style="justify-content:center">${modeBtn('auto', '🧭 自動配樂')}${modeBtn('all', '🔁 全部輪播')}</div>
+    <p class="hint">自動配樂：依早晚、天氣和你在哪裡挑歌（火山、雪地、河邊、夜裡都有自己的歌）。點一首歌的 ▶ 會單曲循環。</p>
+    <div style="max-height:46vh;overflow:auto;text-align:left">${rows}</div>`);
+  document.getElementById('musOnOff').onclick = () => { toggleMusic(); openMusic(); };
+  document.querySelectorAll('[data-mmode]').forEach(el => el.onclick = () => { setMusMode(el.dataset.mmode); if (state.music) BGM.play(chooseTrack(BGM.index())); openMusic(); });
+  document.querySelectorAll('[data-trk]').forEach(el => el.onclick = () => { setMusMode(el.dataset.trk); if (!state.music) toggleMusic(); BGM.play(+el.dataset.trk); setTimeout(openMusic, 50); });
+}
+const MOOD_NAME = { day: '白天', dawn: '清晨', dusk: '黃昏', night: '夜晚', harbor: '港口', sea: '海上', reef: '珊瑚礁', cold: '雪地', volcano: '火山', river: '河邊', storm: '暴風雨', festival: '慶典', mangrove: '紅樹林', deep: '深海' };
+function setMusMode(m) { musMode = m; try { localStorage.setItem(MODE_KEY, m); } catch (e) {} }
+function toggleMusic() {
   state.music = !state.music; musLabel(); try { localStorage.setItem(MUS_KEY, state.music ? 'on' : 'off'); } catch (e) {}
-  if (state.music) startMusic(); else if (window.BGM) BGM.stop();
-});
+  if (state.music) { audio(); startMusic(); } else if (window.BGM) BGM.stop();
+}
+window.__music = { chooseTrack, musicMood, moodScore, openMusic, get mode() { return musMode; } };
+musBtn.addEventListener('click', () => { audio(); if (window.BGM) openMusic(); else toggleMusic(); });
 // 切到別的 App 或關掉螢幕時停止音樂，回來再繼續
 document.addEventListener('visibilitychange', () => {
   if (!window.BGM) return;
