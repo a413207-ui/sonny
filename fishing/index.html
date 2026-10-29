@@ -202,13 +202,13 @@
 <div class="overlay" id="fishDetail"><div class="card" id="fishDetailCard"></div></div>
 <div class="overlay" id="badgePop"><div class="card" id="badgeCard"></div></div>
 
-<script src="data/fish.js?v=2026.10.29-74"></script>
-<script src="art.js?v=2026.10.29-74"></script>
-<script src="music.js?v=2026.10.29-74"></script>
+<script src="data/fish.js?v=2026.10.29-75"></script>
+<script src="art.js?v=2026.10.29-75"></script>
+<script src="music.js?v=2026.10.29-75"></script>
 <script>
 'use strict';
 // 版本號：每次更新都要改（也要改上面三個 script 的 ?v=），遊戲會用它檢查網站上有沒有新版
-const BUILD = '2026.10.29-74';
+const BUILD = '2026.10.29-75';
 // ════════════════ 基本設定 ════════════════
 const FISH = window.FISH_DATA || [];
 const N = 160, TW = 32, TH = 16, LH = 4;         // 地圖格數、等角格寬高、陸地高度
@@ -221,8 +221,8 @@ const BOATABLE = new Set([T.DEEP, T.SEA, T.REEF, T.COLD, T.MANGROVE, T.VOLCANO, 
 const REGION_OF = { [T.SEA]: 'harbor', [T.DEEP]: 'deep', [T.REEF]: 'reef', [T.LAKE]: 'lake', [T.RIVER]: 'river', [T.COLD]: 'cold', [T.MANGROVE]: 'mangrove', [T.VOLCANO]: 'volcano', [T.LAGOON]: 'lagoon', [T.BIGRIVER]: 'bigriver', [T.UPRIVER]: 'upriver' };
 const REGION_NAME = { harbor: '港灣', deep: '深海', reef: '珊瑚礁', lake: '翠湖', river: '溪谷', cold: '冰川海域', mangrove: '紅樹林河口', volcano: '火山海域', wreck: '沉船', cave: '海蝕洞', lagoon: '無人島潟湖', frozen: '冰封秘境', bigriver: '大河下游', upriver: '大河上游' };
 const RAR = {
-  common: { name: '普通', color: '#8a9a7a', w: 60, pow: .55 },
-  uncommon: { name: '少見', color: '#4a9a5a', w: 25, pow: .75 },
+  common: { name: '普通', color: '#8a9a7a', w: 60, pow: .68 },
+  uncommon: { name: '少見', color: '#4a9a5a', w: 25, pow: .82 },
   rare: { name: '稀有', color: '#3a7ad0', w: 10, pow: 1.0 },
   epic: { name: '史詩', color: '#9a4ad0', w: 4, pow: 1.25 },
   legendary: { name: '傳說', color: '#e0902a', w: 1, pow: 1.55 },
@@ -887,11 +887,11 @@ function startCast() {
   const w = waterAhead(o.x, o.y, state.player.fx, state.player.fy);
   if (!w) return toast('前面沒有水，換個方向試試');
   state.player.fx = w.fx; state.player.fy = w.fy;
-  Object.assign(fish, { state: 'cast', t: 0, region: regionAt(w.x, w.y), fx: w.x, fy: w.y, nibbles: [], d: 100, dMax: 100, tension: 0, struggle: false, swap: 0, boss: false, dash: 0, warn: 0, rod: 0, lure: 0, moved: 0, lured: 0, side: 1, fishX: 0, push: 0 });
+  Object.assign(fish, { state: 'cast', t: 0, region: regionAt(w.x, w.y), fx: w.x, fy: w.y, nibbles: [], d: 100, dMax: 100, tension: 0, struggle: false, swap: 0, boss: false, dash: 0, warn: 0, rod: 0, lure: 0, moved: 0, lured: 0, side: 1, fishX: 0, push: 0, slackT: 0, slackWarn: 0 });
   const wait = rand(2.2, 6.5) / (1 + state.rod.luck * .2) * (WEATHER[weather].bite || 1);
   fish.biteAt = .7 + wait;
   if (boss && Math.hypot(w.x - boss.x, w.y - boss.y) < 2.8) { fish.boss = true; fish.biteAt = .7 + rand(1.5, 3); toast('🎣 拋到巨大魚影旁邊了…屏住呼吸！', 2500); return; }
-  for (let k = 0, n = Math.floor(rand(0, 3)); k < n; k++) fish.nibbles.push(rand(1.2, fish.biteAt - .3));
+  for (let k = 0, n = Math.floor(rand(0, 4)); k < n; k++) fish.nibbles.push(rand(1.2, fish.biteAt - .3));
   toast(`🎣 拋竿！（${REGION_NAME[fish.region]}）浮標沉下去再拉竿`);
 }
 function pickFish(region) {
@@ -911,12 +911,13 @@ function hook() {
   fish.catch = fish.boss ? pickBoss(fish.region) : pickFish(fish.region); useBait();
   const rar = RAR[fish.catch.def.rarity];
   fish.power = rar.pow * (.8 + fish.catch.k * .5);
-  fish.state = 'reel'; fish.t = 0; fish.d = 100; fish.tension = 20; fish.swap = rand(.4, 1.2);
+  fish.state = 'reel'; fish.t = 0; fish.d = 80; fish.tension = 20;   // 上鉤時魚離 80（滿 110 就跑掉）
+  fish.swap = rand(.4, 1.2);
   fish.swapPow = 0;
   // 巨物：力氣大、距離遠、會衝刺，但掙扎頻率和稀有魚差不多，換好竿子就拉得上來
   if (fish.boss) { boss = null; fish.power = clamp(1.2 * (.9 + fish.catch.k * .25), 1.1, 1.35); fish.swapPow = 1; fish.d = fish.dMax = 150; fish.dashT = rand(3, 5); buzz([120, 50, 120, 50, 240]); SFX.hook(); toast('‼️‼️ 是巨物！牠會衝刺，看到「⚠️」就先放手！', 3200); return; }
   buzz([60, 30, 60]); SFX.hook();
-  toast(fish.catch.def.rarity === 'legendary' || fish.catch.def.rarity === 'epic' ? '‼️ 好重！是大傢伙！按住收線，張力太高就放手' : '上鉤了！按住「收線」，張力太高就放手');
+  toast(fish.catch.def.rarity === 'legendary' || fish.catch.def.rarity === 'epic' ? '‼️ 好重！是大傢伙！按住收線，張力太高就放手' : '上鉤了！按住「收線」，張力太高就放手，但線不能太鬆');
 }
 function fail(msg) { buzz(200); SFX.fail(); fish.state = 'fail'; fish.t = 0; fish.msg = msg; toast(msg, 2200); }
 function endFishing(msg) { fish.state = null; holding = false; if (msg) toast(msg); }
@@ -963,7 +964,7 @@ function updateFishing(dt) {
     if (fish.nib > 0) fish.nib -= dt;
     if (fish.t > fish.biteAt) { fish.state = 'bite'; fish.biteT = 0; buzz([90, 40, 90]); SFX.bite(); flash(); updateHud(); }
   } else if (fish.state === 'bite') {
-    fish.biteT += dt; if (fish.biteT > .9 + state.rod.power * .1 - (state.sickOn ? .2 : 0)) fail('沒拉到…魚跑掉了');
+    fish.biteT += dt; if (fish.biteT > .7 + state.rod.power * .1 - (state.sickOn ? .2 : 0)) fail('沒拉到…魚跑掉了');
   } else if (fish.state === 'reel') {
     fish.swap -= dt;
     if (fish.swap <= 0) { const sp = fish.swapPow || fish.power; fish.struggle = !fish.struggle; fish.swap = fish.struggle ? rand(.5, 1.3) * sp : rand(.6, 1.6) / sp; if (fish.struggle) { buzz(35); if (Math.random() < .6) fish.side = -fish.side; } }
@@ -973,8 +974,12 @@ function updateFishing(dt) {
     const pk = fish.push > 0 ? 1 - .35 * fish.push : 1 + .3 * -fish.push, rk = fish.push > 0 ? 1 + .2 * fish.push : 1;
     if (!prog.rodTip && fish.t > .8) { prog.rodTip = 1; toast('🕹️ 小技巧：魚往哪邊衝，搖桿就往反方向壓竿！', 3200); }
     const rp = state.rod.power;
-    if (holding) { fish.d -= (fish.struggle ? 6 : 19) * rp * rk * dt; fish.tension += (fish.struggle ? 62 * fish.power : 16 * fish.power) * pk * dt / rp * (1 + wx.wave * .15); }
-    else { fish.tension -= 45 * dt; fish.d += (fish.struggle ? 9 : 3) * fish.power * dt; }
+    if (holding) { fish.d -= (fish.struggle ? 6 : 17) * rp * rk * dt; fish.tension += (fish.struggle ? 90 * fish.power : 24 * fish.power) * pk * dt / rp * (1 + wx.wave * .15); }
+    else { fish.tension -= 45 * dt; fish.d += (fish.struggle ? 14 : 5) * fish.power * dt; }
+    if (fish.struggle) fish.d += (fish.boss ? 6 : 10) * fish.power * Math.max(0, 1 - fish.push) * dt;   // 掙扎時魚橫衝，沒壓竿就被拉遠
+    // 線放太鬆（張力幾乎 0）超過 1.4 秒，魚會脫鉤
+    if (fish.tension < 3 && !(fish.dash > 0) && !(fish.warn > 0)) { fish.slackT = (fish.slackT || 0) + dt; if (fish.slackT > .5 && !fish.slackWarn) { fish.slackWarn = 1; toast('線太鬆了！快收線，魚要脫鉤了', 1200); buzz(40); } }
+    else { fish.slackT = Math.max(0, (fish.slackT || 0) - dt * 2); if (fish.slackT === 0) fish.slackWarn = 0; }
     if (fish.boss) {   // 巨物：每隔幾秒衝刺一次，衝刺時還按著收線，張力會暴衝
       if (fish.dash > 0) { fish.dash -= dt; fish.d += 14 * dt; if (holding) fish.tension += 95 * dt; }
       else if (fish.warn > 0) { fish.warn -= dt; if (fish.warn <= 0) { fish.dash = 1.6; buzz(250); } }
@@ -983,6 +988,7 @@ function updateFishing(dt) {
     const esc = fish.boss ? fish.dMax + 40 : (fish.dMax || 100) + 10;   // 拉到多遠魚就跑掉（巨物會衝刺，留多一點空間）
     fish.tension = clamp(fish.tension, 0, 100); fish.d = clamp(fish.d, 0, esc);
     if (fish.tension >= 100) fail('啪！線斷了…');
+    else if (fish.slackT > 1.4) fail('線太鬆，魚脫鉤了…');
     else if (fish.d >= esc) fail(fish.boss ? '巨物掙脫，游回深處了…' : '魚游走了…');
     else if (fish.d <= 0) caught();
   } else if (fish.state === 'trophy' && fish.t > 1.7) showCatchCard();
@@ -2061,7 +2067,7 @@ function updateHud() {
   btnB.textContent = b ? b.label : ''; btnB.style.visibility = b ? 'visible' : 'hidden';
   const bars = document.getElementById('bars'); bars.classList.toggle('show', fish.state === 'reel');
   if (fish.state === 'reel') { document.querySelector('#tension>div').style.width = fish.tension + '%'; document.querySelector('#dist>div').style.width = (100 - Math.min(100, fish.d / (fish.dMax || 100) * 100)) + '%'; }
-  bars.classList.toggle('warn', fish.state === 'reel' && (fish.warn > 0 || fish.dash > 0));
+  bars.classList.toggle('warn', fish.state === 'reel' && (fish.warn > 0 || fish.dash > 0 || fish.slackT > .5));
 }
 
 // ════════════════ 繪圖：等角地圖視角 ════════════════
