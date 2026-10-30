@@ -228,13 +228,13 @@
 <div class="overlay" id="fishDetail"><div class="card" id="fishDetailCard"></div></div>
 <div class="overlay" id="badgePop"><div class="card" id="badgeCard"></div></div>
 
-<script src="data/fish.js?v=2026.10.30-88"></script>
-<script src="art.js?v=2026.10.30-88"></script>
-<script src="music.js?v=2026.10.30-88"></script>
+<script src="data/fish.js?v=2026.10.30-89"></script>
+<script src="art.js?v=2026.10.30-89"></script>
+<script src="music.js?v=2026.10.30-89"></script>
 <script>
 'use strict';
 // 版本號：每次更新都要改（也要改上面三個 script 的 ?v=），遊戲會用它檢查網站上有沒有新版
-const BUILD = '2026.10.30-88';
+const BUILD = '2026.10.30-89';
 // ════════════════ 基本設定 ════════════════
 const FISH = window.FISH_DATA || [];
 const N = 160, TW = 32, TH = 16, LH = 4;         // 地圖格數、等角格寬高、陸地高度
@@ -420,6 +420,17 @@ BUILDINGS.push(
   { id: 'house2', deco: true, name: '', sign: '', x: 13, y: 88, w: 2, h: 2, hgt: 12, wall: '#f4ecd8', roof: '#c87a3a' },
   { id: 'house3', deco: true, name: '', sign: '', x: 16, y: 85, w: 2, h: 2, hgt: 12, wall: '#e8e4d8', roof: '#5a8a4a' });
 BUILDINGS.push({ id: 'mine', name: '地底洞窟', sign: '⛏️', x: 14, y: 150, w: 3, h: 2, hgt: 20, wall: '#6a6268', roof: '#4a4448' });   // 大河上游、源頭湖東邊的山壁（地下世界入口）
+// ✈️ 柳河機場：小鎮西南邊的草原。跑道、停機坪、塔台、航廈（國際航線之後才開放，航廈是之後接新地圖的入口）
+const AIRPORT = { rx0: 2, rx1: 4, ry0: 88, ry1: 118, ax0: 5, ax1: 12, ay0: 98, ay1: 106 };
+const AIR = new Map();   // 地圖格 → 'rw' 跑道 / 'ap' 停機坪（地面上畫柏油和標線）
+{ const A = AIRPORT, pave = (x, y, k) => { if (!WATER.has(at(x, y)) && at(x, y) !== T.DOCK) { set(x, y, T.STONE); AIR.set(y * N + x, k); } };
+  for (let y = A.ry0; y <= A.ry1; y++) for (let x = A.rx0; x <= A.rx1; x++) pave(x, y, 'rw');
+  for (let y = A.ay0; y <= A.ay1; y++) for (let x = A.ax0; x <= A.ax1; x++) pave(x, y, 'ap');
+  for (let y = 87; y < A.ay0; y++) { const t = at(12, y); if (t === T.GRASS || t === T.SAND) set(12, y, T.STONE); } }   // 小鎮 → 航廈的石板路
+BUILDINGS.push(
+  { id: 'airport', name: '柳河機場', sign: '✈️', x: 7, y: 96, w: 4, h: 2, hgt: 18, wall: '#e8eef4', roof: '#9aa6b4' },
+  { id: 'tower', deco: true, noGlow: true, name: '', sign: '', x: 7, y: 108, w: 1, h: 1, hgt: 44, wall: '#e4e8ec', roof: '#5a6470' },
+  { id: 'plane', deco: true, noGlow: true, name: '', sign: '', x: 8, y: 101, w: 3, h: 3, hgt: 8, wall: '#ffffff', roof: '#ffffff' });
 for (const b of BUILDINGS) {
   for (let y = b.y; y < b.y + b.h; y++) for (let x = b.x; x < b.x + b.w; x++) { set(x, y, T.STONE); block[y * N + x] = 1; }
   b.door = [b.x + b.w / 2, b.y + b.h + .5];   // 門在建築的左前方（＋y 那一面）
@@ -523,7 +534,25 @@ function paintGround(g, X0, Y0) {
     if (t === T.UFLOOR || t === T.UHOT || t === T.UCFLOOR) { dots(6, 330, shade(top, -.25), 2, 1); dots(3, 350, shade(top, .18)); }
     if (t === T.UHOT && hash(x, y, 360) < .35) { g.fillStyle = '#ff6a2a'; const cx = p.x - 6 + hash(x, y, 361) * 10 | 0, cy = p.y - LH + 5 + hash(x, y, 362) * 5 | 0; g.fillRect(cx, cy, 4, 1); g.fillRect(cx + 3, cy + 1, 3, 1); }   // 地上的岩漿裂縫
     if (t === T.UCFLOOR && hash(x, y, 370) < .3) { g.fillStyle = ['#b07aff', '#6ae0ff', '#ff8ad8'][Math.floor(hash(x, y, 371) * 3)]; g.fillRect(p.x - 5 + hash(x, y, 372) * 10 | 0, p.y - LH + 4 + hash(x, y, 373) * 6 | 0, 1, 2); }
-    if (t === T.STONE) {
+    const ak = !UNDER && AIR.get(y * N + x);
+    if (ak) {   // ✈️ 柏油跑道／水泥停機坪＋標線
+      const Q = (u, v) => [p.x + (u - v) * TW / 2, p.y - LH + (u + v) * TH / 2];
+      const quad = (u0, v0, u1, v1, c) => { g.fillStyle = c; g.beginPath(); g.moveTo(...Q(u0, v0)); g.lineTo(...Q(u1, v0)); g.lineTo(...Q(u1, v1)); g.lineTo(...Q(u0, v1)); g.closePath(); g.fill(); };
+      const A = AIRPORT;
+      if (ak === 'rw') {
+        dia(p.x, p.y - LH, shade('#55565e', v * .5)); dots(5, 380, '#4a4b52', 2, 1);
+        if (x === A.rx0) quad(.08, 0, .16, 1, '#f4f4f0');                       // 兩側白邊線
+        if (x === A.rx1) quad(.84, 0, .92, 1, '#f4f4f0');
+        const mid = (A.rx0 + A.rx1) >> 1;
+        if (x === mid && y > A.ry0 + 2 && y < A.ry1 - 2 && y % 2 === 0) quad(.44, .1, .56, .9, '#f4f4f0');   // 中線虛線
+        if (y === A.ry0 + 1 || y === A.ry1 - 1) for (let k = 0; k < 3; k++) quad(.12 + k * .3, .15, .24 + k * .3, .85, '#f4f4f0');   // 跑道頭斑馬線
+        if ((y - A.ry0) % 3 === 0 && (x === A.rx0 || x === A.rx1)) { const u = x === A.rx0 ? .05 : .95; quad(u - .05, .45, u + .05, .55, '#ffe680'); }   // 跑道邊燈
+      } else {
+        dia(p.x, p.y - LH, shade('#9a9ca4', v * .5)); quad(0, 0, 1, .03, 'rgba(60,60,70,.35)'); quad(0, 0, .03, 1, 'rgba(60,60,70,.35)');   // 水泥板接縫
+        if (y === 104 && x < 9) quad(0, .45, 1, .55, '#f0c430');                  // 黃色滑行線：跑道 → 飛機
+        if (x === 9 && y === 104) quad(.45, 0, .55, .55, '#f0c430');
+      }
+    } else if (t === T.STONE) {
       // 石板路：交錯的小石塊
       for (let r = 0; r < 4; r++) for (let c = -3; c <= 3; c++) {
         const sx = c * 6 + (r % 2) * 3, sy = 2 + r * 3; if (!inTile(sx, sy + 1)) continue;
@@ -540,6 +569,7 @@ const mapImg = document.createElement('canvas'); mapImg.width = N * 4; mapImg.he
   const g = mapImg.getContext('2d');
   for (let y = 0; y < N; y++) for (let x = 0; x < N; x++) {
     let c = TILE_COLOR[tile[y * N + x]]; if (block[y * N + x]) c = '#3f7a32';
+    const ak = AIR.get(y * N + x); if (ak) c = ak === 'rw' ? '#55565e' : '#9a9ca4';
     if (BUILDINGS.some(b => x >= b.x && x < b.x + b.w && y >= b.y && y < b.y + b.h)) c = '#c8503a';
     g.fillStyle = c; const px = (x - y) * 2 + N * 2, py = (x + y);
     g.fillRect(px - 2, py, 4, 2); g.fillRect(px - 1, py - 1, 2, 4);
@@ -1324,7 +1354,7 @@ function showPanel(html) {
   document.getElementById('closePanel').onclick = () => panelEl().classList.remove('show');
 }
 const FISH_BY_ID = Object.fromEntries(FISH.map(f => [f.id, f]));
-function openBuilding(b) { if (/^tailor/.test(b.id)) return openTailor(b); ({ shop: openShop, market: openMarket, home: openHome, board: openDex, tailorA: () => openTailor(b), tailorB: () => openTailor(b), guild: () => openGuild(), aquarium: () => openAquarium(), quests: () => openQuests(), gyotaku: () => openGyotaku(), mine: () => openMine(), restaurant: () => openRestaurant(), museum: () => { museumPick = false; openMuseum(); } })[b.id](); }
+function openBuilding(b) { if (/^tailor/.test(b.id)) return openTailor(b); ({ shop: openShop, market: openMarket, home: openHome, board: openDex, tailorA: () => openTailor(b), tailorB: () => openTailor(b), guild: () => openGuild(), aquarium: () => openAquarium(), quests: () => openQuests(), gyotaku: () => openGyotaku(), mine: () => openMine(), restaurant: () => openRestaurant(), museum: () => { museumPick = false; openMuseum(); }, airport: () => openAirport() })[b.id](); }
 function openMarket() {
   const total = state.bag.reduce((a, f) => a + f.price, 0);
   const rows = bagListHtml((f, i) => { const d = FISH_BY_ID[f.id]; return `<div class="row"><span><b style="color:${RAR[d.rarity].color}">${d.name}</b> ${fmtW(f.w)}・${f.l} cm</span><button data-sell="${i}">賣 🪙${f.price}</button></div>`; });
@@ -2914,7 +2944,7 @@ function toggleMap() {
   g.font = 'bold 13px sans-serif'; g.textAlign = 'center'; g.lineWidth = 3;
   const label = (t, x, y, col = '#fff') => { const p = mapPos(x, y, sc); g.strokeStyle = '#000a'; g.strokeText(t, p.x, p.y + oy); g.fillStyle = col; g.fillText(t, p.x, p.y + oy); };
   for (const is of ISLANDS) if (isRevealed(is.cx, is.cy) && (!is.hidden || prog.found.lagoon)) label(is.name, is.cx, is.cy + 1, '#fff3c0');
-  for (const [t2, x2, y2, c2] of [['深海', 136, 70, '#a8c8ff'], ['深海', 62, 92, '#a8c8ff'], ['❄️冰川海域', 122, 12, '#e0f4ff'], ['🛶大河', 26, 70, '#c8f0ff'], ['🏘️柳河鎮', 16, 83, '#fff3c0'], ['⛰️上游', 18, 128, '#c8f0ff']]) if (isRevealed(x2, y2)) label(t2, x2, y2, c2);
+  for (const [t2, x2, y2, c2] of [['深海', 136, 70, '#a8c8ff'], ['深海', 62, 92, '#a8c8ff'], ['❄️冰川海域', 122, 12, '#e0f4ff'], ['🛶大河', 26, 70, '#c8f0ff'], ['🏘️柳河鎮', 16, 83, '#fff3c0'], ['✈️機場', 4, 103, '#e0ecff'], ['⛰️上游', 18, 128, '#c8f0ff']]) if (isRevealed(x2, y2)) label(t2, x2, y2, c2);
   for (const s of SPOTS) if (s.id !== 'lagoon' && prog.found[s.id]) label(s.icon + s.name, s.x, s.y + 1, '#ffe680');
   sonarMarks(g, (x2, y2) => { const q = mapPos(x2, y2, sc); return { x: q.x, y: q.y + oy }; }, 1.6);
   const pl = state.onBoat ? state.boat : state.player, p = mapPos(pl.x, pl.y, sc);
@@ -3374,6 +3404,7 @@ function areaName() {
   if (mtn) return mtn.mode === 'summit' ? '🌋 火口湖' : '🧗 火山登山道';
   if (state.onBoat) { const s = spotAt(o.x, o.y); if (s && prog.found[s.id]) return s.cond && !s.cond() ? `${s.name}（漲潮中，清晨才進得去）` : s.icon + ' ' + s.name; return REGION_NAME[REGION_OF[at(xi, yi)]] || (at(xi, yi) === T.ICE ? '冰層' : '海上'); }
   if (ell(xi, yi, RTOWN.x, RTOWN.y, RTOWN.rx + 1.5, RTOWN.ry + 1.5) < 1) return '柳河鎮';
+  if (xi >= AIRPORT.rx0 - 1 && xi <= AIRPORT.ax1 + 1 && yi >= 93 && yi <= AIRPORT.ry1 + 1) return '✈️ 柳河機場';
   const is = ISLANDS[landOf[yi * N + xi] - 1];
   return is ? is.name : (at(xi, yi) === T.DOCK ? '碼頭' : '岸邊');
 }
@@ -3483,6 +3514,7 @@ function drawIso(g, gf, t) {
   if (!state.onBoat) objs.push({ k: state.boat.x + state.boat.y, f: G => drawBoat(G, vx, vy, t) });
   for (const n of resNPC) if (resAwake(n) && near(n)) objs.push({ k: n.x + n.y, f: G => drawResident(G, n, vx, vy, t) });
   { const mb = mineB(); if (mb && near(mb)) objs.push({ k: mb.door[0] + 1.7 + mb.door[1] - .3, f: G => drawMiner(G, vx, vy, t) }); }
+  { const ab = airB(); if (ab && near(ab)) objs.push({ k: ab.door[0] + 1.4 + ab.door[1] - .1, f: G => drawAirStaff(G, vx, vy, t) }); }
   }
   // 主角（在船上就是整艘船）不貼齊像素格，畫在自己的圖層，鏡頭跟著它平滑移動
   const focusK = state.onBoat ? state.boat.x + state.boat.y : state.player.x + state.player.y + .01;
@@ -3505,7 +3537,8 @@ function drawIsoFx(g) {
     const glow = (x, y, r, a) => { const p = iso(x, y), gx = p.x - vx, gy = p.y - vy; const gr = g.createRadialGradient(gx, gy, 0, gx, gy, r); gr.addColorStop(0, `rgba(255,200,110,${a})`); gr.addColorStop(1, 'rgba(255,200,110,0)'); g.fillStyle = gr; g.fillRect(gx - r, gy - r, r * 2, r * 2); };
     const a = phase === 'night' ? .55 : .25;
     for (const l of lamps) glow(l.x, l.y - .8, 26, a);
-    for (const b of BUILDINGS) glow(b.door[0], b.door[1] - .6, 20, a * .8);
+    for (const b of BUILDINGS) if (!b.noGlow) glow(b.door[0], b.door[1] - .6, 20, a * .8);
+    if (Math.abs(pl.x - 6) < 30 && Math.abs(pl.y - 103) < 30) airportGlow(g, vx, vy, a);
     for (const L of LIGHTHOUSES) glow(L.x + .5, L.y - 1.5, L.big ? 52 : 40, a);
     if (phase === 'night' || phase === 'dusk') { const L = lighthouse2, p = iso(L.x + .5, L.y + .5), bx = p.x - vx, by = p.y - vy - LH - 58, ang = performance.now() / 1000 * .9, len = 120;   // 西南燈塔的旋轉光束
       const gr = g.createLinearGradient(bx, by, bx + Math.cos(ang) * len, by + Math.sin(ang) * len * .45); gr.addColorStop(0, `rgba(255,240,170,${a * .7})`); gr.addColorStop(1, 'rgba(255,240,170,0)'); g.fillStyle = gr;
@@ -3546,9 +3579,132 @@ function isoBox(g, x0, y0, w, h, hgt, wall, roof, vx, vy) {
   poly([P(x0, y0, hgt), P(x0 + w, y0, hgt), P(x0 + w, y0 + h, hgt), P(x0, y0 + h, hgt)], roof);
   return P;
 }
+// ════════════════ ✈️ 柳河機場（國際航線準備中）════════════════
+// 之後要開放「飛出國釣魚」時：把 FLIGHTS 裡的航線 open 改成 true，並在 flyTo() 接上新地圖的切換（可比照 enterUnder 的 runLoading＋換世界）
+const AIRPORT_STAFF = { name: '地勤 小翼', look: { hat: 'captain', hair: 'bun_brown', glasses: 'none', beard: 'none', top: 'black_jacket', pants: 'black' } };
+const FLIGHTS = [
+  { id: 'intl1', icon: '🌏', name: '？？？', note: '目的地規劃中', open: false },
+  { id: 'intl2', icon: '🌍', name: '？？？', note: '目的地規劃中', open: false },
+  { id: 'intl3', icon: '🌎', name: '？？？', note: '目的地規劃中', open: false }];
+function flyTo(f) {   // 🔌 之後接新地圖的地方
+  toast('🛫 國際航線還沒開通，敬請期待！', 2600); buzz(60);
+}
+function openAirport() {
+  const pv = '<canvas id="staffPv" width="16" height="26" class="pv" style="width:64px;height:104px;flex:none"></canvas>';
+  const rows = FLIGHTS.map((f, i) => `<div class="row" style="opacity:${f.open ? 1 : .6}"><span>${f.icon} <b>${f.name}</b> <small>${f.note}</small></span><button data-fl="${i}" ${f.open ? '' : 'disabled'}>${f.open ? '🛫 登機' : '🔒 準備中'}</button></div>`).join('');
+  showPanel(`<h2>✈️ 柳河機場</h2><div style="display:flex;gap:10px;align-items:center;text-align:left;margin-bottom:6px">${pv}<p style="margin:0"><b>${AIRPORT_STAFF.name}</b>：「歡迎來到柳河機場！跑道和飛機都準備好了，不過國際航線還在規劃中……等開通了，就能搭飛機到國外的海域釣魚喔！」</p></div>
+    <h3>🛫 出發航班</h3>${rows}<p class="hint">國際航線尚未開放，之後會陸續開通新的釣魚地圖。</p>`);
+  const c = document.getElementById('staffPv'), g = c.getContext('2d'); g.imageSmoothingEnabled = false; g.drawImage(ART.previewFront(AIRPORT_STAFF.look), 0, 0);
+  document.querySelectorAll('[data-fl]').forEach(btn => btn.onclick = () => { const f = FLIGHTS[+btn.dataset.fl]; if (f.open) flyTo(f); });
+}
+const airB = () => BUILDINGS.find(b => b.id === 'airport');
+function drawAirStaff(g, vx, vy, t) {
+  const b = airB(), p = iso(b.door[0] + 1.4, b.door[1] - .1), x = Math.round(p.x - vx), y = Math.round(p.y - vy - LH);
+  if (!drawAirStaff.img) drawAirStaff.img = ART.previewFront(AIRPORT_STAFF.look);
+  g.fillStyle = 'rgba(0,0,0,.2)'; g.fillRect(x - 5, y - 1, 10, 2);
+  g.drawImage(drawAirStaff.img, x - 6, y - 19 - (Math.sin(t * 2.1) > .95 ? 1 : 0), 12, 19.5);
+  if (Math.sin(t * 1.3) > .6) { g.fillStyle = '#ff7a2a'; g.fillRect(x + 6, y - 15, 1, 6); g.fillRect(x + 5, y - 16, 3, 2); }   // 揮指揮棒
+}
+// 有底面高度的方塊（塔台的控制室用）
+function isoSlab(g, x0, y0, w, h, z0, z1, wall, roof, vx, vy) {
+  const P = (x, y, z = 0) => { const p = iso(x, y); return [Math.round(p.x - vx), Math.round(p.y - vy - LH - z)]; };
+  const poly = (pts, c) => { g.fillStyle = c; g.beginPath(); g.moveTo(...pts[0]); for (const q of pts.slice(1)) g.lineTo(...q); g.closePath(); g.fill(); };
+  poly([P(x0, y0 + h, z0), P(x0 + w, y0 + h, z0), P(x0 + w, y0 + h, z1), P(x0, y0 + h, z1)], shade(wall, -.12));
+  poly([P(x0 + w, y0 + h, z0), P(x0 + w, y0, z0), P(x0 + w, y0, z1), P(x0 + w, y0 + h, z1)], shade(wall, -.3));
+  poly([P(x0, y0, z1), P(x0 + w, y0, z1), P(x0 + w, y0 + h, z1), P(x0, y0 + h, z1)], roof);
+  return P;
+}
+// 航廈：白色平頂建築、整排玻璃窗、玻璃自動門、雨遮、屋頂招牌
+function drawTerminal(g, b, vx, vy) {
+  const lit = phase === 'night' || phase === 'dusk', glass = lit ? '#ffe9a0' : '#8ac4e8', glass2 = lit ? '#ffd870' : '#6aa8d4';
+  const P = isoBox(g, b.x, b.y, b.w, b.h, b.hgt, b.wall, b.roof, vx, vy);
+  const poly = (pts, c) => { g.fillStyle = c; g.beginPath(); g.moveTo(...pts[0]); for (const q of pts.slice(1)) g.lineTo(...q); g.closePath(); g.fill(); };
+  const F = b.y + b.h, R = b.x + b.w;
+  poly([P(b.x + .15, F, 5), P(R - .15, F, 5), P(R - .15, F, 15), P(b.x + .15, F, 15)], glass2);   // 正面整排玻璃
+  poly([P(R, b.y + .15, 5), P(R, F - .15, 5), P(R, F - .15, 15), P(R, b.y + .15, 15)], shade(glass2, -.15));   // 側面玻璃
+  g.fillStyle = shade(b.wall, -.25); for (let u = b.x + .5; u < R - .1; u += .5) { const [x, y] = P(u, F, 5); g.fillRect(x, y - 10, 1, 10); }   // 窗框
+  for (let v = b.y + .5; v < F - .1; v += .5) { const [x, y] = P(R, v, 5); g.fillRect(x, y - 10, 1, 10); }
+  g.fillStyle = 'rgba(255,255,255,.5)'; for (let u = b.x + .3; u < R - .2; u += 1) { const [x, y] = P(u, F, 13); g.fillRect(x, y, 3, 1); }   // 玻璃反光
+  const d = b.door[0];
+  poly([P(d - .4, F, 0), P(d + .4, F, 0), P(d + .4, F, 11), P(d - .4, F, 11)], '#2a2e3a');
+  poly([P(d - .35, F, 0), P(d + .35, F, 0), P(d + .35, F, 10), P(d - .35, F, 10)], glass);   // 玻璃自動門
+  { const [x0, y0] = P(d, F, 0); g.fillStyle = '#2a2e3a'; g.fillRect(x0, y0 - 10, 1, 10); }
+  poly([P(d - .8, F, 12), P(d + .8, F, 12), P(d + .8, F + .45, 12), P(d - .8, F + .45, 12)], '#3a6ab0');   // 雨遮
+  poly([P(d - .8, F + .45, 12), P(d + .8, F + .45, 12), P(d + .8, F + .45, 11), P(d - .8, F + .45, 11)], '#24447a');
+  for (const u of [d - .75, d + .75]) { const [x, y] = P(u, F + .4, 0); g.fillStyle = '#5a6470'; g.fillRect(x, y - 11, 1, 11); }
+  // 屋頂：女兒牆、冷氣機、招牌
+  poly([P(b.x, b.y, b.hgt), P(R, b.y, b.hgt), P(R, b.y, b.hgt + 2), P(b.x, b.y, b.hgt + 2)], shade(b.roof, .2));
+  for (const [u, v] of [[b.x + .7, b.y + .6], [b.x + 1.4, b.y + .6]]) isoSlab(g, u, v, .4, .4, b.hgt, b.hgt + 3, '#c8ccd4', '#e0e4ea', vx, vy);
+  const S0 = P(b.x + .6, F - .1, b.hgt + 1), S1 = P(R - .6, F - .1, b.hgt + 1);
+  poly([S0, S1, [S1[0], S1[1] - 7], [S0[0], S0[1] - 7]], '#24305a');   // 招牌底板
+  { const mx = (S0[0] + S1[0]) / 2 | 0, my = ((S0[1] + S1[1]) / 2 | 0) - 4, c = lit ? '#ffe680' : '#ffffff';
+    g.fillStyle = c; g.fillRect(mx - 3, my, 7, 1); g.fillRect(mx, my - 2, 1, 5); g.fillRect(mx - 1, my - 2, 3, 1); g.fillRect(mx - 1, my + 2, 3, 1);   // ✈ 小飛機圖示
+    for (let k = 0; k < 4; k++) { g.fillRect(mx - 14 + k * 2, my - 1, 1, 3); g.fillRect(mx + 6 + k * 2, my - 1, 1, 3); } }
+  // 門口的「國際線準備中」立牌
+  const [ax, ay] = P(d + .95, F + .55, 0); g.fillStyle = '#2a1e14'; g.fillRect(ax - 4, ay - 10, 9, 8); g.fillRect(ax - 3, ay - 2, 1, 2); g.fillRect(ax + 3, ay - 2, 1, 2);
+  g.fillStyle = '#ffd040'; g.fillRect(ax - 3, ay - 9, 7, 6); g.fillStyle = '#d0403a'; g.fillRect(ax - 2, ay - 8, 5, 1); g.fillStyle = '#2a2a2a'; g.fillRect(ax - 2, ay - 6, 5, 1); g.fillRect(ax - 2, ay - 4, 3, 1);
+}
+// 塔台：細長塔身、玻璃控制室、天線和閃爍的紅燈
+function drawTower(g, b, vx, vy) {
+  const lit = phase === 'night' || phase === 'dusk', t = performance.now() / 1000;
+  isoBox(g, b.x, b.y, b.w, b.h, 8, '#c8ccd4', '#a8b0ba', vx, vy);   // 底座小樓
+  const P = isoSlab(g, b.x + .3, b.y + .3, .4, .4, 8, 30, b.wall, b.wall, vx, vy);   // 塔身
+  g.fillStyle = '#d0403a'; for (const z of [15, 24]) { const [x, y] = P(b.x + .3, b.y + .7, z); g.fillRect(x, y, 4, 2); const [x2, y2] = P(b.x + .7, b.y + .7, z); g.fillRect(x2 - 1, y2 - 2, 4, 2); }   // 紅色警示帶
+  isoSlab(g, b.x - .05, b.y - .05, 1.1, 1.1, 30, 32, '#5a6470', '#7a8490', vx, vy);   // 控制室地板
+  const glass = lit ? '#bfe0a0' : '#7ac0e4';
+  isoSlab(g, b.x, b.y, 1, 1, 32, 44, glass, '#3a4450', vx, vy);
+  g.fillStyle = 'rgba(40,50,70,.55)'; for (const u of [.33, .66]) { const [x, y] = P(b.x + u, b.y + 1, 32); g.fillRect(x, y - 12, 1, 12); const [x2, y2] = P(b.x + 1, b.y + u, 32); g.fillRect(x2, y2 - 12, 1, 12); }   // 玻璃窗框   // 玻璃控制室
+  g.fillStyle = 'rgba(255,255,255,.45)'; { const [x, y] = P(b.x + .1, b.y + 1, 41); g.fillRect(x, y, 4, 1); }
+  isoSlab(g, b.x - .08, b.y - .08, 1.16, 1.16, 44, 46, '#2a2e3a', '#6a7480', vx, vy);   // 屋頂
+  const [ax, ay] = P(b.x + .5, b.y + .5, 46); g.fillStyle = '#3a3a40'; g.fillRect(ax, ay - 9, 1, 9); g.fillRect(ax - 2, ay - 6, 5, 1);   // 天線
+  if (Math.sin(t * 3) > 0) { g.fillStyle = '#ff3a2a'; g.fillRect(ax - 1, ay - 11, 3, 2); }   // 紅燈閃爍
+}
+// 停在停機坪上的客機（機頭朝 +y，往跑道方向）
+function drawPlane(g, b, vx, vy) {
+  const P = (x, y, z = 0) => { const p = iso(x, y); return [Math.round(p.x - vx), Math.round(p.y - vy - LH - z)]; };
+  const ink = '#2a2e3a', body = '#f6f7fa', blue = '#2a6ad0';
+  const poly = (pts, c, o = true) => { g.fillStyle = c; g.beginPath(); g.moveTo(...pts[0]); for (const q of pts.slice(1)) g.lineTo(...q); g.closePath(); g.fill(); if (o) { g.strokeStyle = ink; g.lineWidth = 1; g.stroke(); } };
+  const cu = b.x + 1.5, v0 = b.y - .3, v1 = b.y + 3.1;   // 機身中線、機尾、機頭
+  const wing = s => poly([P(cu, b.y + 1.95, 5), P(cu, b.y + 1.25, 5), P(cu + s * 1.55, b.y + .95, 5.5), P(cu + s * 1.55, b.y + 1.2, 5.5)], '#e4e8ee');
+  const engine = s => { const [x, y] = P(cu + s * .8, b.y + 1.55, 3); g.fillStyle = ink; g.fillRect(x - 3, y - 2, 7, 5); g.fillStyle = '#a8b0ba'; g.fillRect(x - 2, y - 1, 5, 3); g.fillStyle = '#5a6470'; g.fillRect(x - 2, y + 1, 5, 1); };
+  const stab = s => poly([P(cu, v0 + .65, 7), P(cu, v0 + .2, 7), P(cu + s * .8, v0 + .05, 7.5), P(cu + s * .8, v0 + .25, 7.5)], '#e4e8ee');
+  // 影子
+  g.fillStyle = 'rgba(0,0,0,.1)'; g.beginPath(); g.moveTo(...P(cu - .2, v0, 0)); g.lineTo(...P(cu - 1.5, b.y + 1.1, 0)); g.lineTo(...P(cu + 1.5, b.y + 1.1, 0)); g.lineTo(...P(cu + .2, v0, 0)); g.lineTo(...P(cu + .2, v1, 0)); g.lineTo(...P(cu - .2, v1, 0)); g.closePath(); g.fill();
+  wing(-1); engine(-1); stab(-1);   // 遠的那一側（左後）
+  // 起落架
+  g.fillStyle = ink; for (const v of [b.y + 2.8, b.y + 1.5]) { const [x, y] = P(cu, v, 0); g.fillRect(x - 1, y - 5, 2, 5); g.fillRect(x - 2, y - 1, 4, 2); }
+  // 機身：粗線條畫成圓筒
+  const A = P(cu, v0, 7), B = P(cu, v1, 7); g.lineCap = 'round';
+  g.strokeStyle = ink; g.lineWidth = 9; g.beginPath(); g.moveTo(...A); g.lineTo(...B); g.stroke();
+  g.strokeStyle = body; g.lineWidth = 7; g.beginPath(); g.moveTo(...A); g.lineTo(...B); g.stroke();
+  g.strokeStyle = '#d4d8e0'; g.lineWidth = 2; g.beginPath(); g.moveTo(A[0], A[1] + 2); g.lineTo(B[0], B[1] + 2); g.stroke();   // 機腹陰影
+  g.strokeStyle = blue; g.lineWidth = 1; g.beginPath(); g.moveTo(A[0], A[1] + 1); g.lineTo(B[0], B[1] + 1); g.stroke();   // 藍色腰線
+  g.lineCap = 'butt';
+  g.fillStyle = '#3a5a7a'; for (let k = 0; k < 9; k++) { const [x, y] = P(cu, v0 + .6 + k * .27, 8.5); g.fillRect(x, y, 1, 1); }   // 客艙小窗
+  { const [x, y] = P(cu, v1 - .15, 8.5); g.fillStyle = '#1e2a3a'; g.fillRect(x - 3, y - 1, 3, 2); g.fillRect(x - 1, y, 3, 1); }   // 駕駛艙擋風玻璃
+  { const [x, y] = P(cu, v0 + 2.3, 7); g.fillStyle = '#c8ccd4'; g.fillRect(x + 2, y - 2, 1, 4); }   // 機門
+  // 垂直尾翼（藍色）
+  poly([P(cu, v0 + .1, 9), P(cu, v0 + .8, 9), P(cu, v0 + .25, 19), P(cu, v0 - .1, 19)], blue);
+  { const [x, y] = P(cu, v0 + .25, 14); g.fillStyle = '#ffd040'; g.fillRect(x - 1, y, 3, 2); }   // 尾翼上的小標誌
+  stab(1); wing(1); engine(1);   // 近的那一側（右前）
+}
+// 夜晚的機場燈光：跑道邊燈、航廈窗光、塔台旋轉燈
+function airportGlow(g, vx, vy, a) {
+  const A = AIRPORT, t = performance.now() / 1000;
+  const dot = (x, y, r, col, al) => { const p = iso(x, y), gx = p.x - vx, gy = p.y - vy - LH; if (gx < -r || gy < -r || gx > low.width + r || gy > low.height + r) return; const gr = g.createRadialGradient(gx, gy, 0, gx, gy, r); gr.addColorStop(0, `rgba(${col},${al})`); gr.addColorStop(1, `rgba(${col},0)`); g.fillStyle = gr; g.fillRect(gx - r, gy - r, r * 2, r * 2); };
+  for (let y = A.ry0; y <= A.ry1; y += 3) { dot(A.rx0 + .05, y + .5, 9, '255,236,150', a); dot(A.rx1 + .95, y + .5, 9, '255,236,150', a); }
+  const run = (t * 6) % (A.ry1 - A.ry0); dot(A.rx0 + 1.5, A.ry1 - run, 14, '200,230,255', a * .9);   // 跑道上一路跑過去的引導燈
+  const b = airB(); dot(b.x + b.w / 2 + .3, b.y + b.h + .2, 30, '255,210,130', a * .9);
+  const tw = BUILDINGS.find(x => x.id === 'tower'), p = iso(tw.x + .5, tw.y + .5), bx = p.x - vx, by = p.y - vy - LH - 40, ang = t * 1.6, len = 70;
+  const gr = g.createLinearGradient(bx, by, bx + Math.cos(ang) * len, by + Math.sin(ang) * len * .45); gr.addColorStop(0, `rgba(200,255,200,${a * .6})`); gr.addColorStop(1, 'rgba(200,255,200,0)'); g.fillStyle = gr;
+  g.beginPath(); g.moveTo(bx, by); g.lineTo(bx + Math.cos(ang - .1) * len, by + Math.sin(ang - .1) * len * .45); g.lineTo(bx + Math.cos(ang + .1) * len, by + Math.sin(ang + .1) * len * .45); g.closePath(); g.fill();
+}
 function drawBuilding(g, b, vx, vy) {
   if (b.id === 'quests') return drawQuestBoard(g, b, vx, vy);
   if (b.id === 'mine') return drawMineEntrance(g, b, vx, vy);
+  if (b.id === 'airport') return drawTerminal(g, b, vx, vy);
+  if (b.id === 'tower') return drawTower(g, b, vx, vy);
+  if (b.id === 'plane') return drawPlane(g, b, vx, vy);
   const P = isoBox(g, b.x, b.y, b.w, b.h, b.hgt, b.wall, b.roof, vx, vy);
   // 斜屋頂：中脊
   const ridge = [P(b.x + .5, b.y + b.h / 2, b.hgt + 8), P(b.x + b.w - .5, b.y + b.h / 2, b.hgt + 8)];
