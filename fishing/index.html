@@ -228,13 +228,13 @@
 <div class="overlay" id="fishDetail"><div class="card" id="fishDetailCard"></div></div>
 <div class="overlay" id="badgePop"><div class="card" id="badgeCard"></div></div>
 
-<script src="data/fish.js?v=2026.10.30-87"></script>
-<script src="art.js?v=2026.10.30-87"></script>
-<script src="music.js?v=2026.10.30-87"></script>
+<script src="data/fish.js?v=2026.10.30-88"></script>
+<script src="art.js?v=2026.10.30-88"></script>
+<script src="music.js?v=2026.10.30-88"></script>
 <script>
 'use strict';
 // 版本號：每次更新都要改（也要改上面三個 script 的 ?v=），遊戲會用它檢查網站上有沒有新版
-const BUILD = '2026.10.30-87';
+const BUILD = '2026.10.30-88';
 // ════════════════ 基本設定 ════════════════
 const FISH = window.FISH_DATA || [];
 const N = 160, TW = 32, TH = 16, LH = 4;         // 地圖格數、等角格寬高、陸地高度
@@ -2696,7 +2696,8 @@ const wrapD = (d, L) => ((d % L) + L * 1.5) % L - L / 2;          // 環形上�
 const wrapX = (x, L) => ((x % L) + L) % L;
 function aqFish(f) {
   const def = FISH_BY_ID[f.id], img = document.createElement('canvas'); img.width = 64; img.height = 32; drawFishTo(img, def);
-  const w = clamp(12 + Math.log10(Math.max(3, f.l)) * 15, 16, 66), bottom = BOTTOM_SHAPES.has(def.shape);
+  const boost = { epic: 1.12, legendary: 1.25 }[def.rarity] || 1;   // 史詩、傳說稍微大一點，一眼看得出來
+  const w = clamp(12 + Math.log10(Math.max(3, f.l)) * 15, 16, 66) * boost, bottom = BOTTOM_SHAPES.has(def.shape);
   return { f, def, img, w, h: w / 2, x: rand(0, aq.WW), y: bottom ? aq.sandY - w * .2 : rand(aq.H * .2, aq.H * .75), vx: rand(-8, 8), vy: 0, tx: 0, ty: 0, ph: Math.random() * 6, bottom, wait: 0 };
 }
 function aqTarget(o) {   // 下一個要游去的點：多半在附近，偶爾游一大段繞圈
@@ -2732,7 +2733,7 @@ function aqAddPanel() {
   document.querySelectorAll('[data-pick]').forEach(el => el.onclick = () => {
     if (prog.aquarium.length >= AQ_CAP) { toast(`水族箱滿了（${AQ_CAP} 條），先放回幾條再放新的`); buzz(120); return; }
     const f = state.bag.splice(+el.dataset.pick, 1)[0]; prog.aquarium.push(f); aqSync(); SFX.pickup(); buzz(30);
-    toast(`🐠 ${FISH_BY_ID[f.id].name} 游進水族箱了！`); save(); updateHud(); aqAddPanel(); checkAch();
+    const rr = FISH_BY_ID[f.id].rarity; toast(rr === 'legendary' ? `👑 傳說的「${FISH_BY_ID[f.id].name}」游進水族箱了！全身散發金光！` : rr === 'epic' ? `✨ 史詩的「${FISH_BY_ID[f.id].name}」游進水族箱了！身邊有紫色光暈` : `🐠 ${FISH_BY_ID[f.id].name} 游進水族箱了！`, 3000); save(); updateHud(); aqAddPanel(); checkAch();
   });
 }
 function aqManagePanel() {
@@ -2812,7 +2813,15 @@ function drawAquarium(dt) {
     o.x = wrapX(o.x + o.vx * dt, WW); o.y += o.vy * dt; o.ph += dt * (3 + Math.abs(o.vx) * .4);
     if (Math.abs(o.vx) > .8) o.flip = o.vx < 0;
     const x = sxOf(o.x); if (x < -o.w || x > W2 + o.w) continue;
-    g.save(); g.translate(Math.round(x), Math.round(o.y + (o.bottom ? 0 : Math.sin(o.ph * .5) * 1))); g.scale(o.flip ? -1 : 1, 1 + Math.sin(o.ph) * .04);
+    const fy = Math.round(o.y + (o.bottom ? 0 : Math.sin(o.ph * .5) * 1)), rar = o.def.rarity;
+    if (rar === 'epic' || rar === 'legendary') {   // ✨ 史詩：紫色光暈；傳說：金色光暈＋閃光＋一串光點尾巴
+      const col = rar === 'epic' ? '190,90,255' : '255,196,40', pulse = .8 + Math.sin(aq.t * 2.4 + o.ph) * .2, R = o.w * (rar === 'epic' ? .75 : .9);
+      const gr = g.createRadialGradient(x, fy, 0, x, fy, R); gr.addColorStop(0, `rgba(${col},${.85 * pulse})`); gr.addColorStop(.55, `rgba(${col},${.4 * pulse})`); gr.addColorStop(1, `rgba(${col},0)`); g.fillStyle = gr; g.fillRect(x - R, fy - R, R * 2, R * 2);
+      for (let i = 0; i < (rar === 'epic' ? 3 : 6); i++) { const a = aq.t * 1.5 + i * 2.1 + o.ph, rr = o.w * (.45 + (i % 2) * .15), on = Math.sin(aq.t * 6 + i * 1.7 + o.ph) > -.2; if (!on) continue;
+        const sx = Math.round(x + Math.cos(a) * rr), sy = Math.round(fy + Math.sin(a) * rr * .5); g.fillStyle = rar === 'epic' ? '#e8c8ff' : '#fff6b0'; g.fillRect(sx - 1, sy, 3, 1); g.fillRect(sx, sy - 1, 1, 3); }
+      if (rar === 'legendary') for (let i = 1; i < 6; i++) { g.fillStyle = `rgba(255,220,120,${.5 - i * .08})`; g.fillRect(Math.round(x - (o.flip ? -1 : 1) * (o.w * .45 + i * 4)), fy + Math.round(Math.sin(aq.t * 3 + i) * 2), 2, 2); }
+    }
+    g.save(); g.translate(Math.round(x), fy); g.scale(o.flip ? -1 : 1, 1 + Math.sin(o.ph) * .04);
     g.drawImage(o.img, -o.w / 2, -o.h / 2, o.w, o.h); g.restore();
   }
   // 環形玻璃：前面的玻璃柱（視差 1.25）＋兩側變暗（像站在圓圈中間）
@@ -2826,7 +2835,7 @@ function drawAquarium(dt) {
   if (aq.label && (aq.label.t -= dt) > 0 && aq.fish.includes(aq.label.o)) {
     const o = aq.label.o, f = o.f, x = sxOf(o.x);
     if (x > 0 && x < W2) { lab.style.display = 'block'; lab.style.left = (x / W2 * 100) + '%'; lab.style.top = ((o.y - o.h / 2 - 2) / H2 * 100) + '%';
-      lab.innerHTML = `<span style="color:${RAR[o.def.rarity].color === '#8a9a7a' ? '#d8e8c8' : RAR[o.def.rarity].color}">${o.def.name}</span>・${fmtW(f.w)}・${f.l} cm`; }
+      lab.innerHTML = `${{ epic: '✨', legendary: '👑' }[o.def.rarity] || ''}<span style="color:${RAR[o.def.rarity].color === '#8a9a7a' ? '#d8e8c8' : RAR[o.def.rarity].color}">${o.def.name}</span>（${RAR[o.def.rarity].name}）・${fmtW(f.w)}・${f.l} cm`; }
     else lab.style.display = 'none';
   } else lab.style.display = 'none';
 }
