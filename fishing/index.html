@@ -228,13 +228,13 @@
 <div class="overlay" id="fishDetail"><div class="card" id="fishDetailCard"></div></div>
 <div class="overlay" id="badgePop"><div class="card" id="badgeCard"></div></div>
 
-<script src="data/fish.js?v=2026.10.30-86"></script>
-<script src="art.js?v=2026.10.30-86"></script>
-<script src="music.js?v=2026.10.30-86"></script>
+<script src="data/fish.js?v=2026.10.30-87"></script>
+<script src="art.js?v=2026.10.30-87"></script>
+<script src="music.js?v=2026.10.30-87"></script>
 <script>
 'use strict';
 // 版本號：每次更新都要改（也要改上面三個 script 的 ?v=），遊戲會用它檢查網站上有沒有新版
-const BUILD = '2026.10.30-86';
+const BUILD = '2026.10.30-87';
 // ════════════════ 基本設定 ════════════════
 const FISH = window.FISH_DATA || [];
 const N = 160, TW = 32, TH = 16, LH = 4;         // 地圖格數、等角格寬高、陸地高度
@@ -3411,7 +3411,7 @@ function update(dt) {
   updateSick(dt);
   updateResidents(dt);
   updateFishing(dt);
-  const target = fish.state && fish.state !== 'cast' ? 1 : fish.state === 'cast' ? Math.min(1, fish.t / .5) : 0;
+  const target = mtn ? 1 : fish.state && fish.state !== 'cast' ? 1 : fish.state === 'cast' ? Math.min(1, fish.t / .5) : 0;   // 在山上一律用釣魚視角，不會閃出地圖
   viewMix += (target - viewMix) * Math.min(1, dt * 6);
   const an = areaName(); if (an !== lastArea) { if (lastArea) toast('📍 ' + an); lastArea = an; updateHud(); }
 }
@@ -3780,7 +3780,7 @@ function frame(now) {
   const dt = Math.min(.05, (now - last) / 1000); last = now; const t = now / 1000;
   update(dt);
   const hidden = !!aq || !!cut || !!dive || (!!mtn && !(mtn.mode === 'summit' && fish.state));   // 水族館或頒獎動畫蓋住整個畫面時，不必再畫地圖（省電）
-  const isoOn = viewMix < .99 && !hidden, thirdOn = viewMix > .01 && !hidden, S = PIX * DPR;
+  const isoOn = viewMix < .99 && !hidden && !mtn, thirdOn = viewMix > .01 && !hidden, S = PIX * DPR;
   lx.imageSmoothingEnabled = false; l3x.imageSmoothingEnabled = false;
   if (isoOn) drawIso(lx, lfx, t);
   if (thirdOn) drawThird(l3x, t);
@@ -3832,7 +3832,7 @@ document.addEventListener('visibilitychange', () => { if (!document.hidden) chec
 load(); initFog(); uFogInit(); applyGear(); applyLook(); updateHud(); drawMini(); setInterval(save, 10000); addEventListener('pagehide', save);
 if (resumeUnder) enterUnder(resumeUnder); else toast('歡迎來到漁港鎮！走到碼頭盡頭「上船」出海，或在水邊直接「拋竿」', 3200);
 if (params.get('demo') === 'boat') { state.onBoat = true; }
-window.__game = { state, fish, FISH, docks, BUILDINGS, prog, ACH, save, applyGear, openBuilding, checkAch, openDex, startCast, hook }; window.__walk = walkable; window.__pick = pickFish; window.__drifts = drifts; window.__regionAt = regionAt; window.__boatable = boatable; window.__islands = ISLANDS; window.__openFishDetail = openFishDetail; window.__aq = () => aq; window.__drawAq = drawAquarium; window.__tile = at; window.__adv = { SPOTS, fogPct, revealAt, isRevealed, discover, giveMap, digTreasure, openQuests, genQuest, get boss() { return boss; }, set boss(v) { boss = v; }, set bossCD(v) { bossCD = v; }, GEAR, drawTreasureMap }; window.__contextB = contextB; window.__uzone = (x, y) => (UNDER ? landOf : (U.landOf || landOf))[y * N + x]; window.__uzc = UZC.map(c => c); window.__ustairs = () => U.stairs; window.__ucamp = () => U.camp; window.__res = resNPC; window.__dive = () => dive; window.__mtn = () => mtn; window.__enterMountain = enterMountain; window.__volcano = volcano; window.__startDive = startDive; window.__endDive = endDive; window.__divePick = divePick; window.__diveTarget = diveTarget; window.__openResident = openResident; window.__ulair = () => U.lair; window.__lairActive = lairActive; window.__openCamp = openCamp; window.__world = () => world; window.__checkUpdate = checkUpdate; window.__actx = () => actx; window.__contest = { nextContestKey, contestAt, runContest, openGuild, contestTable, startCeremony, get cut() { return cut; } };   // 給測試用
+window.__game = { state, fish, FISH, docks, BUILDINGS, prog, ACH, save, applyGear, openBuilding, checkAch, openDex, startCast, hook }; window.__walk = walkable; window.__pick = pickFish; window.__drifts = drifts; window.__regionAt = regionAt; window.__boatable = boatable; window.__islands = ISLANDS; window.__openFishDetail = openFishDetail; window.__aq = () => aq; window.__drawAq = drawAquarium; window.__tile = at; window.__adv = { SPOTS, fogPct, revealAt, isRevealed, discover, giveMap, digTreasure, openQuests, genQuest, get boss() { return boss; }, set boss(v) { boss = v; }, set bossCD(v) { bossCD = v; }, GEAR, drawTreasureMap }; window.__contextB = contextB; window.__uzone = (x, y) => (UNDER ? landOf : (U.landOf || landOf))[y * N + x]; window.__uzc = UZC.map(c => c); window.__ustairs = () => U.stairs; window.__ucamp = () => U.camp; window.__res = resNPC; window.__dive = () => dive; window.__mtn = () => mtn; window.__viewMix = () => viewMix; window.__enterMountain = enterMountain; window.__volcano = volcano; window.__startDive = startDive; window.__endDive = endDive; window.__divePick = divePick; window.__diveTarget = diveTarget; window.__openResident = openResident; window.__ulair = () => U.lair; window.__lairActive = lairActive; window.__openCamp = openCamp; window.__world = () => world; window.__checkUpdate = checkUpdate; window.__actx = () => actx; window.__contest = { nextContestKey, contestAt, runContest, openGuild, contestTable, startCeremony, get cut() { return cut; } };   // 給測試用
 requestAnimationFrame(frame);
 </script>
 </body>
