@@ -223,13 +223,13 @@
 <div class="overlay" id="fishDetail"><div class="card" id="fishDetailCard"></div></div>
 <div class="overlay" id="badgePop"><div class="card" id="badgeCard"></div></div>
 
-<script src="data/fish.js?v=2026.10.30-84"></script>
-<script src="art.js?v=2026.10.30-84"></script>
-<script src="music.js?v=2026.10.30-84"></script>
+<script src="data/fish.js?v=2026.10.30-85"></script>
+<script src="art.js?v=2026.10.30-85"></script>
+<script src="music.js?v=2026.10.30-85"></script>
 <script>
 'use strict';
 // 版本號：每次更新都要改（也要改上面三個 script 的 ?v=），遊戲會用它檢查網站上有沒有新版
-const BUILD = '2026.10.30-84';
+const BUILD = '2026.10.30-85';
 // ════════════════ 基本設定 ════════════════
 const FISH = window.FISH_DATA || [];
 const N = 160, TW = 32, TH = 16, LH = 4;         // 地圖格數、等角格寬高、陸地高度
@@ -2137,7 +2137,8 @@ function diveTarget() {   // 正前方、夠近的寶物
   return best;
 }
 function divePick() {
-  const it = diveTarget(); if (!it) return;
+  const it = diveTarget(); if (!it || dive.reach > 0) return;
+  dive.reach = .5;   // 右手伸出去抓（動畫）
   dive.items.splice(dive.items.indexOf(it), 1);
   let msg;
   if (it.kind === 'coin') { const c = Math.round(rand(30, 120)); state.coins += c; dive.coins += c; msg = `🪙 古金幣 ${c}`; dive.found.push('古金幣'); }
@@ -2164,6 +2165,7 @@ function updateDive(dt) {
   if (!panelOpen) {
     d.yaw += ix * 1.7 * dt;
     const sp = -iy * 3 * dt, nx = d.x + Math.sin(d.yaw) * sp, nz = d.z + Math.cos(d.yaw) * sp;
+    d.stroke = (d.stroke || 0) + Math.abs(iy) * dt * 3.2; d.turn = ix;   // 手划水、轉頭時手會跟著偏
     if (Math.hypot(nx, nz - 12) < 32 && !(Math.abs(nx) < 6.5 && Math.abs(nz - 14) < 2.2)) { d.x = nx; d.z = nz; }   // 不能游出範圍、不能穿過船身
     d.o2 -= dt;
   }
@@ -2175,8 +2177,22 @@ function updateDive(dt) {
     if (dist < .4) { const a = Math.random() * 6.28, r = rand(3, 9); f.tx = clamp(f.x + Math.cos(a) * r, -25, 25); f.tz = clamp(f.z + Math.sin(a) * r, -14, 36); f.ty = rand(.6, 4.5); }
     else { f.x += dx / dist * f.sp * dt; f.z += dz / dist * f.sp * dt; f.y += (f.ty - f.y) * dt * .5; f.vx = dx / dist; f.vz = dz / dist; }
   }
+  if (d.reach > 0) d.reach -= dt;
   for (const b of d.bubbles) b.y -= b.v * dt; d.bubbles = d.bubbles.filter(b => b.y > -.1);
   if ((d.hudT = (d.hudT || 0) + dt) > .2) { d.hudT = 0; diveHud(); }
+}
+const GLOVE_ROWS = ['...kk.kk.kk.....', '..kGHkGHkGHk....', '..kGGkGGkGGk.kk.', '..kGGkGGkGGkkGHk', '..kGGGGGGGGGkGGk', '..kGHGGGGGGGGGGk', '..kGGGGGGGGGGGk.', '..kGGGGGGGGGGGk.', '...kGGGGGGGGGk..', '...kYYYYYYYYYk..', '...kYYYYYYYYYk..', '...kCCCCCCCCCk..', '..kCCCCCCCCCCCk.', '..kCCCCCCCCCCCk.', '.kCCCCCCCCCCCCCk', '.kCCCCCCCCCCCCCk'];
+let gloveImg = null;
+function drawDiveHands(g, W, H, d, t) {
+  if (!gloveImg) { const P = { k: '#14141a', G: '#3e3e4a', H: '#62626e', Y: '#e8b020', C: '#2a4a6a' }; gloveImg = document.createElement('canvas'); gloveImg.width = 16; gloveImg.height = 16; const c = gloveImg.getContext('2d'); GLOVE_ROWS.forEach((r, y) => [...r].forEach((ch, x) => { if (P[ch]) { c.fillStyle = P[ch]; c.fillRect(x, y, 1, 1); } })); }
+  const s = W * .3, ph = d.stroke || 0, sw = Math.sin(ph), bob = Math.sin(t * 1.6) * 2, turn = (d.turn || 0) * 8;
+  const reach = d.reach > 0 ? Math.sin((1 - d.reach / .5) * Math.PI) : 0;   // 0→1→0
+  for (const side of [-1, 1]) {
+    // 划水：手先往中間前方伸，再往兩邊撥開
+    let x = W / 2 + side * (W * .3 - Math.max(0, sw) * W * .12 + Math.max(0, -sw) * W * .05) - turn, y = H * .74 + bob - Math.max(0, sw) * H * .06 + Math.max(0, -sw) * H * .02, sc = 1 - Math.max(0, sw) * .15;
+    if (side === 1 && reach > 0) { x += (W / 2 - x) * reach * .85; y += (H * .6 - y) * reach; sc *= 1 - reach * .35; }
+    g.save(); g.translate(x | 0, y | 0); if (side === 1) g.scale(-1, 1); g.rotate(side * -.18 * (1 - reach)); g.drawImage(gloveImg, -s * sc / 2, -s * sc * .35, s * sc, s * sc); g.restore();
+  }
 }
 function drawDiveWreck(g, sx, sy, s, w, h) {   // 斜躺在海底的沉船
   const W = w * s, H = h * s, x0 = sx - W / 2, y0 = sy - H;
@@ -2188,16 +2204,19 @@ function drawDiveWreck(g, sx, sy, s, w, h) {   // 斜躺在海底的沉船
 }
 function drawDive(dt) {
   if (!dive) return; updateDive(dt); if (!dive) return;
-  const d = dive, g = dvg, W = diveCv.width, H = diveCv.height, hz = H * .36, FOV = W * .9, camY = 1.0, t = d.t;   // 視線放低一點，近處海底的寶物才看得到
+  const d = dive, g = dvg, W = diveCv.width, H = diveCv.height, hz = H * .4, FOV = W * .95, camY = 1.0, t = d.t;   // 視線放低一點，近處海底的寶物才看得到
   g.imageSmoothingEnabled = false;
   // 海水：上亮下暗
-  let gr = g.createLinearGradient(0, 0, 0, H); gr.addColorStop(0, '#2a8ab0'); gr.addColorStop(.42, '#14506e'); gr.addColorStop(1, '#0a2a3e'); g.fillStyle = gr; g.fillRect(0, 0, W, H);
+  let gr = g.createLinearGradient(0, 0, 0, hz); gr.addColorStop(0, '#5ac8e8'); gr.addColorStop(.5, '#2a90b8'); gr.addColorStop(1, '#1a6a90'); g.fillStyle = gr; g.fillRect(0, 0, W, hz + 1);
+  for (let i = 0; i < 9; i++) { const x = ((i * 31 + t * 6 - d.yaw * 30) % (W + 20) + W + 20) % (W + 20) - 10; g.fillStyle = `rgba(255,255,255,${.12 + .08 * Math.sin(t * 2 + i)})`; g.fillRect(x | 0, 2 + (i % 3) * 3, 10 + (i % 4) * 4, 1); }   // 頭頂水面的波光
   // 從水面照下來的光柱
   g.globalCompositeOperation = 'lighter';
   for (let i = 0; i < 5; i++) { const x = ((i * 47 + Math.sin(t * .3 + i) * 18 - d.yaw * 40) % (W + 60) + W + 60) % (W + 60) - 30; g.fillStyle = `rgba(160,230,255,${.05 + .03 * Math.sin(t + i)})`; g.beginPath(); g.moveTo(x, 0); g.lineTo(x + 14, 0); g.lineTo(x + 34, hz + 30); g.lineTo(x + 6, hz + 30); g.closePath(); g.fill(); }
   g.globalCompositeOperation = 'source-over';
   // 海底沙地（往遠處淡進藍色）
-  gr = g.createLinearGradient(0, hz, 0, H); gr.addColorStop(0, '#2a5a6a'); gr.addColorStop(.25, '#6a7a6a'); gr.addColorStop(1, '#b8a878'); g.fillStyle = gr; g.fillRect(0, hz, W, H - hz);
+  gr = g.createLinearGradient(0, hz, 0, H); gr.addColorStop(0, '#2a7890'); gr.addColorStop(.18, '#6aa098'); gr.addColorStop(.5, '#c8c090'); gr.addColorStop(1, '#e8d8a0'); g.fillStyle = gr; g.fillRect(0, hz, W, H - hz);
+  g.strokeStyle = 'rgba(255,255,240,.18)'; g.lineWidth = 1;   // 海底晃動的光紋
+  for (let i = 0; i < 7; i++) { const yy = hz + (H - hz) * (.15 + i * .13) ; g.beginPath(); for (let x = 0; x <= W; x += 6) { const y = yy + Math.sin(x * .08 + t * 1.6 + i * 2 - d.yaw * 4) * (2 + i); x ? g.lineTo(x, y) : g.moveTo(x, y); } g.stroke(); }
   const fx = Math.sin(d.yaw), fz = Math.cos(d.yaw), rx = Math.cos(d.yaw), rz = -Math.sin(d.yaw);
   const proj = (x, y, z) => { const dx = x - d.x, dz = z - d.z, dep = dx * fx + dz * fz; if (dep < .25) return null; const lat = dx * rx + dz * rz; return { sx: W / 2 + lat / dep * FOV, sy: hz + (camY - y) / dep * FOV, s: FOV / dep, dep }; };
   // 沙地上的小點（跟著視角移動，才有往前游的感覺）
@@ -2210,7 +2229,7 @@ function drawDive(dt) {
   list.sort((a, b) => b.p.dep - a.p.dep);
   const tgt = diveTarget();
   for (const { p, o, k } of list) {
-    const fog = clamp(1 - p.dep / 30, 0, 1); g.globalAlpha = .25 + fog * .75;
+    const fog = clamp(1 - p.dep / 30, 0, 1); g.globalAlpha = .45 + fog * .55;
     if (k === 'deco') {
       if (o.kind === 'wreck') drawDiveWreck(g, p.sx, p.sy, p.s, o.w, o.h);
       else if (o.kind === 'mast') { g.fillStyle = '#4a3428'; g.save(); g.translate(p.sx, p.sy); g.rotate(-.35); g.fillRect(-o.w * p.s / 2, -o.h * p.s, o.w * p.s, o.h * p.s); g.fillStyle = 'rgba(220,210,180,.5)'; g.fillRect(o.w * p.s * .5, -o.h * p.s * .9, o.h * p.s * .35, o.h * p.s * .45); g.restore(); }
@@ -2240,16 +2259,18 @@ function drawDive(dt) {
   for (const b of d.bubbles) { g.beginPath(); g.arc(b.x * W + Math.sin(t * 5 + b.s) * 2, b.y * H, b.s, 0, 7); g.stroke(); }
   // 最後一罐快用完：畫面一閃一閃變紅
   if (prog.o2 === 0 && d.o2 < 10) { g.fillStyle = `rgba(255,40,40,${.12 + .1 * Math.sin(t * 8)})`; g.fillRect(0, 0, W, H); }
-  // 潛水頭盔：圓形玻璃窗、黃銅框、鉚釘、玻璃反光
-  const cx = W / 2, cy = H * .46, R = Math.min(W * .49, H * .42);
-  g.fillStyle = '#2a1a0e'; g.beginPath(); g.rect(0, 0, W, H); g.arc(cx, cy, R, 0, Math.PI * 2, true); g.fill('evenodd');
-  g.strokeStyle = '#b8862a'; g.lineWidth = 7; g.beginPath(); g.arc(cx, cy, R + 2, 0, 7); g.stroke();
-  g.strokeStyle = '#e8b84a'; g.lineWidth = 2; g.beginPath(); g.arc(cx, cy, R + 1, Math.PI * 1.1, Math.PI * 1.6); g.stroke();
-  g.strokeStyle = '#6a4a1a'; g.lineWidth = 2; g.beginPath(); g.arc(cx, cy, R + 6, 0, 7); g.stroke();
-  for (let i = 0; i < 12; i++) { const a = i / 12 * Math.PI * 2, x = cx + Math.cos(a) * (R + 3), y = cy + Math.sin(a) * (R + 3); g.fillStyle = '#5a3a14'; g.fillRect(x - 2, y - 2, 4, 4); g.fillStyle = '#ffd86a'; g.fillRect(x - 1, y - 1, 2, 2); }
-  const vg = g.createRadialGradient(cx, cy, R * .55, cx, cy, R); vg.addColorStop(0, 'rgba(0,10,20,0)'); vg.addColorStop(1, 'rgba(0,10,20,.55)'); g.fillStyle = vg; g.beginPath(); g.arc(cx, cy, R, 0, 7); g.fill();
-  g.strokeStyle = 'rgba(255,255,255,.28)'; g.lineWidth = 3; g.beginPath(); g.arc(cx, cy, R * .82, Math.PI * 1.15, Math.PI * 1.4); g.stroke();
-  g.lineWidth = 1.5; g.beginPath(); g.arc(cx, cy, R * .74, Math.PI * 1.2, Math.PI * 1.32); g.stroke();
+  // 🧤 自己的雙手（潛水手套）：游泳時划水、轉頭時跟著偏、撿東西時右手伸出去
+  drawDiveHands(g, W, H, d, t);
+  // 潛水頭盔的大面罩：幾乎填滿畫面，只在四周留一圈黃銅框
+  const cx = W / 2, cy = H * .5, RX = W * .62, RY = H * .48;
+  g.fillStyle = '#2a1a0e'; g.beginPath(); g.rect(0, 0, W, H); g.ellipse(cx, cy, RX, RY, 0, 0, Math.PI * 2, true); g.fill('evenodd');
+  g.strokeStyle = '#b8862a'; g.lineWidth = 6; g.beginPath(); g.ellipse(cx, cy, RX + 2, RY + 2, 0, 0, 7); g.stroke();
+  g.strokeStyle = '#e8b84a'; g.lineWidth = 2; g.beginPath(); g.ellipse(cx, cy, RX + 1, RY + 1, 0, Math.PI * 1.15, Math.PI * 1.6); g.stroke();
+  g.strokeStyle = '#6a4a1a'; g.lineWidth = 2; g.beginPath(); g.ellipse(cx, cy, RX + 5, RY + 5, 0, 0, 7); g.stroke();
+  for (let i = 0; i < 20; i++) { const a = i / 20 * Math.PI * 2, x = cx + Math.cos(a) * (RX + 3), y = cy + Math.sin(a) * (RY + 3); if (x < 2 || x > W - 2) continue; g.fillStyle = '#5a3a14'; g.fillRect(x - 2, y - 2, 4, 4); g.fillStyle = '#ffd86a'; g.fillRect(x - 1, y - 1, 2, 2); }
+  const vg = g.createRadialGradient(cx, cy, Math.min(RX, RY) * .7, cx, cy, Math.max(RX, RY)); vg.addColorStop(0, 'rgba(0,10,20,0)'); vg.addColorStop(1, 'rgba(0,10,20,.35)'); g.fillStyle = vg; g.beginPath(); g.ellipse(cx, cy, RX, RY, 0, 0, 7); g.fill();
+  g.strokeStyle = 'rgba(255,255,255,.22)'; g.lineWidth = 3; g.beginPath(); g.ellipse(cx, cy, RX * .86, RY * .86, 0, Math.PI * 1.12, Math.PI * 1.32); g.stroke();
+  g.lineWidth = 1.5; g.beginPath(); g.ellipse(cx, cy, RX * .78, RY * .78, 0, Math.PI * 1.16, Math.PI * 1.26); g.stroke();
   // 準星（正前方有東西可以撿就變亮）
   g.fillStyle = tgt ? '#fff6a0' : 'rgba(255,255,255,.35)'; g.fillRect(cx - 4, cy, 3, 1); g.fillRect(cx + 2, cy, 3, 1); g.fillRect(cx, cy - 4, 1, 3); g.fillRect(cx, cy + 2, 1, 3);
 }
