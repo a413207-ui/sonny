@@ -226,6 +226,18 @@ UNDER_FISH = [
     ("udragon", "地底龍魚", "L", "ulava", "any", (200.0, 800.0), (400, 900), "myth", "#3a1a3a", "#ff6a2a", "住在熔岩河最深處的古龍，只在龍穴冒泡時現身。"),
 ]
 
+# ── 🌋 火山山頂的火口湖（2026-10-30）：爬上火山才釣得到 ──
+CRATER_FISH = [
+    ("crater_tetra", "火口燈魚", "C", "crater", "any", (0.01, 0.06), (4, 9), "slim", "#3ac8b0", "#ffe060", "在溫溫的湖水裡成群發光。"),
+    ("sulfur_loach", "硫磺泥鰍", "C", "crater", "any", (0.03, 0.15), (10, 20), "eel", "#c8b040", "#6a5a20", "身上有淡淡的硫磺味。"),
+    ("steam_carp", "蒸氣鯉", "U", "crater", "any", (1.0, 6.0), (30, 70), "round", "#e8e0d8", "#ff8a6a", "游過的地方會冒出一縷白煙。"),
+    ("ash_catfish", "火山灰鯰", "U", "crater", "any", (1.0, 8.0), (40, 90), "slim", "#5a5a60", "#a8a8b0", "全身像蓋了一層火山灰。"),
+    ("jade_trout", "翡翠鱒", "R", "crater", "any", (2.0, 8.0), (40, 75), "slim", "#2aa880", "#c0ffe0", "跟火口湖的湖水一樣是翡翠色。"),
+    ("ember_koi", "炭火錦鯉", "R", "crater", "any", (3.0, 10.0), (50, 90), "round", "#2a2226", "#ff6a2a", "黑色的鱗片下透出炭火一樣的紅光。"),
+    ("cloud_eel", "雲端鰻", "E", "crater", "any", (5.0, 20.0), (120, 260), "eel", "#e8f0ff", "#8ac8ff", "住在雲層上的湖，傳說會游上天空。"),
+    ("crater_lord", "火口湖之主", "L", "crater", "any", (80.0, 300.0), (250, 500), "myth", "#1a6a5a", "#ffd040", "守護火山山頂的巨魚，火山噴發就是牠在打呵欠。"),
+]
+
 WEATHER_FISH = [
     ("kelp_drifter", "漂流藻魚", "C", "harbor,reef", "any", (0.05, 0.2), (6, 14), "flat", "#8a8a3a", "#d8d870", "躲在漂流海藻下面，跟著浪一起漂來。", "rain,storm,waves,typhoon"),
     ("rain_ayu", "雨香魚", "U", "river", "any", (0.1, 0.4), (15, 30), "slim", "#7a9aa8", "#a0e0ff", "下雨溪水變涼時成群出現。", "rain,storm,typhoon"),
@@ -238,7 +250,7 @@ WEATHER_FISH = [
 ]
 WEATHERS = ["sunny", "cloudy", "rain", "storm", "waves", "typhoon"]
 
-REGIONS = ["harbor", "lake", "river", "reef", "deep", "cold", "mangrove", "volcano", "wreck", "cave", "lagoon", "frozen", "bigriver", "upriver", "ucave", "ulake", "ucrystal", "ulava"]
+REGIONS = ["harbor", "lake", "river", "reef", "deep", "cold", "mangrove", "volcano", "wreck", "cave", "lagoon", "frozen", "bigriver", "upriver", "ucave", "ulake", "ucrystal", "ulava", "crater"]
 TIMES = ["dawn", "day", "dusk", "night"]
 
 
@@ -254,7 +266,7 @@ def shade(hex_color, k):
 
 def build():
     out = []
-    for row in FISH + WEATHER_FISH + UNDER_FISH:
+    for row in FISH + WEATHER_FISH + UNDER_FISH + CRATER_FISH:
         (fid, name, rar, region, times, w, l, shape, body, accent, desc) = row[:11]
         f = {
             "id": fid,

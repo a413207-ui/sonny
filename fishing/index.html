@@ -148,6 +148,10 @@
   .rank tr.me { background: #ffe7b0; font-weight: 800; } .rank td.sc { text-align: right; font-weight: 800; }
   /* 頒獎動畫 */
   #cut.overlay.show { display: block; background: #000; z-index: 40; }
+  /* 爬火山 */
+  #mtn.overlay.show { display: block; background: #2a3a4a; z-index: 4; }
+  #mtnCv { position: absolute; inset: 0; width: 100%; height: 100%; image-rendering: pixelated; }
+  #mtnHud { position: absolute; left: 50%; transform: translateX(-50%); top: calc(14px + env(safe-area-inset-top)); width: min(70vw, 300px); text-align: center; color: #fff6dd; font-weight: 800; font-size: 15px; text-shadow: 0 2px 0 #000; }
   /* 潛水 */
   #dive.overlay.show { display: block; background: #0a2a3e; z-index: 4; }
   #diveCv { position: absolute; inset: 0; width: 100%; height: 100%; image-rendering: pixelated; }
@@ -212,6 +216,7 @@
   <button id="closeMap">關閉</button>
 </div></div>
 <div class="overlay" id="panel"><div class="card" id="panelCard"></div></div>
+<div class="overlay" id="mtn"><canvas id="mtnCv"></canvas><div id="mtnHud"></div></div>
 <div class="overlay" id="dive"><canvas id="diveCv"></canvas>
   <div id="diveHud"><div id="diveO2"></div><div class="o2bar"><div id="diveO2Bar"></div></div><div id="diveFound"></div></div></div>
 <div class="overlay" id="aquarium"><canvas id="aqCv"></canvas><div id="aqLabel"></div><div id="aqEmpty"></div>
@@ -223,13 +228,13 @@
 <div class="overlay" id="fishDetail"><div class="card" id="fishDetailCard"></div></div>
 <div class="overlay" id="badgePop"><div class="card" id="badgeCard"></div></div>
 
-<script src="data/fish.js?v=2026.10.30-85"></script>
-<script src="art.js?v=2026.10.30-85"></script>
-<script src="music.js?v=2026.10.30-85"></script>
+<script src="data/fish.js?v=2026.10.30-86"></script>
+<script src="art.js?v=2026.10.30-86"></script>
+<script src="music.js?v=2026.10.30-86"></script>
 <script>
 'use strict';
 // 版本號：每次更新都要改（也要改上面三個 script 的 ?v=），遊戲會用它檢查網站上有沒有新版
-const BUILD = '2026.10.30-85';
+const BUILD = '2026.10.30-86';
 // ════════════════ 基本設定 ════════════════
 const FISH = window.FISH_DATA || [];
 const N = 160, TW = 32, TH = 16, LH = 4;         // 地圖格數、等角格寬高、陸地高度
@@ -241,7 +246,7 @@ const T = { DEEP: 0, SEA: 1, REEF: 2, LAKE: 3, RIVER: 4, SAND: 5, GRASS: 6, STON
 const WATER = new Set([T.DEEP, T.SEA, T.REEF, T.LAKE, T.RIVER, T.COLD, T.MANGROVE, T.VOLCANO, T.LAGOON, T.BIGRIVER, T.UPRIVER, T.USTREAM, T.ULAKE, T.UCRYSTAL, T.ULAVA]);
 const BOATABLE = new Set([T.DEEP, T.SEA, T.REEF, T.COLD, T.MANGROVE, T.VOLCANO, T.LAGOON, T.BIGRIVER, T.UPRIVER, T.USTREAM, T.ULAKE, T.UCRYSTAL]);   // 地底的水（岩漿除外）木筏能划
 const REGION_OF = { [T.SEA]: 'harbor', [T.DEEP]: 'deep', [T.REEF]: 'reef', [T.LAKE]: 'lake', [T.RIVER]: 'river', [T.COLD]: 'cold', [T.MANGROVE]: 'mangrove', [T.VOLCANO]: 'volcano', [T.LAGOON]: 'lagoon', [T.BIGRIVER]: 'bigriver', [T.UPRIVER]: 'upriver', [T.USTREAM]: 'ucave', [T.ULAKE]: 'ulake', [T.UCRYSTAL]: 'ucrystal', [T.ULAVA]: 'ulava' };
-const REGION_NAME = { harbor: '港灣', deep: '深海', reef: '珊瑚礁', lake: '翠湖', river: '溪谷', cold: '冰川海域', mangrove: '紅樹林河口', volcano: '火山海域', wreck: '沉船', cave: '海蝕洞', lagoon: '無人島潟湖', frozen: '冰封秘境', bigriver: '大河下游', upriver: '大河上游', ucave: '洞穴水潭', ulake: '地底湖', ucrystal: '水晶池', ulava: '熔岩河' };
+const REGION_NAME = { harbor: '港灣', deep: '深海', reef: '珊瑚礁', lake: '翠湖', river: '溪谷', cold: '冰川海域', mangrove: '紅樹林河口', volcano: '火山海域', wreck: '沉船', cave: '海蝕洞', lagoon: '無人島潟湖', frozen: '冰封秘境', bigriver: '大河下游', upriver: '大河上游', ucave: '洞穴水潭', ulake: '地底湖', ucrystal: '水晶池', ulava: '熔岩河', crater: '火口湖' };
 const RAR = {
   common: { name: '普通', color: '#8a9a7a', w: 60, pow: .68 },
   uncommon: { name: '少見', color: '#4a9a5a', w: 25, pow: .82 },
@@ -825,6 +830,7 @@ try { musMode = localStorage.getItem(MODE_KEY) || 'auto'; } catch (e) {}
 const ISL_MOOD = { 柳河鎮: 'harbor', 漁港鎮: 'harbor', 金鱗島: 'festival', 冰晶島: 'cold', 火山島: 'volcano', 紅樹林島: 'mangrove', 大河平原: 'river', 翠湖森林島: 'river', 溪谷山島: 'river', 珊瑚小島: 'reef', 無人島: 'reef' };
 const REG_MOOD = { harbor: 'harbor', deep: 'deep', wreck: 'deep', cave: 'deep', reef: 'reef', lagoon: 'reef', cold: 'cold', frozen: 'cold', volcano: 'volcano', mangrove: 'mangrove', lake: 'river', river: 'river', bigriver: 'river', upriver: 'river' };
 function musicMood() {   // 現在的場合：時段、天氣、所在地
+  if (mtn) return { phase, place: 'volcano', storm: false };
   if (UNDER) { const z = landOf[Math.floor(state.player.y) * N + Math.floor(state.player.x)]; return { phase: 'under', place: z === 3 ? 'crystal' : z === 4 ? 'lava' : 'under', storm: false }; }   // 地底：依區域放地底的歌
   const o = state.onBoat ? state.boat : state.player, xi = Math.floor(o.x), yi = Math.floor(o.y);
   const is = !state.onBoat && ISLANDS[landOf[yi * N + xi] - 1];
@@ -971,6 +977,8 @@ function contextB() {
   if (dive) return { label: '上浮', fn: () => endDive(false) };
   if (fish.state === 'wait' || fish.state === 'cast') return { label: '收竿', fn: () => endFishing('收竿了') };
   if (fish.state) return null;
+  if (mtn) return { label: '下山', fn: leaveMountain };
+  if (nearVolcanoBase()) return { label: '爬山', fn: enterMountain };   // 火山登山口
   if (canDive()) return { label: '潛水', fn: startDive };   // 沉船上方可以潛下去
   if (state.onBoat) { const s = landingSpot(); return s ? { label: '下船', fn: () => { state.onBoat = false; state.boat.vx = state.boat.vy = 0; Object.assign(state.player, s); toast('上岸了'); } } : null; }   // 下船時船停住，不會滑走
   const p = state.player;
@@ -995,6 +1003,7 @@ function contextA() {
   if (fish.state === 'reel') return '收線\n（按住）';
   if (fish.state === 'trophy') return '好耶！';
   if (fish.state) return '…';
+  if (mtn) return mtn.mode === 'summit' ? '拋竿' : null;
   const o = state.onBoat ? state.boat : state.player;
   return waterAhead(o.x, o.y, state.player.fx, state.player.fy) ? '拋竿' : null;
 }
@@ -1013,15 +1022,17 @@ function pressA(down) {
 function regionAt(x, y) { const s = spotAt(x, y); if (s && prog.found[s.id] !== undefined && (!s.cond || s.cond())) return s.region; return REGION_OF[at(Math.floor(x), Math.floor(y))] || 'harbor'; }
 function startCast() {
   const o = state.onBoat ? state.boat : state.player;
-  const w = waterAhead(o.x, o.y, state.player.fx, state.player.fy);
+  if (mtn && mtn.mode !== 'summit') return;
+  const w = mtn ? { x: o.x, y: o.y, fx: state.player.fx, fy: state.player.fy, crater: true } : waterAhead(o.x, o.y, state.player.fx, state.player.fy);   // 山頂：直接往火口湖拋
   if (!w) return toast('前面沒有水，換個方向試試');
   if (UNDER && regionAt(w.x, w.y) === 'ulava' && !prog.heatLine) { toast('🔥 一般釣線一碰到岩漿就燒斷了！到營地買「耐熱釣線」', 3000); buzz(80); return; }
   state.player.fx = w.fx; state.player.fy = w.fy;
-  Object.assign(fish, { state: 'cast', t: 0, region: regionAt(w.x, w.y), fx: w.x, fy: w.y, nibbles: [], d: 100, dMax: 100, tension: 0, struggle: false, swap: 0, boss: false, dash: 0, warn: 0, rod: 0, lure: 0, moved: 0, lured: 0, side: 1, fishX: 0, push: 0, slackT: 0, slackWarn: 0 });
+  if (w.crater) viewMix = 1;
+  Object.assign(fish, { state: 'cast', t: 0, region: w.crater ? 'crater' : regionAt(w.x, w.y), fx: w.x, fy: w.y, nibbles: [], d: 100, dMax: 100, tension: 0, struggle: false, swap: 0, boss: false, dash: 0, warn: 0, rod: 0, lure: 0, moved: 0, lured: 0, side: 1, fishX: 0, push: 0, slackT: 0, slackWarn: 0 });
   const wait = rand(2.2, 6.5) / (1 + state.rod.luck * .2) * (buffOn('bite') ? .7 : 1) * (UNDER ? 1.15 : (WEATHER[weather].bite || 1));   // 地底沒有天氣，魚也比較謹慎
   fish.biteAt = .7 + wait;
   if (UNDER && lairActive() && Math.hypot(w.x - U.lair.x, w.y - U.lair.y) < 2.4) { fish.boss = true; fish.biteAt = .7 + rand(2, 3.5); toast('🐉 龍穴冒出巨大的泡泡……有東西在下面！', 2800); buzz([80, 40, 80]); return; }
-  if (!UNDER && boss && Math.hypot(w.x - boss.x, w.y - boss.y) < 2.8) { fish.boss = true; fish.biteAt = .7 + rand(1.5, 3); toast('🎣 拋到巨大魚影旁邊了…屏住呼吸！', 2500); return; }
+  if (!UNDER && !mtn && boss && Math.hypot(w.x - boss.x, w.y - boss.y) < 2.8) { fish.boss = true; fish.biteAt = .7 + rand(1.5, 3); toast('🎣 拋到巨大魚影旁邊了…屏住呼吸！', 2500); return; }
   for (let k = 0, n = Math.floor(rand(0, 4)); k < n; k++) fish.nibbles.push(rand(1.2, fish.biteAt - .3));
   toast(`🎣 拋竿！（${REGION_NAME[fish.region]}）浮標沉下去再拉竿`);
 }
@@ -1208,6 +1219,10 @@ const ACH = [
   ['res5', '🤝 交到朋友', '和一位居民變成 5 顆心', s => RESIDENTS.some(r => Math.floor(((s.res || {})[r.id] || {}).p / 5 || 0) >= 5)],
   ['res10', '💞 知心好友', '和一位居民變成 10 顆心', s => RESIDENTS.some(r => Math.floor(((s.res || {})[r.id] || {}).p / 5 || 0) >= 10)],
   ['resall', '🏘️ 大家的好朋友', '和所有居民都變成 10 顆心', s => RESIDENTS.every(r => Math.floor(((s.res || {})[r.id] || {}).p / 5 || 0) >= 10)],
+  ['summit1', '🌋 登頂火山', '爬上火山山頂', s => (s.summits || 0) >= 1],
+  ['climbfast', '🧗 登山高手', '75 秒內爬上火山', s => s.climbBest > 0 && s.climbBest <= 75],
+  ['crater1', '🏞️ 火口湖釣手', '在山頂的火口湖釣到魚', s => (s.region.crater || 0) > 0],
+  ['craterlord', '👑 火口湖之主', '釣到火口湖之主', s => !!s.dex.crater_lord],
   ['dive1', '🤿 第一次潛水', '穿潛水服潛到沉船底下', s => (s.dives || 0) >= 1],
   ['divechest', '💰 沉船寶藏', '打開沉船底下的寶箱', s => (s.diveChests || 0) >= 1],
   ['relicall', '🏺 沉船考古家', '找齊 8 件沉船文物', s => RELICS.every(r => (s.relics || {})[r.id])],
@@ -1224,7 +1239,7 @@ const ACH = [
 // 徽章等級：bronze 銅、silver 銀、gold 金、rainbow 彩虹（最難）
 const TIER = { first: 'bronze', c10: 'bronze', c50: 'silver', c200: 'gold', d10: 'bronze', d30: 'silver', d60: 'gold', dall: 'rainbow',
   r_harbor: 'bronze', r_lake: 'bronze', r_river: 'bronze', r_reef: 'silver', r_deep: 'silver', t_dawn: 'bronze', t_dusk: 'bronze', t_night: 'silver',
-  rare: 'silver', epic: 'gold', legend: 'gold', legend_all: 'rainbow', w10: 'silver', w100: 'gold', m1000: 'bronze', m10000: 'gold', rod: 'bronze', boat: 'bronze', style1: 'bronze', style10: 'gold', tailorall: 'gold', wx_rain: 'bronze', wx_typhoon: 'gold', wx_special: 'silver', drift10: 'silver', contest1: 'bronze', podium: 'silver', champion: 'gold', r_cold: 'silver', r_mangrove: 'bronze', r_volcano: 'silver', r_bigriver: 'bronze', r_upriver: 'silver', aq1: 'bronze', aqleg: 'silver', aq20: 'gold', explore50: 'silver', explore85: 'gold', spot1: 'bronze', spotall: 'rainbow', dig1: 'bronze', dig5: 'gold', boss1: 'silver', boss5: 'gold', quest1: 'bronze', quest10: 'gold', gearall: 'silver', under1: 'silver', uzones: 'silver', ufish1: 'bronze', ulava: 'silver', uquest5: 'gold', uall: 'gold', udragon: 'rainbow', resmeet: 'silver', res5: 'bronze', res10: 'silver', resall: 'gold', dive1: 'bronze', divechest: 'silver', relicall: 'gold', cook1: 'bronze', cook20: 'silver', serve10: 'silver', museum1: 'bronze', museumhall: 'gold', museumall: 'rainbow', print1: 'bronze', print10: 'silver', printleg: 'gold' };
+  rare: 'silver', epic: 'gold', legend: 'gold', legend_all: 'rainbow', w10: 'silver', w100: 'gold', m1000: 'bronze', m10000: 'gold', rod: 'bronze', boat: 'bronze', style1: 'bronze', style10: 'gold', tailorall: 'gold', wx_rain: 'bronze', wx_typhoon: 'gold', wx_special: 'silver', drift10: 'silver', contest1: 'bronze', podium: 'silver', champion: 'gold', r_cold: 'silver', r_mangrove: 'bronze', r_volcano: 'silver', r_bigriver: 'bronze', r_upriver: 'silver', aq1: 'bronze', aqleg: 'silver', aq20: 'gold', explore50: 'silver', explore85: 'gold', spot1: 'bronze', spotall: 'rainbow', dig1: 'bronze', dig5: 'gold', boss1: 'silver', boss5: 'gold', quest1: 'bronze', quest10: 'gold', gearall: 'silver', under1: 'silver', uzones: 'silver', ufish1: 'bronze', ulava: 'silver', uquest5: 'gold', uall: 'gold', udragon: 'rainbow', resmeet: 'silver', res5: 'bronze', res10: 'silver', resall: 'gold', summit1: 'silver', climbfast: 'gold', crater1: 'bronze', craterlord: 'gold', dive1: 'bronze', divechest: 'silver', relicall: 'gold', cook1: 'bronze', cook20: 'silver', serve10: 'silver', museum1: 'bronze', museumhall: 'gold', museumall: 'rainbow', print1: 'bronze', print10: 'silver', printleg: 'gold' };
 const TIER_NAME = { bronze: '銅', silver: '銀', gold: '金', rainbow: '彩虹' };
 const achParts = a => { const i = a[1].indexOf(' '); return { id: a[0], icon: a[1].slice(0, i), title: a[1].slice(i + 1), desc: a[2], tier: TIER[a[0]] || 'bronze' }; };
 const medalHtml = (b, got) => `<div class="medal ${got ? b.tier : 'lock'}"><i>${got ? b.icon : '？'}</i></div>`;
@@ -1246,7 +1261,7 @@ function showNextBadge() {
   document.getElementById('badgeBook').onclick = () => { badgeQueue.length = 0; pop.classList.remove('show'); openDex('ach'); };
 }
 const SAVE_KEY = 'bay-fishing-save-v1';
-const prog = { dex: {}, ach: {}, catches: 0, region: {}, time: {}, rar: {}, maxW: 0, earned: 0, rodIdx: 0, boatLv: 0, bait: 0, pills: 0, look: null, closet: [], wxc: {}, drift: 0, contest: {}, contestN: 0, contestBest: 0, contestWins: 0, aquarium: [], found: {}, maps: [], dug: 0, boss: 0, quests: [], questDone: 0, rep: 0, gear: {}, explore: 0, fog: null, prints: [], rodTip: 0, lamp: 0, mineOpen: 0, underVisit: 0, ufog: null, raft: 0, uraft: null, heatLine: 0, uquests: [], uquestDone: 0, uzones: 0, udragonAt: 0, dishes: {}, buffs: {}, orders: [], cooked: 0, served: 0, museum: {}, res: {}, diveSuit: 0, o2: 0, dives: 0, diveChests: 0, relics: {} };
+const prog = { dex: {}, ach: {}, catches: 0, region: {}, time: {}, rar: {}, maxW: 0, earned: 0, rodIdx: 0, boatLv: 0, bait: 0, pills: 0, look: null, closet: [], wxc: {}, drift: 0, contest: {}, contestN: 0, contestBest: 0, contestWins: 0, aquarium: [], found: {}, maps: [], dug: 0, boss: 0, quests: [], questDone: 0, rep: 0, gear: {}, explore: 0, fog: null, prints: [], rodTip: 0, lamp: 0, mineOpen: 0, underVisit: 0, ufog: null, raft: 0, uraft: null, heatLine: 0, uquests: [], uquestDone: 0, uzones: 0, udragonAt: 0, dishes: {}, buffs: {}, orders: [], cooked: 0, served: 0, museum: {}, res: {}, diveSuit: 0, o2: 0, dives: 0, diveChests: 0, relics: {}, summits: 0, climbBest: 0 };
 function savePos() {   // 在地底時，地面位置記洞口，另外記地底的位置
   if (!UNDER) return { x: state.player.x, y: state.player.y, bx: state.boat.x, by: state.boat.y, onBoat: state.onBoat };
   const b = mineB(); if (prog.raft && state.boat.x > 0) prog.uraft = { x: state.boat.x, y: state.boat.y };
@@ -2275,10 +2290,183 @@ function drawDive(dt) {
   g.fillStyle = tgt ? '#fff6a0' : 'rgba(255,255,255,.35)'; g.fillRect(cx - 4, cy, 3, 1); g.fillRect(cx + 2, cy, 3, 1); g.fillRect(cx, cy - 4, 1, 3); g.fillRect(cx, cy + 2, 1, 3);
 }
 
+// ════════════════ 🌋 爬火山：第三人稱攀岩到山頂，山頂有火口湖可以釣魚 ════════════════
+// 搖桿上下爬、左右橫移；爬的時候體力會掉，到休息點（岩棚）才會恢復；體力用光或被落石砸到會滑回上一個休息點
+const MTN = { top: 500, ledges: [125, 250, 375], pxm: 4.2, climb: 15, side: 26 };
+let mtn = null;
+const mtnCv = document.getElementById('mtnCv'), mtg = mtnCv.getContext('2d');
+const nearVolcanoBase = () => !UNDER && !state.onBoat && !mtn && Math.hypot(state.player.x - volcano.x, state.player.y - volcano.y) < 2.8;
+const MTN_TIPS = ['體力快沒了就爬到岩棚上休息', '看到上面有紅色「！」就快往旁邊躲，落石要來了', '噴氣孔冒白煙的時候別靠近', '爬到 500 公尺就是山頂的火口湖', '岩壁上發亮的火山石可以換錢喔', '炎博士說：火口湖的魚，平地都看不到'];
+function enterMountain() {
+  if (loadingOn) return;
+  runLoading('up', () => {
+    mtnCv.width = 200; mtnCv.height = Math.round(200 * innerHeight / innerWidth);
+    mtn = { mode: 'climb', t: 0, alt: 0, camAlt: 0, x: .5, st: 100, ledge: 0, rocks: [], rockT: 3, fall: null, gems: {}, anim: 0, moving: false, best: prog.climbBest || 0, got: 0, hit: 0 };
+    document.getElementById('mtn').classList.add('show'); document.body.classList.add('diving');
+  }, () => { toast('🧗 開始爬火山！搖桿往上爬，體力用完會滑下去，記得在岩棚休息', 4000); updateHud(); }, false, { label: '🧗 前往火山登山口', theme: 'mtn', tips: MTN_TIPS });
+}
+function leaveMountain() {
+  if (loadingOn || !mtn) return;
+  const wasSummit = mtn.mode === 'summit';
+  runLoading('down', () => { mtn = null; document.getElementById('mtn').classList.remove('show'); document.body.classList.remove('diving'); },
+    () => { toast(wasSummit ? '🌋 下山了，回到火山島' : '🌋 先下山休息一下', 2400); save(); updateHud(); }, false, { label: '🥾 下山中', theme: 'mtn', tips: MTN_TIPS });
+}
+const mtnWallX = (alt, side) => side < 0 ? .1 + Math.sin(alt * .05) * .03 + Math.sin(alt * .013) * .02 : .9 + Math.sin(alt * .04 + 1) * .03 - Math.sin(alt * .017) * .02;   // 岩壁左右邊緣（隨高度彎曲）
+const mtnVent = alt => { const a = Math.floor(alt / 38); return a >= 2 && hash(a, 1, 960) < .7 ? { alt: a * 38 + 12 + hash(a, 2, 960) * 10, x: .2 + hash(a, 3, 960) * .6 } : null; };
+const mtnGem = i => ({ alt: 20 + i * 27 + hash(i, 1, 970) * 12, x: .18 + hash(i, 2, 970) * .64 });
+function updateMtn(dt) {
+  const m = mtn; m.t += dt;
+  if (m.mode !== 'climb') return;
+  let ix = jv.x, iy = jv.y;
+  if (keys['arrowleft'] || keys['a']) ix -= 1; if (keys['arrowright'] || keys['d']) ix += 1;
+  if (keys['arrowup'] || keys['w']) iy -= 1; if (keys['arrowdown'] || keys['s']) iy += 1;
+  if (document.querySelector('#panel.show, #badgePop.show') || loadingOn) { ix = iy = 0; }
+  const onLedge = [0, ...MTN.ledges].some(l => Math.abs(m.alt - l) < 1.2);
+  if (m.fall) {   // 滑下去：掉回上一個休息點
+    m.fall.t += dt; m.alt = Math.max(m.fall.to, m.fall.from - (m.fall.from - m.fall.to) * Math.min(1, m.fall.t / .9) ** 1.6);
+    if (m.fall.t >= .9) { m.alt = m.fall.to; m.fall = null; m.st = Math.max(m.st, 60); }
+  } else {
+    const up = -iy, sd = ix;
+    if (Math.abs(up) > .2 || Math.abs(sd) > .2) {
+      const k = m.st < 20 ? .6 : 1;   // 快沒力時爬得慢
+      m.alt = clamp(m.alt + up * MTN.climb * k * dt, 0, MTN.top);
+      const nx = m.x + sd * dt * MTN.side / 100 * k, L = mtnWallX(m.alt, -1) + .06, R = mtnWallX(m.alt, 1) - .06; m.x = clamp(nx, L, R);
+      m.anim += dt * (Math.abs(up) + Math.abs(sd) * .6) * 5; m.moving = true;
+      if (!onLedge) m.st -= (up > .2 ? 7.5 : 4) * dt;
+    } else { m.moving = false; if (!onLedge) m.st -= 1.5 * dt; }
+    if (onLedge) m.st = Math.min(100, m.st + 30 * dt);
+    for (const l of MTN.ledges) if (m.alt >= l - .5 && l > m.ledge) { m.ledge = l; toast(`🚩 到達休息點 ${l} 公尺！在這裡體力會恢復`, 2200); SFX.pickup(); }
+    if (m.st <= 0) { m.st = 0; mtnFall('手沒力了……滑下去了！'); }
+    if (m.alt >= MTN.top) return mtnSummit();
+    // 火山石（撿一次就不見）
+    for (let i = 0; i < 18; i++) { if (m.gems[i]) continue; const g = mtnGem(i); if (Math.abs(g.alt - m.alt) < 2.5 && Math.abs(g.x - m.x) < .07) { m.gems[i] = 1; const c = Math.round(rand(40, 120)); state.coins += c; m.got += c; toast(`💎 撿到發亮的火山石！🪙${c}`, 1600); SFX.pickup(); buzz(30); } }
+    // 噴氣孔：每 3 秒噴一次
+    const v = mtnVent(m.alt); if (v && Math.abs(v.alt - m.alt) < 4 && Math.abs(v.x - m.x) < .1 && (m.t + v.alt) % 3 < 1) { m.st -= 20; m.x = clamp(m.x + (m.x > v.x ? .12 : -.12), .15, .85); toast('♨️ 好燙！被噴氣孔的蒸氣噴到', 1600); buzz(80); SFX.fail(); if (m.st <= 0) mtnFall('被蒸氣燙到手一鬆……'); }
+  }
+  // 落石：越高越多
+  if ((m.rockT -= dt) <= 0) { m.rockT = rand(2.2, 4.5) - m.alt / MTN.top * 1.2; m.rocks.push({ x: clamp(m.x + rand(-.25, .25), .15, .85), alt: m.camAlt + 60, warn: 1.1, v: 0 }); }
+  for (const r of m.rocks) {
+    if (r.warn > 0) { r.warn -= dt; continue; }
+    r.v += 60 * dt; r.alt -= r.v * dt;
+    if (!r.hit && !m.fall && Math.abs(r.alt - (m.alt + 4)) < 3 && Math.abs(r.x - m.x) < .07) { r.hit = true; m.hit++; m.st -= 35; buzz([100, 50, 100]); SFX.fail(); if (m.st <= 0) mtnFall('被落石砸中，摔下去了！'); else toast('🪨 被落石打到了！', 1400); }
+  }
+  m.rocks = m.rocks.filter(r => r.alt > m.camAlt - 80);
+  m.camAlt += (m.alt - m.camAlt) * Math.min(1, dt * 5);
+  if ((m.hudT = (m.hudT || 0) + dt) > .15) { m.hudT = 0; mtnHud(); }
+}
+function mtnFall(msg) { const m = mtn; if (m.fall) return; m.fall = { from: m.alt, to: m.ledge, t: 0 }; m.st = 0; toast('😵 ' + msg, 2200); buzz([200, 80, 200]); }
+function mtnSummit() {
+  const m = mtn; m.mode = 'summit'; m.t = 0; const secs = Math.round(performance.now() / 1000 - m.start);
+  prog.summits = (prog.summits || 0) + 1; if (!prog.climbBest || secs < prog.climbBest) prog.climbBest = secs;
+  SFX.caught(); buzz([40, 30, 40, 30, 160]);
+  toast(`🌋 登頂！標高 ${MTN.top} 公尺・用了 ${Math.floor(secs / 60)} 分 ${secs % 60} 秒${m.got ? `・火山石 🪙${m.got}` : ''}。山頂的火口湖可以釣魚！`, 4600);
+  checkAch(); save(); mtnHud(); updateHud();
+}
+function mtnHud() {
+  const m = mtn, el = document.getElementById('mtnHud'); if (!m) return;
+  if (m.mode === 'summit') { el.innerHTML = '🌋 火口湖・標高 500 m<br><small>按「拋竿」釣魚，按「下山」回火山島</small>'; return; }
+  el.innerHTML = `⛰️ <b>${Math.floor(m.alt)}</b> / ${MTN.top} m<div class="o2bar"><div style="width:${m.st}%;background:${m.st < 25 ? '#ff6a5a' : '#8ad050'}"></div></div><small>體力 ${Math.ceil(m.st)}・下一個休息點 ${[...MTN.ledges, MTN.top].find(l => l > m.alt + .5) || MTN.top} m</small>`;
+}
+function drawMtn(dt) {
+  if (!mtn) return;
+  const ov = document.getElementById('mtn'), showOv = !(mtn.mode === 'summit' && fish.state);
+  if (ov.classList.contains('show') !== showOv) { ov.classList.toggle('show', showOv); document.body.classList.toggle('diving', showOv); }
+  if (!mtn.start) mtn.start = performance.now() / 1000;
+  updateMtn(dt); if (!mtn || !showOv) return;
+  const m = mtn, g = mtg, W = mtnCv.width, H = mtnCv.height, t = m.t;
+  g.imageSmoothingEnabled = false;
+  if (m.mode === 'summit') return drawSummit(g, W, H, t);
+  const PY = H * .62, toY = alt => PY - (alt - m.camAlt) * MTN.pxm, k = m.camAlt / MTN.top;
+  // 背景：越高天空越多、海越遠
+  const sky = PHASE[phase].sky; let gr = g.createLinearGradient(0, 0, 0, H); gr.addColorStop(0, sky[0]); gr.addColorStop(.6 + k * .3, sky[1]); gr.addColorStop(1, '#2a6aa0'); g.fillStyle = gr; g.fillRect(0, 0, W, H);
+  const seaY = H * (.75 + k * .6); g.fillStyle = '#2a6aa0'; g.fillRect(0, seaY, W, H); g.fillStyle = 'rgba(255,255,255,.3)'; for (let i = 0; i < 12; i++) g.fillRect((hash(i, 1, 980) * W + t * 3) % W | 0, seaY + 4 + hash(i, 2, 980) * 30 | 0, 6, 1);
+  g.fillStyle = 'rgba(255,255,255,.85)'; for (let i = 0; i < 7; i++) { const cy = ((hash(i, 3, 980) * H * 2 + m.camAlt * 1.6) % (H * 1.4)) - H * .2, cx = (hash(i, 4, 980) * W + t * 4 * (1 + i % 3)) % (W + 60) - 30; g.fillRect(cx | 0, cy | 0, 28, 5); g.fillRect(cx + 5 | 0, cy - 3 | 0, 16, 4); }   // 雲（往下飄過，感覺越爬越高）
+  // 岩壁（一列一列畫，邊緣隨高度彎）
+  for (let y = -4; y < H + 4; y += 4) {
+    const alt = m.camAlt + (PY - y) / MTN.pxm, L = mtnWallX(alt, -1) * W, R = mtnWallX(alt, 1) * W, band = Math.floor(alt / 1);
+    g.fillStyle = alt > MTN.top ? 'rgba(0,0,0,0)' : shade(alt > 400 ? '#4a3a38' : '#5a4e48', (hash(band, 0, 981) - .5) * .12); if (alt <= MTN.top) g.fillRect(L | 0, y, (R - L) | 0, 4);
+    if (alt <= MTN.top) { g.fillStyle = '#2a2024'; g.fillRect(L - 2 | 0, y, 2, 4); g.fillRect(R | 0, y, 2, 4); }
+  }
+  // 岩縫、握點
+  for (let a = Math.floor(m.camAlt - 60); a < m.camAlt + 80; a += 3) {
+    if (a < 0 || a > MTN.top) continue; const y = toY(a);
+    for (let j = 0; j < 3; j++) { const h = hash(a, j, 982); if (h < .5) continue; const x = (mtnWallX(a, -1) + .04 + hash(a, j + 5, 982) * .78) * W; g.fillStyle = h > .85 ? '#8a7a70' : '#3a2e2c'; g.fillRect(x | 0, y | 0, h > .85 ? 4 : 6, h > .85 ? 2 : 1); }
+  }
+  // 休息點（岩棚）、起點、山頂邊緣
+  for (const l of [0, ...MTN.ledges]) { const y = toY(l); if (y < -20 || y > H + 20) continue; const L = mtnWallX(l, -1) * W - 6, R = mtnWallX(l, 1) * W + 6;
+    g.fillStyle = '#2a2024'; g.fillRect(L, y, R - L, 7); g.fillStyle = '#7a6a5a'; g.fillRect(L + 1, y, R - L - 2, 5); g.fillStyle = '#5a8a3a'; g.fillRect(L + 1, y - 1, R - L - 2, 2);
+    if (l) { const fx = R - 16; g.fillStyle = '#3a2a18'; g.fillRect(fx, y - 16, 1, 16); g.fillStyle = l <= m.ledge ? '#ffd040' : '#d0402a'; g.fillRect(fx + 1, y - 16, 7, 5); g.font = 'bold 6px sans-serif'; g.fillStyle = '#fff6dd'; g.textAlign = 'left'; g.fillText(l + 'm', fx - 14, y - 3); } }
+  { const y = toY(MTN.top); if (y > -40) { g.fillStyle = '#3a2a28'; g.fillRect(W * .08, y - 6, W * .84, 8); for (let i = 0; i < 4; i++) { const ph = (t * .3 + i / 4) % 1; g.fillStyle = `rgba(230,230,230,${.5 * (1 - ph)})`; g.fillRect(W * (.3 + i * .12) | 0, y - 12 - ph * 30 | 0, 10, 6); } } }   // 山頂冒煙
+  // 噴氣孔
+  for (let a = Math.floor((m.camAlt - 60) / 38) * 38; a < m.camAlt + 80; a += 38) { const v = mtnVent(a + 1); if (!v) continue; const y = toY(v.alt), x = v.x * W; g.fillStyle = '#1a1214'; g.fillRect(x - 4, y - 2, 8, 4); g.fillStyle = '#ff6a2a'; g.fillRect(x - 2, y - 1, 4, 2);
+    if ((m.t + v.alt) % 3 < 1) { g.fillStyle = 'rgba(240,240,240,.75)'; for (let i = 0; i < 6; i++) g.fillRect(x - 8 + hash(i, Math.floor(t * 8), 983) * 16 | 0, y - 4 - i * 4 | 0, 6 + i, 4); } else if ((m.t + v.alt) % 3 > 2.3) { g.fillStyle = 'rgba(240,240,240,.35)'; g.fillRect(x - 2, y - 6, 4, 4); } }
+  // 火山石
+  for (let i = 0; i < 18; i++) { if (m.gems[i]) continue; const gm = mtnGem(i), y = toY(gm.alt); if (y < -10 || y > H + 10) continue; const x = gm.x * W, on = Math.sin(t * 4 + i) > 0; g.fillStyle = '#2a1e14'; g.fillRect(x - 3, y - 3, 6, 6); g.fillStyle = on ? '#ff8a4a' : '#d05a2a'; g.fillRect(x - 2, y - 2, 4, 4); if (on) { g.fillStyle = '#fff0a0'; g.fillRect(x - 1, y - 2, 1, 1); } }
+  // 安全繩：從主角拉到上一個休息點
+  const px = m.x * W, py = toY(m.alt), ly = toY(m.ledge);
+  g.strokeStyle = '#e8c860'; g.lineWidth = 1; g.beginPath(); g.moveTo(px, py - 10); g.quadraticCurveTo(px + 6, (py + ly) / 2, W * .5, ly); g.stroke();
+  // 主角（背影，兩手輪流往上抓）
+  const pose = m.fall ? 'pull' : m.moving ? 'cast' : 'pull', flip = Math.floor(m.anim) % 2 === 1, s = 1.6;
+  g.save(); g.translate(px | 0, py | 0); if (flip && !m.fall) g.scale(-1, 1); ART.drawThirdPerson(g, 0, 0, s, pose); g.restore();
+  g.fillStyle = '#8a5a30'; g.fillRect(px - 6, py - 34, 12, 10); g.fillStyle = '#6a4224'; g.fillRect(px - 6, py - 30, 12, 2);   // 登山背包
+  // 落石（先在上方出現紅色「！」警告）
+  for (const r of m.rocks) { const x = r.x * W; if (r.warn > 0) { g.fillStyle = Math.sin(t * 20) > 0 ? '#ff3a2a' : '#ffd040'; g.fillRect(x - 2, 6, 4, 10); g.fillRect(x - 2, 18, 4, 4); g.fillStyle = 'rgba(0,0,0,.25)'; g.fillRect(x - 6, 0, 12, H); continue; }
+    const y = toY(r.alt); g.fillStyle = '#2a2024'; g.fillRect(x - 6, y - 6, 12, 11); g.fillStyle = '#7a6a62'; g.fillRect(x - 5, y - 5, 10, 9); g.fillStyle = '#9a8a80'; g.fillRect(x - 4, y - 5, 4, 2); }
+}
+// 山頂：火口湖（第三人稱，站在湖邊）
+function drawSummit(g, W, H, t) {
+  const ph = PHASE[phase], hz = H * .38;
+  let gr = g.createLinearGradient(0, 0, 0, hz); gr.addColorStop(0, ph.sky[0]); gr.addColorStop(1, ph.sky[1]); g.fillStyle = gr; g.fillRect(0, 0, W, hz);
+  if (phase === 'night') for (let i = 0; i < 40; i++) { g.fillStyle = `rgba(255,255,255,${.4 + hash(i, 1) * .6})`; g.fillRect(hash(i, 2) * W | 0, hash(i, 3) * hz * .8 | 0, 1, 1); }
+  g.fillStyle = 'rgba(255,255,255,.8)'; for (let i = 0; i < 4; i++) { const cx = (hash(i, 7) * W + t * 3) % (W + 40) - 20, cy = hz * (.5 + hash(i, 8) * .35); g.fillRect(cx | 0, cy | 0, 26, 4); }   // 腳下的雲海
+  // 火口的岩壁（遠方一圈）
+  g.fillStyle = phase === 'night' ? '#2a2024' : '#6a5048'; for (let x = 0; x < W; x += 2) { const h = 14 + Math.sin(x * .05) * 6 + Math.sin(x * .17 + 1) * 4; g.fillRect(x, hz - h | 0, 2, h + 1 | 0); }
+  g.fillStyle = phase === 'night' ? '#3a2e2c' : '#8a6a58'; for (let x = 0; x < W; x += 2) { const h = 6 + Math.sin(x * .09 + 2) * 3; g.fillRect(x, hz - h | 0, 2, 2); }
+  for (let i = 0; i < 5; i++) { const ph2 = (t * .2 + i / 5) % 1; g.fillStyle = `rgba(230,230,230,${.45 * (1 - ph2)})`; g.fillRect(W * (.1 + i * .2) + Math.sin(ph2 * 5 + i) * 6 | 0, hz - 18 - ph2 * 40 | 0, 8 + ph2 * 10 | 0, 4 + ph2 * 4 | 0); }   // 岩縫冒出的白煙
+  // 翡翠色的火口湖
+  gr = g.createLinearGradient(0, hz, 0, H); gr.addColorStop(0, '#5ad8c0'); gr.addColorStop(1, '#1a7a6a'); g.fillStyle = gr; g.fillRect(0, hz, W, H - hz);
+  g.fillStyle = 'rgba(255,255,255,.4)'; for (let k = 1; k < 20; k++) { const z = k / 20, y = hz + (H - hz) * z * z; for (let i = 0; i < 4 + k; i++) { const x = ((hash(k, i) * W + t * (4 + k)) % (W + 20)) - 10; g.fillRect(x | 0, y | 0, 2 + k * .3 | 0, 1); } }
+  for (let i = 0; i < 6; i++) { const ph2 = (t * .35 + i / 6) % 1, x = W * hash(i, 9, 985); g.fillStyle = `rgba(255,255,255,${.35 * (1 - ph2)})`; g.fillRect(x | 0, hz + 10 + hash(i, 10, 985) * 40 - ph2 * 14 | 0, 6, 3); }   // 湖面的熱氣
+  // 岸邊岩石、標高牌
+  g.fillStyle = '#3a3034'; g.fillRect(0, H * .9, W, H * .1); g.fillStyle = '#5a4e50'; g.fillRect(0, H * .9, W, 2);
+  const sx = W * .6, sy = H * .84; g.fillStyle = '#5a3a1e'; g.fillRect(sx, sy - 22, 2, 22); g.fillStyle = '#e8c88a'; g.fillRect(sx - 12, sy - 26, 26, 10); g.fillStyle = '#3a2a18'; g.font = 'bold 6px sans-serif'; g.textAlign = 'center'; g.fillText('火口湖 500m', sx + 1, sy - 19);
+  // 主角背影＋釣竿
+  const s = Math.max(2, Math.round(H / 120)), bx = Math.round(W * .32), by = Math.round(H * .98);
+  const [hx, hy] = ART.drawThirdPerson(g, bx, by, s, 'idle');
+  ART.drawRod(g, (RODS[prog.rodIdx] || RODS[0]).id, hx, hy, hx + W * .22, by - H * .55, s, t);
+}
+// 讀取畫面（山）：主角背著背包沿著之字形山路走，雲往下飄
+function drawMtnLoading(g, W, H, k, t, dir) {
+  const up = dir === 'up', lerpC = (a, b, u) => { const A = parseInt(a.slice(1), 16), B = parseInt(b.slice(1), 16); const c = s => Math.round(((A >> s) & 255) + (((B >> s) & 255) - ((A >> s) & 255)) * u); return `rgb(${c(16)},${c(8)},${c(0)})`; };
+  const h = up ? k : 1 - k;   // 0＝山腳 1＝山頂
+  let gr = g.createLinearGradient(0, 0, 0, H); gr.addColorStop(0, lerpC('#8ad0f0', '#ffb070', h * .6)); gr.addColorStop(1, lerpC('#d8f0ff', '#ffe0b0', h * .6)); g.fillStyle = gr; g.fillRect(0, 0, W, H);
+  g.fillStyle = '#fff6c8'; g.fillRect(W * .75 | 0, H * .12 | 0, 10, 10);
+  // 遠方的山
+  g.fillStyle = '#9ab0c8'; for (let x = 0; x < W; x += 2) { const y = H * .45 + Math.sin(x * .04) * 10 + Math.sin(x * .11) * 5; g.fillRect(x, y | 0, 2, H); }
+  // 火山（中間）：山頂冒煙
+  const cx = W / 2, top = H * .2; g.fillStyle = '#5a4648'; g.beginPath(); g.moveTo(cx - 10, top); g.lineTo(cx + 10, top); g.lineTo(cx + W * .7, H); g.lineTo(cx - W * .7, H); g.closePath(); g.fill();
+  g.fillStyle = '#6a5658'; g.beginPath(); g.moveTo(cx - 10, top); g.lineTo(cx, top); g.lineTo(cx - W * .25, H); g.lineTo(cx - W * .7, H); g.closePath(); g.fill();
+  for (let i = 0; i < 6; i++) { const ph = (t * .4 + i / 6) % 1; g.fillStyle = `rgba(230,230,230,${.6 * (1 - ph)})`; g.fillRect(cx - 4 + Math.sin(ph * 6 + i) * 6 * ph | 0, top - 4 - ph * 40 | 0, 6 + ph * 10 | 0, 4 + ph * 4 | 0); }
+  // 之字形山路
+  const pts = []; for (let i = 0; i <= 8; i++) { const y = H * .95 - i * (H * .7 / 8), w = (1 - i / 8) * W * .5 + 6; pts.push([cx + (i % 2 ? -1 : 1) * w * .55, y]); }
+  g.strokeStyle = '#c8a878'; g.lineWidth = 3; g.beginPath(); pts.forEach(([x, y], i) => i ? g.lineTo(x, y) : g.moveTo(x, y)); g.stroke();
+  // 主角沿著山路走
+  const pos = h * 8, i0 = Math.min(7, Math.floor(pos)), f = pos - i0, [ax, ay] = pts[i0], [bx2, by2] = pts[i0 + 1], px = ax + (bx2 - ax) * f, py = ay + (by2 - ay) * f;
+  const frame = Math.floor(t * 6) % 2 ? 1 : 2;
+  g.save(); g.translate(px | 0, py | 0); ART.drawPerson(g, 0, Math.abs(Math.sin(t * 9)) > .5 ? -1 : 0, { back: up, flip: bx2 < ax, frame, sitting: false, rod: null }); g.restore();
+  g.fillStyle = '#8a5a30'; g.fillRect(px - 4 + (bx2 < ax ? 2 : -2), py - 15, 6, 7);   // 背包
+  // 雲（往下飄＝往上走的感覺）
+  g.fillStyle = 'rgba(255,255,255,.9)'; for (let i = 0; i < 5; i++) { const y = ((hash(i, 1, 990) * H + (up ? 1 : -1) * t * 30) % (H + 40) + H + 40) % (H + 40) - 20, x = hash(i, 2, 990) * W; g.fillRect(x | 0, y | 0, 30, 6); g.fillRect(x + 6 | 0, y - 4 | 0, 18, 5); }
+  // 讀取條：綠 → 火山橘
+  const bw = Math.round(W * .7), bx = Math.round((W - bw) / 2), by = H - 18;
+  g.fillStyle = '#2a1e14'; g.fillRect(bx - 2, by - 2, bw + 4, 9); g.fillStyle = '#1a1418'; g.fillRect(bx - 1, by - 1, bw + 2, 7);
+  g.fillStyle = up ? lerpC('#5ab04a', '#ff7a2a', k) : lerpC('#ff7a2a', '#5ab04a', k); g.fillRect(bx, by, Math.round(bw * k), 5);
+}
+
 // ════════════════ 📋 委託板 ════════════════
 const QUEST_TITLES = ['新來的釣客', '熟面孔', '漁村好朋友', '港口紅人', '漁村英雄', '傳說釣客'];
 const repLv = () => Math.min(QUEST_TITLES.length, 1 + Math.floor((prog.rep || 0) / 6));
-const HIDDEN_REGIONS = new Set(['wreck', 'cave', 'lagoon', 'frozen', 'ucave', 'ulake', 'ucrystal', 'ulava']);
+const HIDDEN_REGIONS = new Set(['wreck', 'cave', 'lagoon', 'frozen', 'ucave', 'ulake', 'ucrystal', 'ulava', 'crater']);
 function genQuest() {
   const who = NPC_NAMES[Math.floor(Math.random() * NPC_NAMES.length)], u = Math.random(), id = 'q' + Date.now().toString(36) + Math.floor(Math.random() * 1e4);
   if (u < .2) { const n = 2 + Math.floor(Math.random() * 3); return { id, who, type: 'drift', n, start: prog.drift || 0, reward: 120 * n, rep: 1 }; }
@@ -3113,22 +3301,22 @@ const hexA = (hex, a) => { const n = parseInt(hex.slice(1), 16); return `rgba(${
 // ── 讀取畫面：提燈下樓梯（回地面就倒過來往上爬）──
 let loadingOn = false;
 const LOAD_TIPS = ['地底很暗，提燈照得到的地方才看得清楚', '迷路了就找往上的石階，可以回到地面', '水晶會發光，跟著光走比較不會迷路', '熔岩河很燙，靠近時小心腳步', `${MINER_NAME}說：地底的魚比地上難釣很多`, '地底湖的水面下，好像有藍色的光在游…', `${MINER_NAME}正在調查地底的魚，之後就能釣了`, '小地圖只會記下你走過、照亮過的地方'];
-function runLoading(dir, work, done, resume) {
+function runLoading(dir, work, done, resume, opts = {}) {
   loadingOn = true; const el = document.getElementById('loadScr'), cvL = document.getElementById('loadCv'), g = cvL.getContext('2d');
   const H = 170, Wd = Math.max(80, Math.round(H * innerWidth / innerHeight)); cvL.width = Wd; cvL.height = H; g.imageSmoothingEnabled = false;
   el.classList.add('show'); if (window.BGM) BGM.duck(2.6);
   const txt = document.getElementById('loadTxt'), tip = document.getElementById('loadTip');
-  let ti = Math.floor(Math.random() * LOAD_TIPS.length), tipT = 0, worked = false, lastStep = -1;
-  const t0 = performance.now(), DUR = 2300, label = dir === 'down' ? (resume ? '⬇️ 回到地下世界' : '⬇️ 前往地下世界') : '⬆️ 回到大河平原';
-  tip.textContent = '💡 ' + LOAD_TIPS[ti];
+  let ti = Math.floor(Math.random() * (opts.tips || LOAD_TIPS).length), tipT = 0, worked = false, lastStep = -1;
+  const t0 = performance.now(), DUR = 2300, label = opts.label || (dir === 'down' ? (resume ? '⬇️ 回到地下世界' : '⬇️ 前往地下世界') : '⬆️ 回到大河平原'), TIPS = opts.tips || LOAD_TIPS;
+  tip.textContent = '💡 ' + TIPS[ti];
   const stepFn = now => {
     const k = Math.min(1, (now - t0) / DUR), t = (now - t0) / 1000;
     if (!worked && k > .3) { worked = true; try { work(); } catch (e) { console.error(e); } }
-    drawLoading(g, Wd, H, k, t, dir);
+    (opts.theme === 'mtn' ? drawMtnLoading : drawLoading)(g, Wd, H, k, t, dir);
     const st = Math.floor(t * 3.2); if (st !== lastStep && k < .95) { lastStep = st; if (state.snd) tone(150, 110, .06, .1, 'triangle'); }
     if (st % 4 === 3 && Math.random() < .02 && state.snd) tone(1500, 900, .1, .05);
     txt.textContent = `${label}… ${Math.round(k * 100)}%`;
-    if ((tipT += 16) > 1500) { tipT = 0; ti = (ti + 1) % LOAD_TIPS.length; tip.textContent = '💡 ' + LOAD_TIPS[ti]; }
+    if ((tipT += 16) > 1500) { tipT = 0; ti = (ti + 1) % TIPS.length; tip.textContent = '💡 ' + TIPS[ti]; }
     if (k < 1) requestAnimationFrame(stepFn); else { el.classList.remove('show'); loadingOn = false; if (done) done(); }
   };
   requestAnimationFrame(stepFn);
@@ -3174,6 +3362,7 @@ const y0IceBelt = y => y < 11;   // 北方厚冰層
 function areaName() {
   const o = state.onBoat ? state.boat : state.player, xi = Math.floor(o.x), yi = Math.floor(o.y);
   if (UNDER) { const z = UZONE[landOf[yi * N + xi]]; return z ? z.name : '⛏️ 地底通道'; }
+  if (mtn) return mtn.mode === 'summit' ? '🌋 火口湖' : '🧗 火山登山道';
   if (state.onBoat) { const s = spotAt(o.x, o.y); if (s && prog.found[s.id]) return s.cond && !s.cond() ? `${s.name}（漲潮中，清晨才進得去）` : s.icon + ' ' + s.name; return REGION_NAME[REGION_OF[at(xi, yi)]] || (at(xi, yi) === T.ICE ? '冰層' : '海上'); }
   if (ell(xi, yi, RTOWN.x, RTOWN.y, RTOWN.rx + 1.5, RTOWN.ry + 1.5) < 1) return '柳河鎮';
   const is = ISLANDS[landOf[yi * N + xi] - 1];
@@ -3236,7 +3425,7 @@ function updateHud() {
   document.getElementById('bagChip').textContent = '🐟 ' + state.bag.length;
   document.getElementById('baitChip').textContent = '🪱 ' + prog.bait;
   const a = contextA(), b = contextB();
-  btnA.textContent = a || (dive ? '撿起' : '拋竿'); btnA.classList.toggle('off', !a); btnA.classList.toggle('alert', fish.state === 'bite');
+  btnA.textContent = a || (dive ? '撿起' : mtn && mtn.mode === 'climb' ? '攀爬中' : '拋竿'); btnA.classList.toggle('off', !a); btnA.classList.toggle('alert', fish.state === 'bite');
   const sc = document.getElementById('statusChip'); let st = '';
   if (state.pillT > 0) { const r = Math.ceil(state.pillT); st = `💊 防暈中 ${Math.floor(r / 60)}:${String(r % 60).padStart(2, '0')}`; }
   else if (state.sickOn) st = '🤢 暈船' + (prog.pills > 0 ? `（點我吃藥 💊${prog.pills}）` : '');
@@ -3434,7 +3623,7 @@ function drawThird(g, t) {
     g.fillStyle = `rgba(60,66,80,${Math.min(.8, skyDark * 1.3)})`; for (let i = 0; i < 7; i++) { const cx = ((hash(i, 17) * lw + t * (4 + wx.wind * 18) * (1 + i * .2)) % (lw + 60)) - 30, cy = hash(i, 18) * hz * .7; g.fillRect(cx | 0, cy | 0, 40, 8); g.fillRect((cx | 0) + 6, (cy | 0) - 5, 26, 6); } }
   if (UNDER) drawCaveSky(g, lw, hz, t, reg);   // 地底：洞穴天花板取代天空
   // 遠景：依區域
-  const far = { harbor: '#5a7a6a', deep: null, reef: '#e8d49a', lake: '#3a6a3a', river: '#5a6a5a', cold: '#e8f2fa', mangrove: '#2f5a3a', volcano: '#3a2e30', wreck: null, cave: '#2e2a30', lagoon: '#e8d49a', frozen: '#f0f8ff', bigriver: null, upriver: null }[reg];
+  const far = { harbor: '#5a7a6a', deep: null, reef: '#e8d49a', lake: '#3a6a3a', river: '#5a6a5a', cold: '#e8f2fa', mangrove: '#2f5a3a', volcano: '#3a2e30', wreck: null, cave: '#2e2a30', lagoon: '#e8d49a', frozen: '#f0f8ff', bigriver: null, upriver: null , crater: '#6a5048'}[reg];
   if (far) { g.fillStyle = phase === 'night' ? shade(far, -.6) : far; for (let x = 0; x < lw; x += 2) { const h = (Math.sin(x * .03 + 1) * .5 + Math.sin(x * .011) * .8 + 1.4) * (reg === 'lake' || reg === 'river' ? 9 : 5); g.fillRect(x, hz - h | 0, 2, h + 1 | 0); } }
   if (reg === 'harbor') { g.fillStyle = phase === 'night' ? '#2a2a3a' : '#c8b8a0'; g.fillRect(lw * .15 | 0, hz - 12, 14, 12); g.fillRect(lw * .22 | 0, hz - 9, 10, 9); g.fillStyle = '#d0403a'; g.fillRect(lw * .3 | 0, hz - 22, 4, 22); }
   if (reg === 'cold') { g.fillStyle = phase === 'night' ? '#8a9aaa' : '#ffffff'; for (let i = 0; i < 5; i++) { const x = hash(i, 23) * lw | 0, w = 10 + hash(i, 24) * 22 | 0, h = 4 + hash(i, 25) * 8 | 0; g.fillRect(x, hz - h, w, h); g.fillRect(x + 3, hz - h - 3, w - 8, 3); } }
@@ -3460,7 +3649,7 @@ function drawThird(g, t) {
   if (reg === 'frozen') { g.fillStyle = phase === 'night' ? '#8a9aaa' : '#ffffff'; for (let i = 0; i < 7; i++) { const x = hash(i, 33) * lw | 0, w = 14 + hash(i, 34) * 30 | 0, h = 14 + hash(i, 35) * 22 | 0; g.fillRect(x, hz - h, w, h); g.fillStyle = phase === 'night' ? '#6a7a8a' : '#d8eefa'; g.fillRect(x + w - 4, hz - h, 4, h); g.fillStyle = phase === 'night' ? '#8a9aaa' : '#ffffff'; } }
   if (reg === 'lake' || reg === 'river') { g.fillStyle = phase === 'night' ? '#1a2a1a' : '#2f6a2f'; for (let i = 0; i < 9; i++) { const x = hash(i, 20) * lw | 0; g.fillRect(x, hz - 16, 6, 10); g.fillRect(x + 2, hz - 20, 2, 6); } }
   // 水面
-  const wc = { harbor: '#3f8fd0', deep: '#1e3f7a', reef: '#3fc3c0', lake: '#3a9a7a', river: '#4fb0b8', cold: '#4a7aa8', mangrove: '#4a7a5a', volcano: '#4a3a56', wreck: '#1e3a5a', cave: '#2a4a5a', lagoon: '#3ad0c8', frozen: '#6a9ac8', bigriver: '#4a98a8', upriver: '#5ab4c4' , ucave: '#1e4a5e', ulake: '#163a60', ucrystal: '#4a2a7a', ulava: '#e0561e'}[reg];
+  const wc = { harbor: '#3f8fd0', deep: '#1e3f7a', reef: '#3fc3c0', lake: '#3a9a7a', river: '#4fb0b8', cold: '#4a7aa8', mangrove: '#4a7a5a', volcano: '#4a3a56', wreck: '#1e3a5a', cave: '#2a4a5a', lagoon: '#3ad0c8', frozen: '#6a9ac8', bigriver: '#4a98a8', upriver: '#5ab4c4' , ucave: '#1e4a5e', ulake: '#163a60', ucrystal: '#4a2a7a', ulava: '#e0561e', crater: '#3ac8b0'}[reg];
   const top = UNDER ? shade(wc, -.05) : phase === 'day' ? shade(wc, .25) : shade(ph.sea, .1);
   gr = g.createLinearGradient(0, hz, 0, lh); gr.addColorStop(0, top); gr.addColorStop(1, phase === 'night' || UNDER ? shade(wc, -.65) : shade(wc, -.2)); g.fillStyle = gr; g.fillRect(0, hz, lw, lh - hz);
   if (phase !== 'day' && !UNDER) { g.fillStyle = phase === 'night' ? 'rgba(255,240,200,.25)' : 'rgba(255,200,120,.35)'; for (let k = 0; k < 10; k++) { const yy = hz + 2 + k * k * 1.2; g.fillRect(lw * .78 - 6 + Math.sin(t * 2 + k) * 3 | 0, yy | 0, 12 + k, 1); } }
@@ -3516,7 +3705,7 @@ function drawThird(g, t) {
   }
   // 前景：船頭或岸邊
   if (state.onBoat) { g.fillStyle = '#6a3e1e'; g.beginPath(); g.moveTo(0, lh); g.lineTo(lw * .1, lh * .82); g.lineTo(lw * .55, lh * .8); g.lineTo(lw * .7, lh); g.fill(); g.fillStyle = '#b07a46'; g.beginPath(); g.moveTo(0, lh); g.lineTo(lw * .12, lh * .86); g.lineTo(lw * .52, lh * .84); g.lineTo(lw * .64, lh); g.fill(); }
-  else { const col = UNDER ? (fish.region === 'ulava' ? '#3a2420' : '#3a3438') : fish.region === 'lake' || fish.region === 'river' ? '#5a9a3a' : '#c8a870'; g.fillStyle = col; g.fillRect(0, lh * .9 | 0, lw * .5 | 0, lh); g.fillStyle = shade(col, -.25); g.fillRect(0, lh * .9 | 0, lw * .5 | 0, 2); }   // 地底的岸邊是岩石
+  else { const col = fish.region === 'crater' ? '#3a3034' : UNDER ? (fish.region === 'ulava' ? '#3a2420' : '#3a3438') : fish.region === 'lake' || fish.region === 'river' ? '#5a9a3a' : '#c8a870'; g.fillStyle = col; g.fillRect(0, lh * .9 | 0, lw * .5 | 0, lh); g.fillStyle = shade(col, -.25); g.fillRect(0, lh * .9 | 0, lw * .5 | 0, 2); }   // 地底的岸邊是岩石
   // 釣到魚：正面把魚捧高
   if (showOff && window.ART && ART.drawTrophy) {
     const st = Math.max(3, Math.round(lh / 105));
@@ -3590,7 +3779,7 @@ let last = performance.now();
 function frame(now) {
   const dt = Math.min(.05, (now - last) / 1000); last = now; const t = now / 1000;
   update(dt);
-  const hidden = !!aq || !!cut || !!dive;   // 水族館或頒獎動畫蓋住整個畫面時，不必再畫地圖（省電）
+  const hidden = !!aq || !!cut || !!dive || (!!mtn && !(mtn.mode === 'summit' && fish.state));   // 水族館或頒獎動畫蓋住整個畫面時，不必再畫地圖（省電）
   const isoOn = viewMix < .99 && !hidden, thirdOn = viewMix > .01 && !hidden, S = PIX * DPR;
   lx.imageSmoothingEnabled = false; l3x.imageSmoothingEnabled = false;
   if (isoOn) drawIso(lx, lfx, t);
@@ -3620,6 +3809,7 @@ function frame(now) {
   drawCut(dt);
   drawAquarium(dt);
   drawDive(dt);
+  drawMtn(dt);
   drawMini();   // 小地圖每格都更新，才不會一跳一跳
   if ((hudTick += dt) > .12) { hudTick = 0; updateHud(); }
   requestAnimationFrame(frame);
@@ -3642,7 +3832,7 @@ document.addEventListener('visibilitychange', () => { if (!document.hidden) chec
 load(); initFog(); uFogInit(); applyGear(); applyLook(); updateHud(); drawMini(); setInterval(save, 10000); addEventListener('pagehide', save);
 if (resumeUnder) enterUnder(resumeUnder); else toast('歡迎來到漁港鎮！走到碼頭盡頭「上船」出海，或在水邊直接「拋竿」', 3200);
 if (params.get('demo') === 'boat') { state.onBoat = true; }
-window.__game = { state, fish, FISH, docks, BUILDINGS, prog, ACH, save, applyGear, openBuilding, checkAch, openDex, startCast, hook }; window.__walk = walkable; window.__pick = pickFish; window.__drifts = drifts; window.__regionAt = regionAt; window.__boatable = boatable; window.__islands = ISLANDS; window.__openFishDetail = openFishDetail; window.__aq = () => aq; window.__drawAq = drawAquarium; window.__tile = at; window.__adv = { SPOTS, fogPct, revealAt, isRevealed, discover, giveMap, digTreasure, openQuests, genQuest, get boss() { return boss; }, set boss(v) { boss = v; }, set bossCD(v) { bossCD = v; }, GEAR, drawTreasureMap }; window.__contextB = contextB; window.__uzone = (x, y) => (UNDER ? landOf : (U.landOf || landOf))[y * N + x]; window.__uzc = UZC.map(c => c); window.__ustairs = () => U.stairs; window.__ucamp = () => U.camp; window.__res = resNPC; window.__dive = () => dive; window.__startDive = startDive; window.__endDive = endDive; window.__divePick = divePick; window.__diveTarget = diveTarget; window.__openResident = openResident; window.__ulair = () => U.lair; window.__lairActive = lairActive; window.__openCamp = openCamp; window.__world = () => world; window.__checkUpdate = checkUpdate; window.__actx = () => actx; window.__contest = { nextContestKey, contestAt, runContest, openGuild, contestTable, startCeremony, get cut() { return cut; } };   // 給測試用
+window.__game = { state, fish, FISH, docks, BUILDINGS, prog, ACH, save, applyGear, openBuilding, checkAch, openDex, startCast, hook }; window.__walk = walkable; window.__pick = pickFish; window.__drifts = drifts; window.__regionAt = regionAt; window.__boatable = boatable; window.__islands = ISLANDS; window.__openFishDetail = openFishDetail; window.__aq = () => aq; window.__drawAq = drawAquarium; window.__tile = at; window.__adv = { SPOTS, fogPct, revealAt, isRevealed, discover, giveMap, digTreasure, openQuests, genQuest, get boss() { return boss; }, set boss(v) { boss = v; }, set bossCD(v) { bossCD = v; }, GEAR, drawTreasureMap }; window.__contextB = contextB; window.__uzone = (x, y) => (UNDER ? landOf : (U.landOf || landOf))[y * N + x]; window.__uzc = UZC.map(c => c); window.__ustairs = () => U.stairs; window.__ucamp = () => U.camp; window.__res = resNPC; window.__dive = () => dive; window.__mtn = () => mtn; window.__enterMountain = enterMountain; window.__volcano = volcano; window.__startDive = startDive; window.__endDive = endDive; window.__divePick = divePick; window.__diveTarget = diveTarget; window.__openResident = openResident; window.__ulair = () => U.lair; window.__lairActive = lairActive; window.__openCamp = openCamp; window.__world = () => world; window.__checkUpdate = checkUpdate; window.__actx = () => actx; window.__contest = { nextContestKey, contestAt, runContest, openGuild, contestTable, startCeremony, get cut() { return cut; } };   // 給測試用
 requestAnimationFrame(frame);
 </script>
 </body>

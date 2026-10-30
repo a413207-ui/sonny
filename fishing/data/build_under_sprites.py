@@ -215,6 +215,37 @@ def draw(f):
         for i in range(6): p.set(58 + i * .5, 20 + i * .6, A)
         p.tri([(7, 17), (0, 9), (2, 17)], A); p.tri([(7, 17), (0, 26), (2, 17)], "#ffd040")
         eye(p, 54, 13, A)
+    elif fid == "crater_tetra":
+        fishbody(p, f, rx=13, ry=5); p.rect(18, 15, 20, 2, A); eye(p, 37, 13, A)
+    elif fid == "sulfur_loach":
+        eelbody(p, f, amp=2, th=4)
+        for x in range(10, 54, 6): p.set(x, 15 + math.sin(x / 6) * 2, A)
+        eye(p, 54, 14)
+    elif fid == "steam_carp":
+        fishbody(p, f, rx=14, ry=9)
+        for i in range(4): p.rect(30 + i * 3, 4 - i, 2, 2, "#ffffff")
+        p.rect(22, 16, 14, 1, A); eye(p, 37, 12)
+    elif fid == "ash_catfish":
+        fishbody(p, f, rx=16, ry=6)
+        for x in range(16, 44, 4): p.set(x, 13, A)
+        for i in range(7): p.set(47 + i, 18 + i * .4, F); p.set(47 + i, 14 - i * .3, F)
+        eye(p, 42, 14)
+    elif fid == "jade_trout":
+        fishbody(p, f, rx=16, ry=6)
+        for x in range(16, 42, 4): p.set(x, 15, A); p.set(x + 2, 17, shade(B, -.3))
+        eye(p, 40, 13)
+    elif fid == "ember_koi":
+        fishbody(p, f, rx=14, ry=9)
+        for i, (x, y) in enumerate([(20, 12), (26, 17), (32, 11), (24, 20), (34, 18)]): p.rect(x, y, 3, 2, A if i % 2 else "#ffb040")
+        eye(p, 37, 12, A)
+    elif fid == "cloud_eel":
+        eelbody(p, f, amp=3, th=5)
+        for x in range(8, 54, 7): p.rect(x, 9 + math.sin(x / 6) * 3, 4, 2, "#ffffff")
+        eye(p, 54, 14, A)
+    elif fid == "crater_lord":
+        fishbody(p, f, cx=32, rx=20, ry=10, tail=6, fin=False)
+        for x in range(16, 46, 5): p.tri([(x, 7), (x + 4, 7), (x + 2, 1)], A)
+        p.rect(20, 18, 24, 2, A); p.rect(46, 18, 8, 2, "#ffffff"); eye(p, 46, 12, A)
     else:
         fishbody(p, f); eye(p, 38, 13)
     p.outline(k)
@@ -223,7 +254,7 @@ def draw(f):
 
 def main():
     data = json.load(open(os.path.join(HERE, "fish.json"), encoding="utf-8"))
-    under = [f for f in data if any(r in ("ucave", "ulake", "ucrystal", "ulava") for r in f["regions"])]
+    under = [f for f in data if any(r in ("ucave", "ulake", "ucrystal", "ulava", "crater") for r in f["regions"])]
     for f in under:
         with open(os.path.join(OUT, f["id"] + ".svg"), "w", encoding="utf-8") as fp:
             fp.write(draw(f))
