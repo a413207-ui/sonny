@@ -11,6 +11,9 @@ const RENDER_CAT = DEFS.map((d) => (d.render === 'caterpillar' ? 1 : 0));
 const MASS = DEFS.map((d) => d.mass);
 const SCALE = DEFS.map((d) => d.scale || 1);
 const NO_DESPAWN = DEFS.map((d) => (d.noDespawn ? 1 : 0));
+const HOP = DEFS.map((d) => (d.hop ? 1 : 0)); // 跳跳史萊姆：外觀一蹦一蹦
+// 怪物移速上限（玩家基礎移速 × enemySpeedCapFrac）；王的衝撞是強制位移，不受影響
+const SPEED_CAP = CONFIG.player.speed * CONFIG.stage.enemySpeedCapFrac;
 const HEAVY = 20; // 質量超過這個值的怪（王）不會被小怪推開
 const CELL = 2.5;
 
@@ -108,7 +111,7 @@ export class Enemies {
     this.maxHp[i] = this.hp[i];
     this.slow[i] = 0;
     this.forced[i] = 0;
-    this.speed[i] = def.speed * spdMult * (0.9 + Math.random() * 0.2);
+    this.speed[i] = Math.min(SPEED_CAP, def.speed * spdMult * (0.9 + Math.random() * 0.2));
     this.damage[i] = def.damage * dmgMult;
     this.radius[i] = def.radius;
     this.flash[i] = 0;
@@ -391,7 +394,8 @@ export class Enemies {
         const b = Math.sin(time * 6 + this.phase[i]);
         const sy = r * (0.8 + 0.12 * b);
         const sxz = r * (1.05 - 0.08 * b);
-        _p.set(this.x[i], sy, this.z[i]);
+        const hopY = HOP[t] ? Math.abs(Math.sin(time * 9 + this.phase[i])) * 0.7 : 0;
+        _p.set(this.x[i], sy + hopY, this.z[i]);
         _s.set(sxz, sy, sxz);
         _q.identity();
         _m.compose(_p, _q, _s);

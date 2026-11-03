@@ -71,7 +71,12 @@ export const CONFIG = {
     spawnRateGrowth: 1.16, // 每一階出怪量 ×1.16
     hpGrowth: 1.1, // 每一階怪物血量 ×1.1
     damageGrowth: 1.04, // 每一階接觸傷害 ×1.04
-    speedGrowth: 1.02, // 每一階怪物移動速度 ×1.02
+    speedGrowth: 1.03, // 每一階怪物移動速度 ×1.03（G-BAL-01：1.02 → 1.03）
+    // 一般怪（含精英、王的一般移動，不含王的衝撞）移速上限 = 玩家基礎移速 × 0.9，玩家永遠跑得掉
+    enemySpeedCapFrac: 0.9,
+    // 新手保護（G-BAL-01）：開局 until 秒內，出怪量 ×spawnMult、新出生的怪移速 ×speedMult，
+    // 兩個倍率都隨時間線性回到 1，讓新手前 1 分鐘活得下來（例如 0:45 時折扣剩一半）
+    warmup: { until: 90, spawnMult: 0.6, speedMult: 0.7 },
     maxEnemies: isTouch ? 150 : 300, // 同時在場上限（含精英與王）
     despawnDistance: 48, // 離玩家太遠的怪會被搬回出怪圈
     // 出怪權重：[開始的階數, 怪物 id, 權重, 一次出幾隻(min,max), 陣型]
@@ -79,6 +84,8 @@ export const CONFIG = {
       { from: 0, type: 'slime', weight: 10, group: [3, 6], formation: 'cluster' },
       { from: 1, type: 'caterpillar', weight: 3, group: [3, 5], formation: 'line' },
       { from: 4, type: 'caterpillar', weight: 3, group: [4, 7], formation: 'cluster' },
+      // 跳跳史萊姆：3:00（第 6 階）起少量出現，一次 1～2 隻，逼玩家走位
+      { from: 6, type: 'hopSlime', weight: 1.5, group: [1, 2], formation: 'cluster' },
     ],
   },
 
@@ -121,7 +128,7 @@ export const CONFIG = {
       name: '果凍史萊姆',
       render: 'slime',
       hp: 10,
-      speed: 2.3,
+      speed: 3.6, // G-BAL-01：2.3 → 3.6
       damage: 7,
       radius: 0.6,
       mass: 1,
@@ -134,7 +141,7 @@ export const CONFIG = {
       name: '綠毛蟲',
       render: 'caterpillar',
       hp: 26,
-      speed: 2.7,
+      speed: 4.0, // G-BAL-01：2.7 → 4.0
       damage: 10,
       radius: 0.5,
       mass: 2,
@@ -146,12 +153,28 @@ export const CONFIG = {
       gem: { small: 0.55, medium: 0.4, large: 0.05 },
       gold: { chance: 0.1, amount: 1 },
     },
+    // G-BAL-01 新增：少量出現的快速怪。速度一出場就接近上限（玩家基礎移速 ×0.9 = 4.86），血少一碰就死。
+    hopSlime: {
+      name: '跳跳史萊姆',
+      render: 'slime',
+      hop: true, // 外觀一蹦一蹦地跳
+      hp: 6,
+      speed: 4.8, // 任務建議約 5.0，但一般怪上限是 4.86，所以取 4.8
+      damage: 8,
+      radius: 0.5,
+      scale: 0.8,
+      mass: 0.8,
+      color: 0xff7ab8,
+      opacity: 0.78,
+      gem: { small: 0.6, medium: 0.4, large: 0 },
+      gold: { chance: 0.08, amount: 1 },
+    },
     bigCaterpillar: {
       name: '大綠毛蟲',
       render: 'caterpillar',
       elite: true,
       hp: 240, // 會再乘上當下難度階的血量倍率
-      speed: 2.4,
+      speed: 3.4, // G-BAL-01：2.4 → 3.4
       damage: 16,
       radius: 1.1,
       scale: 2.4, // 外觀是一般毛蟲的 2.4 倍
@@ -168,7 +191,7 @@ export const CONFIG = {
       render: 'slime',
       boss: true,
       hp: 5000, // 固定血量，不隨難度階成長
-      speed: 2.1,
+      speed: 3.0, // G-BAL-01：2.1 → 3.0
       damage: 28,
       radius: 2.4,
       scale: 1,
@@ -198,7 +221,12 @@ export const CONFIG = {
 
   // ---------- 轉職（G-CORE-02）----------
   job: {
-    level: 10, // 升到 Lv10 時暫停、選擇職業
+    // 職業招式解鎖等級：[轉職並拿到第 1 招, 第 2 招進卡池, 第 3 招進卡池]（G-BAL-01）
+    // 第 1 個數字同時是轉職等級。未解鎖的職業招式不會出現在升級卡。
+    unlockLevels: [10, 18, 26],
+    get level() {
+      return this.unlockLevels[0]; // 升到這一級時暫停、選擇職業
+    },
     potionsOnChange: 1, // 轉職時送 1 瓶遺忘藥水
     // bonus：轉職後的永久小加成（會顯示在左側被動數值）
     classes: {
@@ -242,7 +270,7 @@ export const CONFIG = {
       damage: [12, 17, 17, 17, 17],
       range: [2.8, 2.8, 3.2, 3.2, 3.2],
       arc: [130, 130, 140, 140, 150], // 角度
-      cooldown: [1.0, 1.0, 1.0, 0.85, 0.85],
+      cooldown: [1.5, 1.5, 1.5, 1.3, 1.3], // G-BAL-01：[1.0, 1.0, 1.0, 0.85, 0.85]
       doubleSided: [false, false, false, false, true],
       seekRange: 9, // 只追這個距離內的敵人；沒有就朝面向揮
     },
@@ -259,7 +287,7 @@ export const CONFIG = {
       damage: [10, 10, 16, 16, 16],
       count: [1, 2, 2, 3, 3],
       pierce: [0, 0, 0, 1, 1],
-      cooldown: [1.5, 1.5, 1.5, 1.5, 1.2],
+      cooldown: [2.2, 2.2, 2.2, 2.2, 1.8], // G-BAL-01：[1.5, 1.5, 1.5, 1.5, 1.2]
       speed: 15,
       lifetime: 1.6,
       radius: 0.3,
@@ -281,7 +309,7 @@ export const CONFIG = {
       orbitRadius: [2.2, 2.2, 2.4, 2.8, 2.8],
       spin: [3.2, 3.2, 3.4, 3.4, 4.2], // 每秒轉幾弧度
       bladeRadius: 0.6,
-      hitInterval: 0.35, // 每把刀每 0.35 秒結算一次傷害
+      hitInterval: 0.5, // 每把刀每 0.5 秒結算一次傷害（G-BAL-01：0.35 → 0.5，跟其他招式冷卻同比例拉長）
     },
     quake: {
       name: '裂地波',
@@ -298,7 +326,7 @@ export const CONFIG = {
       count: [1, 1, 2, 2, 3],
       spread: 25, // 多道時的扇形角度
       pierce: [99, 99, 99, 99, 99],
-      cooldown: [2.2, 2.2, 2.2, 2.0, 2.0],
+      cooldown: [3.3, 3.3, 3.3, 3.0, 3.0], // G-BAL-01：[2.2, 2.2, 2.2, 2.0, 2.0]
       speed: 11,
       lifetime: 1.0,
       radius: 0.9,
@@ -315,7 +343,7 @@ export const CONFIG = {
       meshColor: 0xffe08a,
       damage: [15, 20, 20, 25, 33],
       radius: [3.0, 3.4, 3.4, 3.8, 3.8],
-      cooldown: [3.0, 3.0, 2.7, 2.7, 2.4],
+      cooldown: [4.5, 4.5, 4.0, 4.0, 3.6], // G-BAL-01：[3.0, 3.0, 2.7, 2.7, 2.4]
       knockback: 3, // 擊退倍率
       slow: [0, 0, 0, 0, 0],
     },
@@ -334,7 +362,7 @@ export const CONFIG = {
       damage: [30, 30, 40, 40, 50],
       radius: [1.8, 1.8, 1.8, 2.2, 2.2],
       delay: 0.6, // 地上預警圈出現後幾秒落下
-      cooldown: [2.6, 2.6, 2.6, 2.4, 2.2],
+      cooldown: [3.9, 3.9, 3.9, 3.6, 3.3], // G-BAL-01：[2.6, 2.6, 2.6, 2.4, 2.2]
       targetRange: 16,
     },
     frost: {
@@ -348,7 +376,7 @@ export const CONFIG = {
       meshColor: 0xaee8ff,
       damage: [8, 8, 8, 12, 18],
       radius: [3.6, 3.6, 4.2, 4.2, 4.2],
-      cooldown: [3.5, 3.5, 3.5, 3.15, 3.15],
+      cooldown: [5.2, 5.2, 5.2, 4.7, 4.7], // G-BAL-01：[3.5, 3.5, 3.5, 3.15, 3.15]
       knockback: 0.5,
       slow: [1.5, 2.2, 2.2, 2.2, 3.0], // 減速秒數（減速時移速 ×0.5）
     },
@@ -368,7 +396,7 @@ export const CONFIG = {
       spread: 50,
       homing: 6, // 轉向速度（越大越會追）
       pierce: [0, 0, 0, 0, 0],
-      cooldown: [1.4, 1.4, 1.4, 1.26, 1.26],
+      cooldown: [2.1, 2.1, 2.1, 1.9, 1.9], // G-BAL-01：[1.4, 1.4, 1.4, 1.26, 1.26]
       speed: 10,
       lifetime: 2.2,
       radius: 0.3,
@@ -391,7 +419,7 @@ export const CONFIG = {
       count: [3, 3, 4, 5, 5],
       spread: 30,
       pierce: [0, 0, 1, 1, 1],
-      cooldown: [1.3, 1.3, 1.3, 1.3, 1.1],
+      cooldown: [2.0, 2.0, 2.0, 2.0, 1.7], // G-BAL-01：[1.3, 1.3, 1.3, 1.3, 1.1]
       speed: 20,
       lifetime: 1.0,
       radius: 0.3,
@@ -413,7 +441,7 @@ export const CONFIG = {
       spread: 60,
       homing: 8,
       pierce: [1, 1, 2, 2, 3],
-      cooldown: [1.6, 1.6, 1.6, 1.6, 1.6],
+      cooldown: [2.4, 2.4, 2.4, 2.4, 2.4], // G-BAL-01：[1.6, 1.6, 1.6, 1.6, 1.6]
       speed: 14,
       lifetime: 2.0,
       radius: 0.35,
@@ -432,7 +460,7 @@ export const CONFIG = {
       damage: [12, 12, 16, 16, 22],
       radius: [1.2, 1.2, 1.2, 1.5, 1.5],
       delay: 0.35,
-      cooldown: [2.4, 2.4, 2.4, 2.4, 2.4],
+      cooldown: [3.6, 3.6, 3.6, 3.6, 3.6], // G-BAL-01：[2.4, 2.4, 2.4, 2.4, 2.4]
       targetRange: 15,
     },
   },
@@ -441,7 +469,7 @@ export const CONFIG = {
   // ---------- 通用被動 ----------
   passives: {
     might: { name: '攻擊', icon: '💪', desc: '傷害 +15%', perLevel: 0.15 },
-    haste: { name: '攻速', icon: '⏱️', desc: '冷卻 -8%', perLevel: 0.08 },
+    haste: { name: '攻速', icon: '⏱️', desc: '冷卻 -8%', perLevel: 0.08, maxReduction: 0.4 }, // 攻速總加成最多 -40% 冷卻
     swift: { name: '移速', icon: '👟', desc: '移動速度 +8%', perLevel: 0.08 },
     area: { name: '範圍', icon: '⭕', desc: '攻擊範圍 +10%', perLevel: 0.1 },
     vitality: { name: '血量', icon: '❤️', desc: '最大血量 +20，並回復 20', perLevel: 20 },
