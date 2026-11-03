@@ -177,6 +177,7 @@
   #cut canvas { position: absolute; inset: 0; width: 100%; height: 100%; image-rendering: pixelated; }
   #cut .t { position: absolute; left: 0; right: 0; text-align: center; color: #fff6dd; font-weight: 900; text-shadow: 0 2px 0 #3a2a18, 0 0 8px #000; pointer-events: none; transition: opacity .4s; padding: 0 12px; }
   #updBar { position: fixed; left: 50%; top: calc(8px + env(safe-area-inset-top)); transform: translateX(-50%); z-index: 45; display: none; background: #3a78c0; color: #fff; border: 3px solid #1e3f6a; border-radius: 20px; padding: 6px 14px; font-weight: 900; font-size: 14px; box-shadow: 0 3px 0 #1e3f6a; cursor: pointer; white-space: nowrap; animation: pulse .8s ease-in-out infinite alternate; }
+  .hud .gc-views { margin: 0; padding-left: 2px; pointer-events: none; font-size: 11px; font-weight: 700; color: rgba(255,246,221,.92); text-shadow: 0 1px 2px #000; white-space: nowrap; }
   #statusChip.sick { background: #d8f0b0; border-color: #4a7a2a; box-shadow: 0 2px 0 #4a7a2a; color: #2a4a14; }
 </style>
 </head>
@@ -188,6 +189,7 @@
   <div class="chip row"><span id="coinChip">🪙 0</span><span id="bagChip">🐟 0</span><span id="baitChip">🪱 0</span></div>
   <div class="chip" id="statusChip" hidden></div>
   <div class="chip" id="bagBtn" style="cursor:pointer">🎒 背包</div>
+  <p class="gc-views" data-gc="page" hidden></p>
 </div>
 <canvas id="mini" width="128" height="96"></canvas>
 <div id="miniHint">點地圖放大</div>
@@ -4000,6 +4002,7 @@ if (params.get('demo') === 'boat') { state.onBoat = true; }
 window.__game = { state, fish, FISH, docks, BUILDINGS, prog, ACH, save, applyGear, openBuilding, checkAch, openDex, startCast, hook }; window.__walk = walkable; window.__pick = pickFish; window.__drifts = drifts; window.__regionAt = regionAt; window.__boatable = boatable; window.__islands = ISLANDS; window.__openFishDetail = openFishDetail; window.__aq = () => aq; window.__drawAq = drawAquarium; window.__tile = at; window.__adv = { SPOTS, fogPct, revealAt, isRevealed, discover, giveMap, digTreasure, openQuests, genQuest, get boss() { return boss; }, set boss(v) { boss = v; }, set bossCD(v) { bossCD = v; }, GEAR, drawTreasureMap }; window.__contextB = contextB; window.__uzone = (x, y) => (UNDER ? landOf : (U.landOf || landOf))[y * N + x]; window.__uzc = UZC.map(c => c); window.__ustairs = () => U.stairs; window.__ucamp = () => U.camp; window.__res = resNPC; window.__dive = () => dive; window.__mtn = () => mtn; window.__viewMix = () => viewMix; window.__enterMountain = enterMountain; window.__volcano = volcano; window.__startDive = startDive; window.__endDive = endDive; window.__divePick = divePick; window.__diveTarget = diveTarget; window.__openResident = openResident; window.__ulair = () => U.lair; window.__lairActive = lairActive; window.__openCamp = openCamp; window.__world = () => world; window.__checkUpdate = checkUpdate; window.__actx = () => actx; window.__contest = { nextContestKey, contestAt, runContest, openGuild, contestTable, startCeremony, get cut() { return cut; } };   // 給測試用
 requestAnimationFrame(frame);
 </script>
+<script src="../view-count.js"></script>
 <script data-goatcounter="https://sonnystudio.goatcounter.com/count"
         async src="//gc.zgo.at/count.js"></script>
 </body>
