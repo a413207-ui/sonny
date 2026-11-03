@@ -1,5 +1,6 @@
 // 升級卡池：招式 6 格、被動 6 格、每項最高 Lv5；欄位滿了只出已擁有項目的升級。
-// 職業招式只有轉職成該職業後才會進卡池。
+// 職業招式只有轉職成該職業後才會進卡池，而且要等玩家等級到 CONFIG.job.unlockLevels 才解鎖
+// （第 1 招轉職時直接給、第 2 招 Lv18、第 3 招 Lv26）。
 import { CONFIG } from './config.js';
 
 export class Upgrades {
@@ -11,15 +12,17 @@ export class Upgrades {
     this.skills = new Map(); // id -> level（照取得順序 = 技能欄順序）
     this.passives = new Map();
     this.job = null;
+    this.playerLevel = 1; // 由 Game 在升級時更新，用來判斷職業招式是否解鎖
   }
 
   level(kind, id) {
     return (kind === 'skill' ? this.skills : this.passives).get(id) || 0;
   }
 
-  // 這個招式目前能不能進卡池（初心者招式 or 自己職業的招式）
-  skillAllowed(def) {
-    return !def.job || def.job === this.job;
+  // 這個招式目前能不能進卡池（初心者招式 or 自己職業、且已解鎖的招式）
+  skillAllowed(def, id) {
+    if (!def.job) return true;
+    return def.job === this.job && this.playerLevel >= jobSkillUnlockLevel(id);
   }
 
   // 列出現在可以拿的所有卡
@@ -33,7 +36,7 @@ export class Upgrades {
       out.push({ kind, id, def, nextLevel: lv + 1 });
     };
     for (const [id, def] of Object.entries(CONFIG.skills)) {
-      if (!this.skillAllowed(def)) continue;
+      if (!this.skillAllowed(def, id)) continue;
       add('skill', id, def, this.skills, this.skills.size >= maxS);
     }
     for (const [id, def] of Object.entries(CONFIG.passives)) {
@@ -74,7 +77,7 @@ export class Upgrades {
     const job = (this.job && CONFIG.job.classes[this.job].bonus) || {};
     return {
       damageMult: 1 + P.might.perLevel * lv('might') + M.might.per * ml('might'),
-      cooldownMult: Math.max(0.3, 1 - P.haste.perLevel * lv('haste')),
+      cooldownMult: 1 - Math.min(P.haste.maxReduction, P.haste.perLevel * lv('haste')),
       speedMult: 1 + P.swift.perLevel * lv('swift') + M.swift.per * ml('swift') + (job.speed || 0),
       areaMult: 1 + P.area.perLevel * lv('area') + (job.area || 0),
       bonusHp: P.vitality.perLevel * lv('vitality') + M.vitality.per * ml('vitality') + (job.bonusHp || 0),
@@ -82,6 +85,15 @@ export class Upgrades {
       goldMult: 1 + M.greed.per * ml('greed'),
     };
   }
+}
+
+// 職業招式在職業招式清單裡的順序決定解鎖等級；初心者招式回傳 0（一開始就能拿）
+export function jobSkillUnlockLevel(id) {
+  const def = CONFIG.skills[id];
+  if (!def?.job) return 0;
+  const idx = CONFIG.job.classes[def.job].skills.indexOf(id);
+  const L = CONFIG.job.unlockLevels;
+  return L[Math.min(idx, L.length - 1)];
 }
 
 // 卡片上要顯示的說明

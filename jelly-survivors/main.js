@@ -6,7 +6,7 @@ import { Input } from './input.js';
 import { Enemies } from './enemies.js';
 import { Gems } from './gems.js';
 import { createSkills } from './weapons.js';
-import { Upgrades, cardText } from './upgrades.js';
+import { Upgrades, cardText, jobSkillUnlockLevel } from './upgrades.js';
 import { Pickups } from './pickups.js';
 import { BossAI } from './boss.js';
 import { SaveStore } from './save.js';
@@ -355,10 +355,15 @@ class Game {
     const st = CONFIG.stage;
     const tier = this.tier;
     const bossMult = this.boss.alive ? CONFIG.boss.spawnRateMult : 1;
-    this.spawnAcc += st.spawnRateBase * Math.pow(st.spawnRateGrowth, tier) * bossMult * dt;
+    // 新手保護：開局 warmup.until 秒內，出怪量與怪的移速從 warmup 的倍率線性回到 1
+    const w = st.warmup;
+    const wt = Math.min(1, this.elapsed / w.until);
+    const warmSpawn = w.spawnMult + (1 - w.spawnMult) * wt;
+    const warmSpeed = w.speedMult + (1 - w.speedMult) * wt;
+    this.spawnAcc += st.spawnRateBase * Math.pow(st.spawnRateGrowth, tier) * bossMult * warmSpawn * dt;
     const hpMult = Math.pow(st.hpGrowth, tier);
     const dmgMult = Math.pow(st.damageGrowth, tier);
-    const spdMult = Math.pow(st.speedGrowth, tier);
+    const spdMult = Math.pow(st.speedGrowth, tier) * warmSpeed;
     let guard = 0;
     while (this.spawnAcc >= 1 && !this.enemies.full && guard++ < 20) {
       const entries = st.spawnTable.filter((e) => tier >= e.from);
@@ -424,10 +429,21 @@ class Game {
       this.level++;
       this.xpNeed = CONFIG.xpForLevel(this.level);
       this.pendingLevels++;
+      this.upgrades.playerLevel = this.level;
+      this.announceJobUnlock();
       if (this.level >= CONFIG.job.level && !this.upgrades.job && !this.jobOffered) {
         this.pendingJob = true;
         this.jobOffered = true;
       }
+    }
+  }
+
+  // 職業招式剛好在這一級解鎖時提示（第 1 招在轉職時直接給，不用提示）
+  announceJobUnlock() {
+    const job = this.upgrades.job && CONFIG.job.classes[this.upgrades.job];
+    if (!job) return;
+    for (const sid of job.skills.slice(1)) {
+      if (jobSkillUnlockLevel(sid) === this.level) this.showBanner(`職業招式「${CONFIG.skills[sid].name}」解鎖了！升級時有機會抽到`, 3);
     }
   }
 
@@ -505,6 +521,12 @@ class Game {
         const name = document.createElement('span');
         name.textContent = CONFIG.skills[sid].name;
         row.appendChild(name);
+        // 解鎖提示：第 1 招轉職直接拿到，其他招式要到指定等級才會進卡池
+        const ul = jobSkillUnlockLevel(sid);
+        const tag = document.createElement('span');
+        tag.className = `unlock${ul <= CONFIG.job.level ? ' now' : ''}`;
+        tag.textContent = ul <= CONFIG.job.level ? '轉職獲得' : `Lv${ul} 解鎖`;
+        row.appendChild(tag);
         list.appendChild(row);
       }
       el.onclick = () => this.chooseJob(idx);
@@ -768,7 +790,18 @@ class Game {
       ['吸取範圍', pct(st.pickupMult - 1)],
       ['金幣', pct(st.goldMult - 1)],
     ];
-    const key = `${job}|${this.potions}|${rows.map((r) => r[1]).join(',')}`;
+    // 下一個還沒解鎖的職業招式
+    let nextUnlock = '';
+    if (this.upgrades.job) {
+      for (const sid of CONFIG.job.classes[this.upgrades.job].skills) {
+        const ul = jobSkillUnlockLevel(sid);
+        if (ul > this.level) {
+          nextUnlock = `Lv${ul} 解鎖：${CONFIG.skills[sid].name}`;
+          break;
+        }
+      }
+    }
+    const key = `${job}|${nextUnlock}|${this.potions}|${rows.map((r) => r[1]).join(',')}`;
     if (this.hudCache.passives === key) return;
     this.hudCache.passives = key;
     const el = $('passives');
@@ -777,6 +810,12 @@ class Game {
     head.className = 'job';
     head.textContent = job;
     el.appendChild(head);
+    if (nextUnlock) {
+      const nu = document.createElement('div');
+      nu.className = 'unlock';
+      nu.textContent = nextUnlock;
+      el.appendChild(nu);
+    }
     for (const [name, val] of rows) {
       const r = document.createElement('div');
       r.className = 'pv';
