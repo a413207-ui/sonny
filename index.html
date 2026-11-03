@@ -52,7 +52,7 @@ h2{font-size:24px;margin:0;font-weight:700}
 .filters button[aria-pressed="true"]{background:var(--ink);color:var(--bg);border-color:var(--ink)}
 .filters button:focus-visible,.card:focus-visible{outline:2px solid var(--accent);outline-offset:3px}
 
-.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(290px,1fr));gap:22px}
+.grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:22px}
 .card{background:var(--surface);border:1px solid var(--line);border-radius:14px;overflow:hidden;display:flex;flex-direction:column;text-decoration:none;color:inherit;transition:transform .2s,border-color .2s}
 .card:hover{transform:translateY(-3px);border-color:var(--accent)}
 .thumb{aspect-ratio:16/10;max-width:100%;position:relative;overflow:hidden;background:var(--accent-soft)}
@@ -65,10 +65,11 @@ h2{font-size:24px;margin:0;font-weight:700}
 .card p{margin:0;font-size:14px;color:var(--muted)}
 .card .gc-views{font-size:12px;color:var(--muted);font-variant-numeric:tabular-nums}
 footer .gc-views{font-variant-numeric:tabular-nums}
-.card.empty{border-style:dashed;background:transparent;justify-content:center;align-items:center;min-height:240px;text-align:center;color:var(--muted)}
+.card.empty{grid-column:1 / -1;border-style:dashed;background:transparent;justify-content:center;align-items:center;min-height:0;padding:28px 20px;text-align:center;color:var(--muted)}
 .card.empty:hover{transform:none;border-color:var(--line)}
 
 footer{margin-top:64px;padding-top:24px;border-top:1px solid var(--line);font-size:13px;color:var(--muted);display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap}
+@media (max-width:720px){.grid{grid-template-columns:1fr}}
 @media (max-width:520px){nav.top{display:none}.intro{padding-block:48px 40px}footer .gc-views{flex-basis:100%}}
 @media (prefers-reduced-motion:reduce){.card{transition:none}.card:hover{transform:none}}
 </style>
@@ -86,7 +87,7 @@ footer{margin-top:64px;padding-top:24px;border-top:1px solid var(--line);font-si
     <h1>Small games,<br>made by AI.<span class="tc">AI 做的小遊戲，點開就能玩。</span></h1>
     <p>嗨，我是 Sonny。這裡收藏的遊戲都是 AI 做的，每一款都是我的一個想法，交給 AI 慢慢長成的樣子。不用下載、不用註冊，打開瀏覽器就能玩。</p>
     <div class="stats">
-      <div><b>5</b><span>已上線作品</span></div>
+      <div><b>2</b><span>已上線作品</span></div>
       <div><b>0 元</b><span>免費遊玩</span></div>
       <div><b>手機 / 電腦</b><span>都能玩</span></div>
     </div>
@@ -120,46 +121,6 @@ footer{margin-top:64px;padding-top:24px;border-top:1px solid var(--line);font-si
       </div>
     </a>
 
-    <a class="card" href="push-glass/">
-      <div class="thumb">
-        <svg viewBox="0 0 320 200" preserveAspectRatio="xMidYMid slice" aria-hidden="true">
-          <rect width="320" height="200" fill="#1A0F0B"/>
-          <path d="M110 30 H210 L260 200 H60 Z" fill="#76421F"/>
-          <path d="M127 30 L94 200M143 30 L127 200M160 30 V200M177 30 L193 200M193 30 L226 200" stroke="#5A2F15" stroke-opacity=".6"/>
-          <path d="M110 30 H210" stroke="#FF5E7E" stroke-width="4"/>
-          <ellipse cx="190" cy="78" rx="14" ry="5" fill="#C4965F"/>
-          <rect x="146" y="128" width="28" height="40" rx="4" fill="#E8961C"/>
-          <rect x="144" y="120" width="32" height="12" rx="6" fill="#FFF6E0"/>
-          <path d="M176 136 a9 9 0 0 1 0 20" fill="none" stroke="#DCEBF0" stroke-width="4" stroke-opacity=".8"/>
-          <circle cx="252" cy="70" r="12" fill="#D9A27A"/>
-          <path d="M240 66 a12 12 0 0 1 24 0" fill="#121212"/>
-        </svg>
-      </div>
-      <div class="body">
-        <div class="meta"><span>休閒 · 3D 闖關</span><span class="chip">點我開始玩</span></div>
-        <h3>推酒杯</h3>
-        <p>當一晚吧台酒保，把啤酒、烈酒推到客人面前的杯墊上。閃過鹽罐和酒漬，推太大力就摔下去！共 8 關。</p>
-        <span class="gc-views" data-gc="href" data-gc-href="push-glass/" hidden></span>
-      </div>
-    </a>
-
-    <a class="card" href="suishouhua/">
-      <div class="thumb">
-        <svg viewBox="0 0 320 200" preserveAspectRatio="xMidYMid slice" aria-hidden="true">
-          <rect width="320" height="200" fill="#FFF4E8"/>
-          <path d="M40 150 C80 60 130 170 170 90 S250 40 280 120" fill="none" stroke="#FF7A59" stroke-width="10" stroke-linecap="round"/>
-          <circle cx="250" cy="60" r="22" fill="#FFC94D"/>
-          <path d="M60 60 l12 0 M66 54 l0 12" stroke="#2F4BD8" stroke-width="4" stroke-linecap="round"/>
-        </svg>
-      </div>
-      <div class="body">
-        <div class="meta"><span>休閒 · 繪圖</span><span class="chip">點我開始畫</span></div>
-        <h3>隨手畫</h3>
-        <p>手機也能用的畫畫小工具：8 種筆刷、256 色、一鍵去背加白邊，畫完直接做成 LINE 貼圖。</p>
-        <span class="gc-views" data-gc="href" data-gc-href="suishouhua/" hidden></span>
-      </div>
-    </a>
-
     <a class="card" href="sgz5/">
       <div class="thumb">
         <svg viewBox="0 0 320 200" preserveAspectRatio="xMidYMid slice" aria-hidden="true">
@@ -177,27 +138,6 @@ footer{margin-top:64px;padding-top:24px;border-top:1px solid var(--line);font-si
         <h3>三國鼎立</h3>
         <p>從黃巾之亂到星落五丈原，8 個史實劇本、400 位武將。內政、外交、計謀、六角格戰場，還有每年的天下武鬥大會。</p>
         <span class="gc-views" data-gc="href" data-gc-href="sgz5/" hidden></span>
-      </div>
-    </a>
-
-    <a class="card" href="sofa-reach/">
-      <div class="thumb">
-        <svg viewBox="0 0 320 200" preserveAspectRatio="xMidYMid slice" aria-hidden="true">
-          <rect width="320" height="200" fill="#E8EDDC"/>
-          <rect y="134" width="320" height="66" fill="#D7DFC6"/>
-          <rect x="18" y="96" width="78" height="54" rx="12" fill="#829A78" stroke="#665447" stroke-width="2"/>
-          <path d="M70 112 C120 70 170 160 240 108" fill="none" stroke="#A97656" stroke-width="13" stroke-linecap="round"/>
-          <path d="M70 112 C120 70 170 160 240 108" fill="none" stroke="#F1C297" stroke-width="10" stroke-linecap="round"/>
-          <circle cx="246" cy="106" r="10" fill="#F3C3A1" stroke="#A97A63" stroke-width="2"/>
-          <rect x="276" y="86" width="16" height="34" rx="5" fill="#536269" stroke="#665447" stroke-width="2"/>
-          <circle cx="150" cy="60" r="12" fill="#F0CC65" stroke="#665447" stroke-width="2"/>
-        </svg>
-      </div>
-      <div class="body">
-        <div class="meta"><span>休閒 · 閃避</span><span class="chip">點我開始玩</span></div>
-        <h3>就差一點！沙發伸手大作戰</h3>
-        <p>懶得起身拿遙控器？那就把手伸長！上下閃過衛生紙、玩具熊、臭襪子，看你的手能伸多遠。</p>
-        <span class="gc-views" data-gc="href" data-gc-href="sofa-reach/" hidden></span>
       </div>
     </a>
 
