@@ -136,6 +136,7 @@ body.locked .unlock{display:grid}
 .pill{z-index:13;border:1.5px solid var(--accent);box-shadow:0 3px 14px rgba(0,0,0,.3);-webkit-transform:translate3d(-50%,0,0);transform:translate3d(-50%,0,0);padding:8px 16px 8px 12px}
 body.locked #bMenu,body.locked #bFit,body.locked .fabs-r,body.locked #bTray,body.locked .panel,body.locked .stagetools{display:none!important}
 @media (prefers-reduced-motion:reduce){*{transition:none!important}}
+.gc-views{position:fixed;z-index:11;left:max(12px,env(safe-area-inset-left,0px));bottom:calc(env(safe-area-inset-bottom,0px) + 18px);margin:0;padding:2px 8px;border-radius:999px;background:var(--surface);border:1px solid var(--line);color:var(--muted);font-size:11px;line-height:1.4;pointer-events:none;white-space:nowrap}
 </style>
 
 <div class="fabs-r" id="fabsR">
@@ -543,6 +544,8 @@ renderRecent();
 })();
 </script>
 
+<p class="gc-views" data-gc="page" hidden></p>
+<script src="../view-count.js"></script>
 <script data-goatcounter="https://sonnystudio.goatcounter.com/count"
         async src="//gc.zgo.at/count.js"></script>
 </body></html>
