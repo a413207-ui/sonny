@@ -56,7 +56,6 @@ button.go{font:inherit;font-weight:900;font-size:17px;border:0;border-radius:14p
 button.go.alt{background:transparent;color:var(--ink);border:1px solid var(--line);font-weight:700;font-size:15px}
 button.go:focus-visible{outline:2px solid var(--ink);outline-offset:3px}
 .home{color:var(--muted);font-size:13px;text-decoration:none}
-.gc-views{position:absolute;left:0;right:0;bottom:calc(10px + env(safe-area-inset-bottom,0px));margin:0;text-align:center;font-size:12px;color:var(--muted);pointer-events:none}
 .err{color:var(--neon)}
 @media (prefers-reduced-motion:reduce){.toast{transition:none}}
 </style>
@@ -72,7 +71,7 @@ button.go:focus-visible{outline:2px solid var(--ink);outline-offset:3px}
   <div class="hint" id="hint">按住酒杯往前一推，放手就滑出去</div>
   <div class="toast" id="toast"></div>
 </div>
-<div id="overlay"><div class="card" id="card"><div class="sign">推酒杯</div><p>載入中…</p></div><p class="gc-views" data-gc="page" hidden></p></div>
+<div id="overlay"><div class="card" id="card"><div class="sign">推酒杯</div><p>載入中…</p></div></div>
 
 <script>
 (function(){
@@ -360,7 +359,6 @@ menu();requestAnimationFrame(loop);
 })();
 </script>
 
-<script src="../view-count.js"></script>
 <script data-goatcounter="https://sonnystudio.goatcounter.com/count"
         async src="//gc.zgo.at/count.js"></script>
 </body>
