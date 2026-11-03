@@ -1,9 +1,17 @@
 // 怪物：資料用 struct-of-arrays 物件池，畫面用 InstancedMesh，碰撞用空間格子。
+// 怪物種類照 CONFIG.enemies 的順序編號；外觀分成 slime（Q 彈球）和 caterpillar（一串小球）兩種畫法，
+// 精英和王只是放大、換色的同一種畫法，所以整場怪物仍然只有 2 個 draw call。
 import * as THREE from './vendor/three.module.min.js';
 import { CONFIG } from './config.js';
 
-const TYPE_IDS = { slime: 0, caterpillar: 1 };
-const TYPE_KEYS = ['slime', 'caterpillar'];
+export const TYPE_KEYS = Object.keys(CONFIG.enemies);
+export const TYPE_IDS = Object.fromEntries(TYPE_KEYS.map((k, i) => [k, i]));
+const DEFS = TYPE_KEYS.map((k) => CONFIG.enemies[k]);
+const RENDER_CAT = DEFS.map((d) => (d.render === 'caterpillar' ? 1 : 0));
+const MASS = DEFS.map((d) => d.mass);
+const SCALE = DEFS.map((d) => d.scale || 1);
+const NO_DESPAWN = DEFS.map((d) => (d.noDespawn ? 1 : 0));
+const HEAVY = 20; // 質量超過這個值的怪（王）不會被小怪推開
 const CELL = 2.5;
 
 const _m = new THREE.Matrix4();
@@ -25,6 +33,11 @@ export class Enemies {
     this.kx = new Float32Array(max); // 擊退速度
     this.kz = new Float32Array(max);
     this.hp = new Float32Array(max);
+    this.maxHp = new Float32Array(max);
+    this.slow = new Float32Array(max); // 減速剩餘秒數
+    this.forced = new Uint8Array(max); // 1 = 由外部（王的招式）決定速度
+    this.fvx = new Float32Array(max);
+    this.fvz = new Float32Array(max);
     this.speed = new Float32Array(max);
     this.damage = new Float32Array(max);
     this.radius = new Float32Array(max);
@@ -32,6 +45,7 @@ export class Enemies {
     this.phase = new Float32Array(max);
     this.dead = new Uint8Array(max);
     this.uid = new Uint32Array(max); // 不會因交換位置而改變的編號
+    this.lastProj = new Uint32Array(max); // 最後打中它的子彈編號（貫穿子彈不重複打）
     this.nextUid = 1;
 
     const cat = CONFIG.enemies.caterpillar;
@@ -68,9 +82,8 @@ export class Enemies {
       mesh.frustumCulled = false;
       scene.add(mesh);
     }
-    this.colSlime = new THREE.Color(s.color);
-    this.colCat = new THREE.Color(cat.color);
-    this.colCatHead = new THREE.Color(cat.headColor);
+    this.colBody = DEFS.map((d) => new THREE.Color(d.color));
+    this.colHead = DEFS.map((d) => new THREE.Color(d.headColor ?? d.color));
   }
 
   reset() {
@@ -92,6 +105,9 @@ export class Enemies {
     this.z[i] = z;
     this.kx[i] = this.kz[i] = 0;
     this.hp[i] = def.hp * hpMult;
+    this.maxHp[i] = this.hp[i];
+    this.slow[i] = 0;
+    this.forced[i] = 0;
     this.speed[i] = def.speed * spdMult * (0.9 + Math.random() * 0.2);
     this.damage[i] = def.damage * dmgMult;
     this.radius[i] = def.radius;
@@ -99,8 +115,9 @@ export class Enemies {
     this.phase[i] = Math.random() * Math.PI * 2;
     this.dead[i] = 0;
     this.uid[i] = this.nextUid++;
-    if (typeKey === 'caterpillar') {
-      const sp = def.segmentSpacing;
+    this.lastProj[i] = 0;
+    if (RENDER_CAT[this.type[i]]) {
+      const sp = CONFIG.enemies.caterpillar.segmentSpacing * SCALE[this.type[i]];
       for (let k = 0; k < this.segs; k++) {
         this.segX[i * this.segs + k] = x - dirX * sp * k;
         this.segZ[i * this.segs + k] = z - dirZ * sp * k;
@@ -109,17 +126,32 @@ export class Enemies {
     return i;
   }
 
-  // 造成傷害；回傳是否打死
-  hit(i, amount, fromX, fromZ) {
+  // 精英／王一定要出得來：池子滿了就把最後一隻一般怪讓出來
+  spawnForced(typeKey, x, z, hpMult = 1) {
+    if (this.count >= this.max) {
+      for (let i = this.count - 1; i >= 0; i--) {
+        const d = DEFS[this.type[i]];
+        if (!d.elite && !d.boss) {
+          this.moveSlot(this.count - 1, i);
+          this.count--;
+          break;
+        }
+      }
+    }
+    return this.spawn(typeKey, x, z, hpMult, 1, 1);
+  }
+
+  // 造成傷害；回傳是否打死。kb = 擊退倍率
+  hit(i, amount, fromX, fromZ, kb = 1) {
     if (this.dead[i]) return false;
     this.hp[i] -= amount;
     this.flash[i] = CONFIG.enemyFlashTime;
     const dx = this.x[i] - fromX;
     const dz = this.z[i] - fromZ;
     const l = Math.hypot(dx, dz) || 1;
-    const mass = CONFIG.enemies[TYPE_KEYS[this.type[i]]].mass;
-    this.kx[i] += (dx / l) * CONFIG.knockback / mass;
-    this.kz[i] += (dz / l) * CONFIG.knockback / mass;
+    const k = (CONFIG.knockback * kb) / MASS[this.type[i]];
+    this.kx[i] += (dx / l) * k;
+    this.kz[i] += (dz / l) * k;
     if (this.hp[i] <= 0) {
       this.dead[i] = 1;
       return true;
@@ -129,6 +161,18 @@ export class Enemies {
 
   typeKey(i) {
     return TYPE_KEYS[this.type[i]];
+  }
+
+  // 找某一種怪的第一隻（王只有一隻），沒有回傳 -1
+  findType(typeKey) {
+    const t = TYPE_IDS[typeKey];
+    for (let i = 0; i < this.count; i++) if (this.type[i] === t && !this.dead[i]) return i;
+    return -1;
+  }
+
+  // 減速（取較長的那個）
+  applySlow(i, seconds) {
+    if (this.slow[i] < seconds) this.slow[i] = seconds;
   }
 
   buildGrid() {
@@ -205,14 +249,15 @@ export class Enemies {
       let dx = px - this.x[i];
       let dz = pz - this.z[i];
       const dist = Math.hypot(dx, dz) || 1;
-      if (dist > despawn) {
+      if (dist > despawn && !NO_DESPAWN[this.type[i]]) {
         respawn(i);
         continue;
       }
       dx /= dist;
       dz /= dist;
+      const t = this.type[i];
       // 毛蟲會左右扭動前進
-      if (this.type[i] === 1) {
+      if (RENDER_CAT[t]) {
         const wig = Math.sin(time * 4 + this.phase[i]) * 0.45;
         const tx = dx - dz * wig;
         const tz = dz + dx * wig;
@@ -220,8 +265,17 @@ export class Enemies {
         dx = tx / l;
         dz = tz / l;
       }
-      let vx = dx * this.speed[i];
-      let vz = dz * this.speed[i];
+      let spd = this.speed[i];
+      if (this.slow[i] > 0) {
+        this.slow[i] -= dt;
+        spd *= 0.5;
+      }
+      let vx = dx * spd;
+      let vz = dz * spd;
+      if (this.forced[i]) {
+        vx = this.fvx[i];
+        vz = this.fvz[i];
+      }
 
       // 分離：避免全部疊成一團
       const ri = this.radius[i];
@@ -229,7 +283,7 @@ export class Enemies {
       const zi = this.z[i];
       let sx = 0;
       let sz = 0;
-      this.query(xi, zi, ri, (j, d2) => {
+      if (MASS[t] < HEAVY) this.query(xi, zi, ri, (j, d2) => {
         if (j === i) return false;
         const rr = ri + this.radius[j];
         if (d2 < rr * rr && d2 > 1e-6) {
@@ -259,8 +313,9 @@ export class Enemies {
       this.z[i] = nz;
       if (this.flash[i] > 0) this.flash[i] -= dt;
 
-      if (this.type[i] === 1) {
+      if (RENDER_CAT[t]) {
         const b = i * this.segs;
+        const spacing = cat.segmentSpacing * SCALE[t];
         this.segX[b] = nx;
         this.segZ[b] = nz;
         for (let k = 1; k < this.segs; k++) {
@@ -269,8 +324,8 @@ export class Enemies {
           const ex = this.segX[b + k] - ax;
           const ez = this.segZ[b + k] - az;
           const l = Math.hypot(ex, ez) || 1;
-          this.segX[b + k] = ax + (ex / l) * cat.segmentSpacing;
-          this.segZ[b + k] = az + (ez / l) * cat.segmentSpacing;
+          this.segX[b + k] = ax + (ex / l) * spacing;
+          this.segZ[b + k] = az + (ez / l) * spacing;
         }
       }
     }
@@ -294,6 +349,11 @@ export class Enemies {
     this.kx[to] = this.kx[from];
     this.kz[to] = this.kz[from];
     this.hp[to] = this.hp[from];
+    this.maxHp[to] = this.maxHp[from];
+    this.slow[to] = this.slow[from];
+    this.forced[to] = this.forced[from];
+    this.fvx[to] = this.fvx[from];
+    this.fvz[to] = this.fvz[from];
     this.speed[to] = this.speed[from];
     this.damage[to] = this.damage[from];
     this.radius[to] = this.radius[from];
@@ -301,6 +361,7 @@ export class Enemies {
     this.phase[to] = this.phase[from];
     this.dead[to] = this.dead[from];
     this.uid[to] = this.uid[from];
+    this.lastProj[to] = this.lastProj[from];
     const s = this.segs;
     this.segX.copyWithin(to * s, from * s, from * s + s);
     this.segZ.copyWithin(to * s, from * s, from * s + s);
@@ -318,15 +379,15 @@ export class Enemies {
   }
 
   syncMeshes(time) {
-    const slime = CONFIG.enemies.slime;
     const cat = CONFIG.enemies.caterpillar;
     let ns = 0;
     let nc = 0;
     for (let i = 0; i < this.count; i++) {
       const flashing = this.flash[i] > 0;
-      if (this.type[i] === 0) {
-        // 史萊姆：Q 彈的上下壓扁動畫
-        const r = slime.radius;
+      const t = this.type[i];
+      if (!RENDER_CAT[t]) {
+        // 史萊姆：Q 彈的上下壓扁動畫（大小跟著碰撞半徑）
+        const r = this.radius[i];
         const b = Math.sin(time * 6 + this.phase[i]);
         const sy = r * (0.8 + 0.12 * b);
         const sxz = r * (1.05 - 0.08 * b);
@@ -335,19 +396,20 @@ export class Enemies {
         _q.identity();
         _m.compose(_p, _q, _s);
         this.slimeMesh.setMatrixAt(ns, _m);
-        this.slimeMesh.setColorAt(ns, flashing ? _white : this.colSlime);
+        this.slimeMesh.setColorAt(ns, flashing ? _white : this.colBody[t]);
         ns++;
       } else {
         const base = i * this.segs;
+        const sc = SCALE[t];
         for (let k = 0; k < this.segs; k++) {
-          const r = k === 0 ? cat.segmentRadius * 1.15 : cat.segmentRadius * (1 - k * 0.06);
-          const hop = Math.abs(Math.sin(time * 8 + this.phase[i] - k * 0.8)) * 0.12;
+          const r = sc * (k === 0 ? cat.segmentRadius * 1.15 : cat.segmentRadius * (1 - k * 0.06));
+          const hop = Math.abs(Math.sin(time * 8 + this.phase[i] - k * 0.8)) * 0.12 * sc;
           _p.set(this.segX[base + k], r + hop, this.segZ[base + k]);
           _s.set(r, r, r);
           _q.setFromAxisAngle(_yAxis, 0);
           _m.compose(_p, _q, _s);
           this.segMesh.setMatrixAt(nc, _m);
-          _c.copy(k === 0 ? this.colCatHead : this.colCat);
+          _c.copy(k === 0 ? this.colHead[t] : this.colBody[t]);
           this.segMesh.setColorAt(nc, flashing ? _white : _c);
           nc++;
         }

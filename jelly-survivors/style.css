@@ -92,8 +92,116 @@ html, body {
   color: #fff;
   font-size: 16px;
 }
-#slots { margin-top: 6px; display: flex; flex-wrap: wrap; gap: 4px; font-size: 12px; }
-#slots .slot { background: rgba(0, 0, 0, 0.35); border-radius: 6px; padding: 1px 6px; }
+#gold { color: #ffe27a; }
+
+/* ---------- 王血條 ---------- */
+#bossbar { width: min(460px, 70vw); margin: 6px auto 0; text-align: center; }
+#bossbar .name { font-size: 13px; font-weight: 900; color: #ffd6ff; letter-spacing: 1px; }
+#bossbar .bar { position: relative; height: 12px; border-radius: 6px; background: rgba(0, 0, 0, 0.5); border: 1px solid rgba(255, 210, 255, 0.7); overflow: hidden; }
+#bossbar .fill { background: linear-gradient(90deg, #b07cff, #ff6ad5); width: 100%; }
+
+/* ---------- 左側被動數值 ---------- */
+#passives {
+  position: fixed;
+  left: calc(env(safe-area-inset-left) + 8px);
+  top: calc(env(safe-area-inset-top) + 66px);
+  z-index: 4;
+  pointer-events: none;
+  min-width: 108px;
+  padding: 6px 8px;
+  border-radius: 10px;
+  background: rgba(0, 0, 0, 0.28);
+  font-size: 12px;
+  line-height: 1.45;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.6);
+}
+#passives .job { font-weight: 900; color: #ffe7a8; margin-bottom: 2px; }
+#passives .pv { display: flex; justify-content: space-between; gap: 10px; }
+#passives .pv b { font-variant-numeric: tabular-nums; color: #bff3ff; }
+#passives .pv.zero { opacity: 0.55; }
+#passives .pv.potion { margin-top: 2px; color: #ffc2f0; justify-content: flex-start; }
+
+/* ---------- 下方技能欄（主動 6 格）---------- */
+#skillbar {
+  --sk: min(54px, calc((100vw - 64px) / 6 - 6px));
+  position: fixed;
+  left: 50%;
+  bottom: calc(env(safe-area-inset-bottom) + 8px);
+  transform: translateX(-50%);
+  z-index: 4;
+  display: flex;
+  gap: 6px;
+  padding: 5px;
+  border-radius: 12px;
+  background: rgba(0, 0, 0, 0.3);
+  pointer-events: none; /* 不攔觸控：在技能欄上拖曳一樣能叫出搖桿 */
+}
+.sk {
+  position: relative;
+  width: var(--sk);
+  height: var(--sk);
+  border-radius: 10px;
+  border: 2px solid rgba(255, 255, 255, 0.75);
+  background: rgba(20, 30, 40, 0.55);
+  overflow: hidden;
+}
+.sk.empty { border-style: dashed; border-color: rgba(255, 255, 255, 0.35); background: rgba(0, 0, 0, 0.18); }
+.sk .ic { position: absolute; inset: 0; }
+.sk .cd {
+  position: absolute;
+  inset: 0;
+  --cd: 0;
+  background: conic-gradient(rgba(0, 0, 0, 0.62) calc(var(--cd) * 360deg), transparent 0);
+}
+.sk .lv {
+  position: absolute;
+  right: 2px;
+  bottom: 1px;
+  font-size: 11px;
+  font-weight: 900;
+  line-height: 1;
+  padding: 1px 3px;
+  border-radius: 4px;
+  background: rgba(0, 0, 0, 0.6);
+}
+
+/* 技能圖示：PNG 載入成功就蓋住文字縮寫 */
+.skicon {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: radial-gradient(circle at 35% 30%, rgba(255, 255, 255, 0.45), transparent 60%), var(--c);
+  border-radius: inherit;
+}
+.skicon .abbr { font-weight: 900; font-size: calc(var(--sk, 48px) * 0.5); color: #fff; text-shadow: 0 1px 3px rgba(0, 0, 0, 0.6); }
+.skicon img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: contain; }
+.skicon.has-img { background: transparent; }
+.skicon.has-img .abbr { display: none; }
+
+/* ---------- 提示橫幅 ---------- */
+#banner {
+  position: fixed;
+  left: 50%;
+  top: 26%;
+  transform: translateX(-50%);
+  z-index: 6;
+  pointer-events: none;
+  padding: 8px 18px;
+  border-radius: 99px;
+  background: rgba(60, 20, 60, 0.75);
+  border: 2px solid #ffb0f0;
+  font-size: 18px;
+  font-weight: 900;
+  white-space: nowrap;
+  max-width: 94vw;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  animation: pop 0.25s ease-out;
+}
+@keyframes pop { from { transform: translateX(-50%) scale(0.7); opacity: 0; } }
 
 /* ---------- 疊加畫面 ---------- */
 .overlay {
@@ -181,9 +289,66 @@ h2 { margin: 0 0 14px; font-size: 26px; }
 
 .card .body { display: flex; flex-direction: column; align-items: center; gap: 6px; }
 
+/* 卡片上的技能圖示 */
+.card .icon .skicon { --sk: 64px; width: 64px; height: 64px; border-radius: 14px; }
+
+/* ---------- 轉職 ---------- */
+#jobs { display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; }
+.card.job { border-color: var(--jc); background: linear-gradient(180deg, #ffffff, #f0eaff); min-height: 0; }
+.card.job .title { color: var(--jc); filter: brightness(0.8); }
+.jobskills { display: flex; flex-direction: column; gap: 6px; margin-top: 6px; width: 100%; }
+.jobskill { display: flex; align-items: center; gap: 8px; font-weight: 800; font-size: 14px; }
+.jobskill .skicon { --sk: 30px; width: 30px; height: 30px; border-radius: 8px; flex: none; }
+
+/* ---------- 遺忘藥水 / 局外升級 ---------- */
+.potion-btn { color: #ffd6f6 !important; border-color: #ffb0f0 !important; }
+.btn.small { width: auto; display: inline-block; padding: 8px 18px; font-size: 15px; margin-top: 12px; }
+#forget-list { display: grid; gap: 8px; }
+.forget-item, .shop-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 8px 10px;
+  border-radius: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.35);
+  background: rgba(0, 0, 0, 0.25);
+  color: #fff;
+  font: inherit;
+  font-weight: 800;
+  text-align: left;
+}
+.forget-item { cursor: pointer; }
+.forget-item:hover { border-color: #ffb0f0; }
+.forget-item .skicon { --sk: 40px; width: 40px; height: 40px; border-radius: 10px; flex: none; }
+.panel.wide { width: min(520px, 100%); }
+.goldline { font-size: 20px; margin: 4px 0 10px; color: #ffe27a; }
+#shop-list { display: grid; gap: 8px; }
+.shop-row .sicon { font-size: 26px; width: 34px; text-align: center; }
+.shop-row .sinfo { flex: 1; display: flex; flex-direction: column; }
+.shop-row small { font-weight: 400; opacity: 0.85; }
+.shop-row .buy {
+  min-width: 82px;
+  padding: 8px 10px;
+  border: none;
+  border-radius: 10px;
+  font: inherit;
+  font-weight: 900;
+  color: #3a2a10;
+  background: linear-gradient(180deg, #ffe9a0, #ffc94a);
+  cursor: pointer;
+}
+.shop-row .buy:disabled { background: rgba(255, 255, 255, 0.2); color: rgba(255, 255, 255, 0.6); cursor: default; }
+.note { font-size: 13px; background: rgba(255, 120, 120, 0.25); border-radius: 8px; padding: 6px 10px; }
+
 /* 直式 / 窄畫面：卡片改成直向排列、橫長條 */
 @media (max-width: 640px), (orientation: portrait) {
-  #cards { grid-template-columns: 1fr; gap: 10px; }
+  #cards, #jobs { grid-template-columns: 1fr; gap: 10px; }
+  .card.job { padding-left: 40px; }
+  .jobskills { flex-direction: row; flex-wrap: wrap; gap: 4px 10px; }
+  .jobskill { font-size: 12px; }
+  .card .icon .skicon { --sk: 48px; width: 48px; height: 48px; }
+  #passives { font-size: 11px; min-width: 96px; padding: 4px 6px; }
   .card { min-height: 0; flex-direction: row; text-align: left; padding: 14px 14px 14px 40px; gap: 12px; }
   .card .icon { font-size: 38px; }
   .card .body { align-items: flex-start; gap: 4px; }
@@ -191,9 +356,16 @@ h2 { margin: 0 0 14px; font-size: 26px; }
 }
 @media (max-height: 460px) and (orientation: landscape) {
   .card { min-height: 0; padding: 12px 10px; gap: 4px; }
+  .card .icon .skicon { --sk: 44px; width: 44px; height: 44px; }
+  .card .desc { font-size: 13px; }
+  .jobskill { font-size: 12px; }
+  .jobskill .skicon { --sk: 22px; width: 22px; height: 22px; }
+  #passives { font-size: 11px; line-height: 1.3; top: calc(env(safe-area-inset-top) + 60px); }
+  #skillbar { --sk: 46px; }
+  .levelup-wrap .sub { margin-bottom: 6px; font-size: 13px; }
   .card .icon { font-size: 34px; }
   h2 { font-size: 20px; margin-bottom: 8px; }
   .panel { padding: 14px; }
   .btn { padding: 10px; }
 }
-#debug { position: fixed; left: 8px; bottom: 8px; font: 12px/1.3 monospace; background: rgba(0,0,0,.5); padding: 4px 6px; border-radius: 4px; z-index: 4; pointer-events: none; }
+#debug { position: fixed; right: 8px; bottom: 80px; font: 12px/1.3 monospace; background: rgba(0,0,0,.5); padding: 4px 6px; border-radius: 4px; z-index: 4; pointer-events: none; }
