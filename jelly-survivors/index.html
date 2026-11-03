@@ -1,0 +1,72 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover" />
+  <meta name="theme-color" content="#6fae55" />
+  <title>果凍大陸：轉職倖存者</title>
+  <link rel="stylesheet" href="./style.css" />
+</head>
+<body>
+  <div id="game"></div>
+
+  <div id="joystick"><div class="knob"></div></div>
+
+  <div id="hud" class="hidden">
+    <div class="xpbar"><div class="fill" id="xp-fill"></div><span id="level">Lv 1</span></div>
+    <div class="row">
+      <div class="hpbar"><div class="fill" id="hp-fill"></div><span id="hp-text">100 / 100</span></div>
+      <div id="timer">00:00</div>
+      <div class="right">
+        <span id="kills">💀 0</span>
+        <button id="pause-btn" aria-label="暫停">⏸</button>
+      </div>
+    </div>
+    <div id="slots"></div>
+  </div>
+
+  <div id="start" class="overlay">
+    <div class="panel">
+      <h1>果凍大陸<br /><small>轉職倖存者</small></h1>
+      <p class="sub">第 1 關・果凍平原 —— 撐過 10:00！</p>
+      <ul class="help">
+        <li>電腦：WASD / 方向鍵移動，Esc 暫停，升級時按 1–3 選卡</li>
+        <li>手機：在畫面任一處按住拖曳，出現搖桿</li>
+        <li>攻擊是自動的，你只要負責走位</li>
+      </ul>
+      <button class="btn" id="start-btn">開始</button>
+    </div>
+  </div>
+
+  <div id="pause" class="overlay hidden">
+    <div class="panel">
+      <h2>暫停</h2>
+      <button class="btn" id="resume-btn">繼續</button>
+      <button class="btn ghost" id="restart-btn">重新開始</button>
+    </div>
+  </div>
+
+  <div id="levelup" class="overlay hidden">
+    <div class="levelup-wrap">
+      <h2>升級！選一個</h2>
+      <div id="cards"></div>
+    </div>
+  </div>
+
+  <div id="result" class="overlay hidden">
+    <div class="panel">
+      <h2 id="result-title">Game Over</h2>
+      <div class="stats">
+        <div><span>存活時間</span><b id="r-time">00:00</b></div>
+        <div><span>擊殺數</span><b id="r-kills">0</b></div>
+        <div><span>等級</span><b id="r-level">1</b></div>
+      </div>
+      <button class="btn" id="again-btn">重新開始</button>
+    </div>
+  </div>
+
+  <script type="module" src="./main.js"></script>
+  <script data-goatcounter="https://sonnystudio.goatcounter.com/count"
+          async src="//gc.zgo.at/count.js"></script>
+</body>
+</html>
