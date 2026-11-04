@@ -1,7 +1,7 @@
 // 怪物：資料用 struct-of-arrays 物件池，畫面用 InstancedMesh，碰撞用空間格子。
 // 怪物種類照 CONFIG.enemies 的順序編號；外觀分成 slime（Q 彈球）和 caterpillar（一串小球）兩種畫法，
 // 精英和王只是放大、換色的同一種畫法，所以整場怪物仍然只有 2 個 draw call。
-import * as THREE from './vendor/three.module.min.js';
+import * as THREE from 'three';
 import { CONFIG } from './config.js';
 
 export const TYPE_KEYS = Object.keys(CONFIG.enemies);

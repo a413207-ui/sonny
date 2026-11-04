@@ -1,5 +1,5 @@
 // 遊戲主程式：狀態機、遊戲迴圈、出怪、玩家、經驗與升級、HUD。
-import * as THREE from './vendor/three.module.min.js';
+import * as THREE from 'three';
 import { CONFIG } from './config.js';
 import { World } from './world.js';
 import { Input } from './input.js';
@@ -10,6 +10,8 @@ import { Upgrades, cardText, jobSkillUnlockLevel } from './upgrades.js';
 import { Pickups } from './pickups.js';
 import { BossAI } from './boss.js';
 import { SaveStore } from './save.js';
+import { SkillFx } from './vfx/skill-fx.js';
+import { QUALITY } from './vfx/system.js';
 
 const $ = (id) => document.getElementById(id);
 const params = new URLSearchParams(location.search);
@@ -54,6 +56,10 @@ class Game {
     this.save = new SaveStore();
     this.player = this.createPlayer();
     this.skills = createSkills(this);
+    // 00GameDevs 技能特效（純視覺）。初心者的特效在標題畫面載入＋預熱，職業特效轉職後才載入。
+    this.skillFx = new SkillFx(this);
+    this.world.vfx = this.skillFx.sys;
+    this.simDt = 0;
     this.boss = new BossAI(this);
     this.pickOut = { gold: 0, potions: 0 };
     this.buildSkillbar();
@@ -65,6 +71,19 @@ class Game {
       else if (this.state === 'jobchange') this.chooseJob(n);
     };
     $('start-btn').onclick = () => this.start();
+    this.vfxReady = false;
+    $('start-btn').disabled = true;
+    $('start-btn').textContent = '特效載入中…';
+    this.skillFx
+      .prepare('novice')
+      .catch((e) => console.warn('特效載入失敗，改用簡單特效', e))
+      .finally(() => {
+        this.vfxReady = true;
+        $('start-btn').disabled = false;
+        $('start-btn').textContent = '開始';
+      });
+    for (const b of document.querySelectorAll('#vfx-quality button')) b.onclick = () => this.setVfxQuality(b.dataset.q);
+    this.updateQualityButtons();
     $('pause-btn').onclick = () => this.togglePause();
     $('resume-btn').onclick = () => this.togglePause();
     $('restart-btn').onclick = () => this.start();
@@ -81,7 +100,7 @@ class Game {
       if (document.hidden && this.state === 'playing') this.togglePause();
     });
     window.addEventListener('keydown', (e) => {
-      if (this.state === 'title' && (e.code === 'Enter' || e.code === 'Space')) this.start();
+      if (this.state === 'title' && this.vfxReady && (e.code === 'Enter' || e.code === 'Space')) this.start();
     });
 
     if (DEBUG) {
@@ -134,6 +153,7 @@ class Game {
     this.pickups.reset();
     this.boss.reset();
     this.upgrades.reset();
+    this.skillFx?.reset();
     for (const s of Object.values(this.skills)) {
       s.reset();
       s.setLevel(0);
@@ -219,6 +239,7 @@ class Game {
     const realDt = Math.min(0.05, (now - this.last) / 1000);
     this.last = now;
     this.time += realDt;
+    this.simDt = this.state === 'playing' ? realDt * this.timeScale : 0; // 特效跟著遊戲時間走，暫停時停住
     if (this.state === 'playing') {
       // 慢的裝置拆成小步，避免穿透
       let remaining = realDt * this.timeScale;
@@ -308,6 +329,7 @@ class Game {
     const x = en.x[i];
     const z = en.z[i];
     this.kills++;
+    this.skillFx.death(x, z, def.radius);
     if (def.boss) {
       this.bossKilled = true;
       this.boss.onDeath();
@@ -424,6 +446,7 @@ class Game {
   // ---------- 經驗 / 升級 ----------
   addXp(v) {
     this.xp += v;
+    if (this.xp >= this.xpNeed) this.skillFx.levelUp();
     while (this.xp >= this.xpNeed) {
       this.xp -= this.xpNeed;
       this.level++;
@@ -538,7 +561,7 @@ class Game {
 
   chooseJob(n) {
     const id = this.jobIds?.[n];
-    if (!id || this.state !== 'jobchange') return;
+    if (!id || this.state !== 'jobchange' || this.jobLoading) return;
     if (performance.now() - this.levelUpOpenedAt < 250) return;
     const job = CONFIG.job.classes[id];
     this.upgrades.job = id;
@@ -548,8 +571,47 @@ class Game {
     if (this.upgrades.skills.size < CONFIG.slots.skills) this.upgrades.apply({ kind: 'skill', id: first, nextLevel: 1 });
     this.applyStatChange();
     this.showBanner(`轉職成功：${job.name}！`);
-    this.setState('playing');
-    if (this.pendingLevels > 0) this.openLevelUp();
+    // 職業特效在這時才載入＋預熱（停在轉職畫面等它好，戰鬥中就不會建立新特效）
+    if (this.skillFx.ready.has(id)) {
+      // 之前（例如上一局）已經載好：直接繼續
+      this.skillFx.setJobColor(id);
+      this.setState('playing');
+      if (this.pendingLevels > 0) this.openLevelUp();
+      return;
+    }
+    this.jobLoading = true;
+    $('job-loading').classList.remove('hidden');
+    this.skillFx
+      .prepare(id)
+      .then(() => this.skillFx.setJobColor(id))
+      .catch((e) => console.warn('職業特效載入失敗，改用簡單特效', e))
+      .finally(() => {
+        this.jobLoading = false;
+        $('job-loading').classList.add('hidden');
+        if (this.state !== 'jobchange') return;
+        this.setState('playing');
+        if (this.pendingLevels > 0) this.openLevelUp();
+      });
+  }
+
+  // ---------- 特效品質（暫停畫面）----------
+  async setVfxQuality(q) {
+    if (!QUALITY[q] || this.qualityBusy) return;
+    this.qualityBusy = true;
+    try {
+      await this.skillFx.setQuality(q);
+    } finally {
+      this.qualityBusy = false;
+      this.updateQualityButtons();
+    }
+  }
+
+  updateQualityButtons() {
+    for (const b of document.querySelectorAll('#vfx-quality button')) {
+      const on = b.dataset.q === this.skillFx.quality;
+      b.classList.toggle('on', on);
+      b.setAttribute('aria-pressed', String(on));
+    }
   }
 
   // ---------- 遺忘藥水 ----------
@@ -685,6 +747,7 @@ class Game {
     this.gems.syncMesh(this.time);
     this.pickups.syncMesh(this.time);
     for (const s of Object.values(this.skills)) s.syncMesh?.(this.time);
+    this.skillFx.sync(this.simDt, this.time); // 要在 syncMesh 之後：有特效的子彈會把原本的幾何藏起來
     this.boss.syncMesh(this.time);
     if (this.bannerUntil && this.time > this.bannerUntil) {
       this.bannerUntil = 0;
@@ -839,7 +902,8 @@ class Game {
       this.fpsAcc = 0;
       this.fpsFrames = 0;
       if (this.debugEl) {
-        this.debugEl.textContent = `FPS ${this.fps.toFixed(0)} | 怪 ${this.enemies.count}/${this.enemies.max} | 寶石 ${this.gems.count} | 階 ${this.tier}`;
+        const fx = this.skillFx.sys;
+        this.debugEl.textContent = `FPS ${this.fps.toFixed(0)} | 怪 ${this.enemies.count}/${this.enemies.max} | 寶石 ${this.gems.count} | 階 ${this.tier} | 特效 ${fx.activeCount}（${QUALITY[fx.quality].label}）`;
       }
     }
   }

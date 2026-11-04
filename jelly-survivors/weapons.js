@@ -1,7 +1,8 @@
 // 招式：依 CONFIG.skills[id].type 選用下面的 class；新招式通常只要在 config.js 加一筆資料。
 // 介面：constructor(game, id) / setLevel(lv) / update(dt) / reset() / cooldownFrac() / syncMesh?(time)
 //   cooldownFrac()：0 = 冷卻好了，1 = 剛放完（技能欄的轉圈遮罩用）
-import * as THREE from './vendor/three.module.min.js';
+// game.skillFx?.xxx(...)：通知 src/vfx/skill-fx.js 播 00GameDevs 特效（純視覺，不影響傷害與判定）
+import * as THREE from 'three';
 import { CONFIG } from './config.js';
 
 const DEG = Math.PI / 180;
@@ -112,6 +113,7 @@ class Slash {
     f.pivot.visible = true;
     f.range = range;
     f.t = 0;
+    g.skillFx?.slash(dx, dz, range, f);
   }
 }
 
@@ -472,6 +474,7 @@ class Aura {
     this.fxT = 0;
     this.fxR = R;
     this.fx.visible = true;
+    g.skillFx?.aura(this.id, R, this);
   }
 
   syncMesh(time) {
@@ -550,6 +553,7 @@ class Strike {
           g.damageEnemy(e, s.dmg, s.x, s.z);
           return false;
         });
+        g.skillFx?.strikeBoom(this.id, s);
       }
       if (s.boom >= 0) {
         s.boom += dt;
@@ -573,6 +577,7 @@ class Strike {
       s.z = en.z[t];
       s.r = d.radius[L] * g.stats.areaMult;
       s.dmg = d.damage[L] * g.stats.damageMult;
+      g.skillFx?.strikeMark(this.id, s);
       fired++;
     }
     this.timer = fired ? (this.cd = d.cooldown[L] * g.stats.cooldownMult) : 0.3;

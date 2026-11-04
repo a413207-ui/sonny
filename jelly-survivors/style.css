@@ -246,6 +246,24 @@ h2 { margin: 0 0 14px; font-size: 26px; }
   cursor: pointer;
 }
 .btn.ghost { background: rgba(255, 255, 255, 0.15); color: #fff; border: 1px solid rgba(255, 255, 255, 0.5); }
+.btn:disabled { opacity: 0.6; cursor: wait; }
+
+/* 暫停畫面：特效品質 高／中／低 */
+.vfxq { display: flex; align-items: center; gap: 8px; margin: 12px 0 2px; }
+.vfxq span { flex: 1; text-align: left; font-weight: 700; }
+.vfxq button {
+  min-width: 52px;
+  padding: 9px 0;
+  font-size: 16px;
+  font-weight: 800;
+  color: #fff;
+  background: rgba(255, 255, 255, 0.12);
+  border: 1px solid rgba(255, 255, 255, 0.45);
+  border-radius: 10px;
+  cursor: pointer;
+}
+.vfxq button.on { color: #10303a; background: linear-gradient(180deg, #ffe7a8, #f0c860); border-color: transparent; }
+#job-loading { margin: 12px 0 0; }
 .stats { display: grid; gap: 8px; margin-bottom: 8px; }
 .stats div { display: flex; justify-content: space-between; background: rgba(0, 0, 0, 0.25); padding: 10px 14px; border-radius: 10px; }
 .stats b { font-size: 18px; }
