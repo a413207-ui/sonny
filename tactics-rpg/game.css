@@ -1,0 +1,38 @@
+/* 試玩戰鬥畫面（編輯器與匯出遊戲共用）。只用系統字型。 */
+.bv { position: relative; display: flex; flex-direction: column; height: 100%; min-height: 0; color: #eee; background: #1b1d26;
+  font-family: system-ui, -apple-system, "Segoe UI", "PingFang TC", "Microsoft JhengHei", "Noto Sans TC", sans-serif; font-size: 14px; }
+.bv button { font: inherit; padding: 6px 12px; border-radius: 6px; border: 1px solid #556; background: #2e3242; color: #eee; cursor: pointer; }
+.bv button:hover:not(:disabled) { background: #3c4258; }
+.bv button:disabled { opacity: .45; cursor: default; }
+.bv-top { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; padding: 6px 8px; background: #262a36; border-bottom: 1px solid #333a4a; }
+.bv-phase { padding: 2px 8px; border-radius: 10px; color: #fff; font-weight: bold; }
+.bv-spacer { flex: 1; }
+.bv-main { flex: 1; display: flex; min-height: 0; }
+.bv-stage { position: relative; flex: 1; min-width: 0; min-height: 240px; overflow: hidden; touch-action: none; }
+.bv-canvas { display: block; touch-action: none; cursor: pointer; }
+.bv-menu { position: absolute; right: 8px; bottom: 8px; display: flex; gap: 6px; }
+.bv-menu button { background: #3a4a7a; border-color: #6a7ab0; padding: 8px 16px; font-weight: bold; }
+.bv-hint { position: absolute; left: 8px; top: 8px; padding: 3px 8px; border-radius: 6px; background: rgba(0,0,0,.55); pointer-events: none; font-size: 13px; }
+.bv-hint:empty { display: none; }
+.bv-side { width: 300px; display: flex; flex-direction: column; gap: 8px; padding: 8px; background: #20232e; border-left: 1px solid #333a4a; overflow: auto; }
+.bv-unit { display: flex; gap: 8px; align-items: center; }
+.bv-portrait { width: 48px; height: 48px; image-rendering: pixelated; border: 1px solid #556; border-radius: 4px; }
+.bv-tag { display: inline-block; padding: 0 6px; border-radius: 8px; color: #fff; font-size: 12px; }
+.bv-stats, .bv-terrain { margin-top: 4px; line-height: 1.6; }
+.bv-muted { color: #889; }
+.bv-forecast { padding: 6px 8px; border: 1px solid #e8584a; border-radius: 6px; background: #2c1f24; line-height: 1.6; }
+.bv-logwrap summary { cursor: pointer; font-weight: bold; }
+.bv-log { margin: 4px 0 0; padding-left: 18px; max-height: 260px; overflow: auto; font-size: 12px; line-height: 1.5; color: #ccd; }
+.bv-result { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; background: rgba(0,0,0,.6); z-index: 5; }
+.bv-result-box { padding: 24px 32px; border-radius: 12px; background: #262a36; border: 1px solid #556; text-align: center; }
+.bv-result h2 { margin: 0 0 8px; font-size: 32px; }
+.bv-result h2.win { color: #f0c830; }
+.bv-result h2.lose { color: #e8584a; }
+.bv-result-btns { display: flex; gap: 8px; justify-content: center; flex-wrap: wrap; margin-top: 12px; }
+.hidden { display: none !important; }
+@media (max-width: 760px) {
+  .bv-main { flex-direction: column; }
+  .bv-stage { flex: 1 1 60%; }
+  .bv-side { width: auto; border-left: 0; border-top: 1px solid #333a4a; flex: 0 0 auto; max-height: 38vh; }
+  .bv-log { max-height: 120px; }
+}
