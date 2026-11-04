@@ -4,30 +4,36 @@ import {
   GROWTH, HAPPINESS, ECON, FACILITIES, LINES, FINANCE, MILESTONES, UNDO_LIMIT, TIME,
   TRANSPORT, ERA_UPGRADES, OBSOLETE, FACILITY_REBUILD, LANDMARK, ERA_EVENTS, REGION_TYPES, REGIONS, REGION_INCOME,
   SPECIAL_EFFECTS, VICTORY, BUILDING_STYLES, SAVE_VERSION, RAIL, ELEVATED,
+  TAX, BUDGET, CRIME, HEALTH, TRAFFIC, LAND_VALUE, POLLUTION,
 } from './config.js';
+import { allocServices, updateServices, eduLevelCap } from './services.js';
 
 // 建築編號（存檔用，只能往後加，不能改舊的）
 export const BLD = {
   NONE: 0, PORT: 1, WELL: 2, WATERWORKS: 3, COAL: 4, LIGHTHOUSE: 5, STATION: 6,
   WATERPOINT: 7, PURIFIER: 8, HYDRO: 9, NUCLEAR: 10, MODERNPLANT: 11, DAM: 12, EPZ: 13, SKYSCRAPER: 14, RAILSTOP: 15,
+  SHUFANG: 16, GONGXUE: 17, MIDDLE: 18, UNIVERSITY: 19, BAOJIA: 20, PAICHU: 21, POLICEHQ: 22, HERBAL: 23, HOSPITAL: 24, MEDCENTER: 25,
 };
-export const BLD_KEY = [null, 'port', 'well', 'waterworks', 'coal', 'lighthouse', 'station', 'waterpoint', 'purifier', 'hydro', 'nuclear', 'modernplant', 'dam', 'epz', 'skyscraper', 'railstop'];
+export const BLD_KEY = [null, 'port', 'well', 'waterworks', 'coal', 'lighthouse', 'station', 'waterpoint', 'purifier', 'hydro', 'nuclear', 'modernplant', 'dam', 'epz', 'skyscraper', 'railstop',
+  'shufang', 'gongxue', 'middle', 'university', 'baojia', 'paichu', 'policehq', 'herbal', 'hospital', 'medcenter'];
 export const KEY_BLD = Object.fromEntries(BLD_KEY.map((k, i) => [k, i]).filter(([k]) => k));
 export const ZONE = { NONE: 0, R: 1, C: 2, I: 3 };
 export const ZONE_KEY = [null, 'R', 'C', 'I'];
 // 每格存的圖層（u8）；pop 另外是 u16
 // bera：這格建築是「哪個時代的樣式」（0 = 沒有）；trans：道路上的交通升級（TRANSPORT.level）；metro：捷運
-// rail：鐵路（1 = 鐵軌、2 = 鐵橋）；elev：這格的道路是高架（底下可以蓋東西，柱子格除外）
-export const U8_LAYERS = ['road', 'zone', 'level', 'bld', 'pipe', 'wire', 'bera', 'trans', 'metro', 'rail', 'elev'];
+// rail：鐵路（1 = 鐵軌、2 = 鐵橋）；relev：這格的鐵路是高架
+// elev：高架道路（1 = 只有高架、2 = 高架＋底下的地面道路，兩層交叉）。高架底下可以蓋東西（柱子格除外）
+export const U8_LAYERS = ['road', 'zone', 'level', 'bld', 'pipe', 'wire', 'bera', 'trans', 'metro', 'rail', 'elev', 'relev'];
 export const TOOLS = ['road', 'rail', 'R', 'C', 'I', ...Object.keys(FACILITIES), 'pipe', 'wire', ...Object.keys(TRANSPORT), 'bulldoze'];
 const LINE_TOOLS = new Set(['road', 'rail', 'pipe', 'wire', ...Object.keys(TRANSPORT)]);
-// 可以蓋成高架的工具（任何道路種類）
-export const ELEVATABLE = new Set(['road', ...Object.keys(TRANSPORT).filter((k) => TRANSPORT[k].on === 'road')]);
+// 可以蓋成高架的工具（任何道路種類＋鐵路）
+export const ELEVATABLE = new Set(['road', 'rail', ...Object.keys(TRANSPORT).filter((k) => TRANSPORT[k].on === 'road')]);
 const RECT_TOOLS = new Set(['R', 'C', 'I', 'bulldoze']);
 const WATER_KEYS = Object.keys(FACILITIES).filter((k) => FACILITIES[k].kind === 'water' || FACILITIES[k].water);
 const POWER_KEYS = Object.keys(FACILITIES).filter((k) => FACILITIES[k].kind === 'power');
 const SPECIAL_KEYS = Object.keys(FACILITIES).filter((k) => FACILITIES[k].specialOf);
 
+const z0 = (g, i) => g.zone[i];
 export const landPrice = (n) => Math.round(LAND.base * LAND.ratio ** (n - 1));
 export const eraInfo = (era) => ERAS[era - 1];
 const clamp = (v, a, b) => (v < a ? a : v > b ? b : v);
@@ -90,8 +96,11 @@ export class Sim {
     this.transit = new Uint8Array(n);     // 交通加成（百分比）
     this.plantPen = new Int8Array(n);     // 電廠附近的幸福度扣分
     this.landmark = new Uint8Array(n);    // 地標加分
-    this.pillar = new Uint8Array(n);      // 高架柱子
+    this.pillar = new Uint8Array(n);      // 高架道路的柱子
+    this.railPillar = new Uint8Array(n);  // 高架鐵路的柱子
     this.railActive = new Uint8Array(n);  // 連到車站的鐵路
+    this.accessRoad = new Int32Array(n).fill(-1); // 區塊進出用的地面道路格
+    allocServices(this);                  // 教育、警力、醫療、污染、健康、犯罪、地價、車流（services.js）
     this.stamp = new Int32Array(n);
     this.stampId = 0;
     this.zoneList = [];
@@ -132,6 +141,11 @@ export class Sim {
     if (!Array.isArray(s.effects)) s.effects = [];
     if (!s.eventsDone || typeof s.eventsDone !== 'object') s.eventsDone = {};
     if (s.victory === undefined) s.victory = null;
+    // 第三版：稅率與預算
+    if (!s.taxRates || typeof s.taxRates !== 'object') s.taxRates = {};
+    for (const z of ['R', 'C', 'I']) if (!Number.isFinite(s.taxRates[z])) s.taxRates[z] = TAX.default;
+    if (!s.budget || typeof s.budget !== 'object') s.budget = {};
+    for (const k of Object.keys(BUDGET.keys)) if (!Number.isFinite(s.budget[k])) s.budget[k] = BUDGET.default;
     return s;
   }
 
@@ -152,6 +166,35 @@ export class Sim {
   }
   // 這格目前最多能長到幾級：本時代上限，以及「舊樣式」那個時代的上限
   maxLevelAt(i) { return Math.min(eraInfo(this.s.era).maxLevel, eraInfo(this.beraAt(i)).maxLevel); }
+  // 成長上限再加上：商業/工業看教育、住宅高樓看地價
+  growthLevelCap(i) {
+    let cap = this.maxLevelAt(i);
+    const z = this.s.grid.zone[i];
+    if (z === ZONE.C || z === ZONE.I) cap = Math.min(cap, eduLevelCap(this, i));
+    else if (z === ZONE.R && this.landValue[i] < LAND_VALUE.highLevelMin) cap = Math.min(cap, 4);
+    return cap;
+  }
+  eduCap(i) { return eduLevelCap(this, i); }
+  // ---------- 稅率、預算 ----------
+  taxRate(z) { return this.s.taxRates[z]; }
+  setTax(z, v) {
+    if (!['R', 'C', 'I'].includes(z)) return false;
+    this.s.taxRates[z] = Math.round(clamp(Number(v) || 0, TAX.min, TAX.max));
+    this.computeTotals();
+    return true;
+  }
+  setBudget(k, v) {
+    if (!(k in BUDGET.keys)) return false;
+    this.s.budget[k] = Math.round(clamp(Number(v) || 0, BUDGET.min, BUDGET.max));
+    this.updateInfra();
+    return true;
+  }
+  // 稅率對成長機率的倍率（高於預設 → 變慢）
+  taxGrowthMult(z) {
+    const d = this.s.taxRates[ZONE_KEY[z]] - TAX.default;
+    return clamp(1 - d * TAX.growthPerPoint, 1 - 1, 1 + TAX.maxBonus);
+  }
+  jammed(i) { const a = this.accessRoad[i]; return a >= 0 && this.cong[a] >= TRAFFIC.yellow; }
   powerNeeded() { return this.s.era >= POWER_REQUIRED_FROM_ERA; }
   hasSpecial(key) { return (this.bldList[key] || []).length > 0; }
   nextLandPrice() { return landPrice(this.s.purchases + 1); }
@@ -193,6 +236,7 @@ export class Sim {
   facMaintenance(key) {
     const f = FACILITIES[key];
     let m = f.maintenance;
+    if (f.kind === 'service') m *= (this.s.budget[f.svc] ?? BUDGET.default) / 100;
     if (this.isObsolete(key)) m *= OBSOLETE[key].maintenanceMult ?? 1;
     if (f.kind === 'power') m *= this.eff('maintPower');
     return m;
@@ -211,6 +255,12 @@ export class Sim {
     if (!out.water) why.push(out.waterCov ? '水量不足' : '沒有水');
     if (this.powerNeeded() && !out.power) why.push(out.powerCov ? '電力不足' : '沒有電');
     if (z === ZONE.R && out.happy < GROWTH.happinessMin) why.push('幸福度太低（工業或電廠太近）');
+    if (z === ZONE.R && this.crime[i] >= CRIME.growthBlock) why.push(`犯罪太高（${this.crime[i]}）：蓋警察局`);
+    if (z === ZONE.R && this.health[i] < HEALTH.growthBlock) why.push(`健康太差（${this.health[i]}）：蓋醫院、遠離污染`);
+    if (this.jammed(i)) why.push('門口的路塞車：成長變慢（蓋公路、高速公路、高架或鐵路分散車流）');
+    if (g.level[i] && g.level[i] < this.maxLevelAt(i) && g.level[i] >= this.growthLevelCap(i)) {
+      why.push(z === ZONE.R ? `地價不夠（${this.landValue[i]}／${LAND_VALUE.highLevelMin}）：蓋不了更高的樓` : `教育程度不夠（${this.edu[i]}）：蓋學校才能再升級`);
+    }
     if (g.level[i] && g.level[i] >= this.maxLevelAt(i)) {
       if (this.beraAt(i) < this.s.era && g.level[i] < eraInfo(this.s.era).maxLevel) why.push(`還是${eraInfo(this.beraAt(i)).name}的舊樣式：改建後才能再長高`);
       else why.push('已達本時代最高等級');
@@ -257,7 +307,7 @@ export class Sim {
     const f = FACILITIES[key], m = this.map;
     if (f.needs === 'river' && !this.near(i, 1, (j) => m.terrain[j] === TERRAIN.RIVER)) return `${f.name}要蓋在河邊`;
     if (f.needs === 'coast' && !this.near(i, 1, (j) => m.terrain[j] === TERRAIN.SEA)) return `${f.name}要蓋在海邊`;
-    if (f.needs === 'road' && !this.neighbors4(i).some((j) => this.connected[j] && !this.s.grid.elev[j])) return `${f.name}要緊鄰接到港口的路`;
+    if (f.needs === 'road' && !this.neighbors4(i).some((j) => this.connected[j] && this.hasGroundRoad(j))) return `${f.name}要緊鄰接到港口的路`;
     if (f.needs === 'rail' && !this.neighbors4(i).some((j) => this.s.grid.rail[j])) return `${f.name}要緊鄰鐵路`;
     return null;
   }
@@ -282,10 +332,25 @@ export class Sim {
     void n;
     return out;
   }
-  // 地面上有沒有東西（分區、建築、鐵路）
-  groundBusy(i) { const g = this.s.grid; return !!(g.zone[i] || g.bld[i] || g.rail[i]); }
+  // 這格有地面道路（港口也算）／有高架道路橋面
+  hasGroundRoad(i) { const g = this.s.grid; return !!((g.road[i] && g.elev[i] !== 1) || g.bld[i] === BLD.PORT); }
+  hasDeck(i) { const g = this.s.grid; return !!(g.road[i] && g.elev[i]); }
+  // 地面上有沒有東西（分區、建築、地面鐵路、地面道路）：高架道路的柱子不能壓在這些上面
+  groundBusy(i) { const g = this.s.grid; return !!(g.zone[i] || g.bld[i] || (g.rail[i] && !g.relev[i]) || (g.road[i] && g.elev[i] === 2)); }
+  // 高架鐵路的柱子不能壓在分區、建築、地面道路上
+  railGroundBusy(i) { const g = this.s.grid; return !!(g.zone[i] || g.bld[i] || (g.road[i] && g.elev[i] !== 1)); }
+  anyPillar(i) { return !!(this.pillar[i] || this.railPillar[i]); }
+  // 地面空著（上面只有高架、而且不是柱子格）
+  groundFree(i) {
+    const g = this.s.grid;
+    return (!g.road[i] || g.elev[i] === 1) && (!g.rail[i] || g.relev[i]) && !g.bld[i] && !this.anyPillar(i);
+  }
+  railCost(i) {
+    const t = this.map.terrain[i];
+    return t === TERRAIN.MOUNTAIN ? RAIL.cost.mountain : t === TERRAIN.HILL ? RAIL.cost.hill : RAIL.cost.plain;
+  }
   // 地面道路（高架不算）擋住
-  groundRoad(i) { const g = this.s.grid; return !!(g.road[i] && !g.elev[i]); }
+  groundRoad(i) { const g = this.s.grid; return !!(g.road[i] && g.elev[i] !== 1); }
   roadCost(i) {
     const t = this.map.terrain[i];
     return t === TERRAIN.MOUNTAIN ? ROAD.cost.mountain : t === TERRAIN.HILL ? ROAD.cost.hill : ROAD.cost.plain;
@@ -304,36 +369,50 @@ export class Sim {
     if (elev && !this.canElevate()) return { cells: [], cost: 0, reason: `要到${eraInfo(ELEVATED.era).name}才能蓋高架`, skipped: [] };
     for (const i of this.cellsFor(tool, x0, y0, x1, y1)) {
       const t = m.terrain[i];
-      const underOK = g.road[i] && g.elev[i] && !this.pillar[i]; // 高架底下（不是柱子）可以蓋
-      const empty = (!g.road[i] || underOK) && !this.groundBusy(i);
+      const empty = this.groundFree(i) && !g.zone[i]; // 高架底下（不是柱子）也算空地
       if (t === TERRAIN.SEA) { reasons.add('不能蓋在海上'); continue; }
       if (!this.owns(i)) { reasons.add('這裡還沒買下（到「區域」購買）'); continue; }
       if (tool === 'road') {
         if (g.bld[i] === BLD.PORT) continue;
         if (elev) {
           if (g.road[i] && g.elev[i]) continue;
-          if (g.road[i]) add(i, ELEVATED.cost, { elev: 1 });                 // 地面路改成高架
+          if (g.road[i]) add(i, ELEVATED.cost, { elev: 2 });                 // 從地面道路上面跨過（地面道路保留，兩層交叉）
           else add(i, (t === TERRAIN.RIVER ? ROAD.cost.plain : this.roadCost(i)) + ELEVATED.cost, { road: 1, elev: 1 });
         } else {
+          if (g.road[i] && g.elev[i] === 1) {
+            // 在高架底下鋪地面道路（柱子格不行）
+            if (this.anyPillar(i)) { reasons.add('高架柱子擋住'); continue; }
+            if (g.zone[i] || g.bld[i]) { reasons.add('有東西擋住，先拆除'); continue; }
+            add(i, t === TERRAIN.RIVER ? ROAD.bridgeCost[era] : this.roadCost(i), { elev: 2 });
+            continue;
+          }
           if (g.road[i]) continue;
           if (g.zone[i] || g.bld[i]) { reasons.add('有東西擋住，先拆除（或打開「高架」從上面跨過）'); continue; }
+          if (this.railPillar[i]) { reasons.add('高架鐵路的柱子擋住'); continue; }
           if (t === TERRAIN.RIVER) add(i, ROAD.bridgeCost[era], { road: 2 });
           else add(i, this.roadCost(i), { road: 1 });
         }
       } else if (tool === 'rail') {
         if (era < RAIL.era) { reasons.add(`要到${eraInfo(RAIL.era).name}才能鋪鐵路`); continue; }
-        if (g.rail[i]) continue;
-        if (g.zone[i] || g.bld[i]) { reasons.add('有東西擋住，先拆除'); continue; }
-        if (this.pillar[i]) { reasons.add('高架柱子擋住'); continue; }
-        if (t === TERRAIN.RIVER) add(i, RAIL.bridgeCost, { rail: 2 });
-        else add(i, t === TERRAIN.MOUNTAIN ? RAIL.cost.mountain : t === TERRAIN.HILL ? RAIL.cost.hill : RAIL.cost.plain, { rail: 1 });
+        if (elev) {
+          // 高架鐵路：從分區、建築、道路上面跨過（柱子格除外）
+          if (g.rail[i] && g.relev[i]) continue;
+          if (g.rail[i]) add(i, ELEVATED.cost, { relev: 1 });               // 地面鐵路改成高架
+          else add(i, (t === TERRAIN.RIVER ? RAIL.cost.plain : this.railCost(i)) + ELEVATED.cost, { rail: 1, relev: 1 });
+        } else {
+          if (g.rail[i]) continue;
+          if (g.zone[i] || g.bld[i]) { reasons.add('有東西擋住，先拆除（或打開「高架」從上面跨過）'); continue; }
+          if (this.anyPillar(i)) { reasons.add('高架柱子擋住'); continue; }
+          if (t === TERRAIN.RIVER) add(i, RAIL.bridgeCost, { rail: 2 });
+          else add(i, this.railCost(i), { rail: 1 });
+        }
       } else if (ZONES[tool]) {
         const z = ZONE[tool];
         if (g.zone[i] === z) continue;
         if (t === TERRAIN.MOUNTAIN) { reasons.add('高山只能鋪路'); continue; }
         if (t === TERRAIN.RIVER) { reasons.add('河流上不能劃區'); continue; }
-        if (g.road[i] && this.pillar[i]) { reasons.add('高架柱子的格子不能蓋'); continue; }
-        if ((g.road[i] && !underOK) || g.bld[i] || g.rail[i]) { reasons.add('有東西擋住，先拆除'); continue; }
+        if (this.anyPillar(i)) { reasons.add('高架柱子的格子不能蓋'); continue; }
+        if (!this.groundFree(i)) { reasons.add('有東西擋住，先拆除'); continue; }
         add(i, ZONES[tool].cost, { zone: z, level: 0, pop: 0, bera: era });
       } else if (FACILITIES[tool]) {
         const f = FACILITIES[tool];
@@ -343,7 +422,7 @@ export class Sim {
           if (f.specialOf < era) { reasons.add('已經過了這個時代'); continue; }
         }
         if (t !== TERRAIN.PLAIN && t !== TERRAIN.HILL) { reasons.add('要蓋在平原或丘陵'); continue; }
-        if (g.road[i] && this.pillar[i]) { reasons.add('高架柱子的格子不能蓋'); continue; }
+        if (this.anyPillar(i)) { reasons.add('高架柱子的格子不能蓋'); continue; }
         if (!empty) { reasons.add('有東西擋住，先拆除'); continue; }
         const why = this.facilitySpotReason(tool, i);
         if (why) { reasons.add(why); continue; }
@@ -362,7 +441,7 @@ export class Sim {
             // 高架模式：沒有路的地方直接蓋一段高架的公路/高速公路；已有的路改成高架並升級
             if (g.bld[i] === BLD.PORT) continue;
             if (g.road[i] && g.elev[i] && g.trans[i] >= tr.level) continue;
-            const set = { trans: Math.max(tr.level, g.trans[i]), elev: 1 };
+            const set = { trans: Math.max(tr.level, g.trans[i]), elev: g.road[i] ? (g.elev[i] || 2) : 1 }; // 已有地面路 → 從上面跨過
             let cc = c * (g.trans[i] >= tr.level ? 0 : 1);
             if (!g.road[i]) { set.road = 1; cc += (t === TERRAIN.RIVER ? ROAD.cost.plain : this.roadCost(i)) + ELEVATED.cost; } else if (!g.elev[i]) cc += ELEVATED.cost;
             add(i, cc, set);
@@ -381,12 +460,15 @@ export class Sim {
         cells.push({ i, cost: 0, set: Object.fromEntries([...U8_LAYERS.map((k) => [k, 0]), ['pop', 0]]) });
       }
     }
-    // 高架：算出蓋好後的柱子位置，柱子不能壓在分區、建築或鐵路上
-    if (cells.some((c) => c.set.elev)) {
-      const newElev = new Set(cells.filter((c) => c.set.elev).map((c) => c.i));
-      const isElev = (j) => newElev.has(j) || !!(g.road[j] && g.elev[j]);
+    // 高架：算出蓋好後的柱子位置，柱子不能壓在地面上的東西
+    if (cells.some((c) => c.set.elev || c.set.relev)) {
+      const key = cells.some((c) => c.set.relev) ? 'relev' : 'elev';
+      const base = key === 'relev' ? 'rail' : 'road';
+      const newElev = new Set(cells.filter((c) => c.set[key]).map((c) => c.i));
+      const isElev = (j) => newElev.has(j) || !!(g[base][j] && g[key][j]);
       const pil = this.pillarsFor([...newElev], isElev);
-      const bad = pil.find((j) => this.groundBusy(j));
+      const twoLevel = (j) => cells.some((c) => c.i === j && c.set.elev === 2);
+      const bad = pil.find((j) => (key === 'relev' ? this.railGroundBusy(j) : this.groundBusy(j) || twoLevel(j)));
       if (bad != null) {
         const W = m.w;
         return { cells, cost, reason: `高架的柱子（每 ${ELEVATED.pillarEvery} 格一根）會壓到 (${bad % W}, ${(bad / W) | 0}) 的東西，先拆除或換個位置`, skipped: [...reasons], pillars: pil };
@@ -548,7 +630,8 @@ export class Sim {
     for (const k of BLD_KEY) if (k) bldList[k] = [];
     const transCells = [];
     let roads = 0, bridges = 0, pipes = 0, wires = 0, metros = 0, rails = 0, railBridges = 0, elevs = 0;
-    const railCells = [], elevCells = [];
+    const railCells = [], elevCells = [], relevCells = [];
+    let relevs = 0;
     const trans = {};
     for (let i = 0; i < n; i++) {
       if (g.zone[i]) zoneList.push(i);
@@ -560,12 +643,15 @@ export class Sim {
       if (g.metro[i]) { metros++; transCells.push(i); }
       if (g.rail[i]) { if (g.rail[i] === 2) railBridges++; else rails++; railCells.push(i); }
       if (g.elev[i] && g.road[i]) { elevs++; elevCells.push(i); }
+      if (g.relev[i] && g.rail[i]) { relevs++; relevCells.push(i); }
     }
     this.zoneList = zoneList;
     this.bldList = bldList;
-    this.lineCount = { road: roads, bridge: bridges, pipe: pipes, wire: wires, trans, metro: metros, rail: rails, railBridge: railBridges, elev: elevs };
+    this.lineCount = { road: roads, bridge: bridges, pipe: pipes, wire: wires, trans, metro: metros, rail: rails, railBridge: railBridges, elev: elevs, relev: relevs };
     this.pillar.fill(0);
     for (const i of this.pillarsFor(elevCells, (j) => g.road[j] && g.elev[j])) this.pillar[i] = 1;
+    this.railPillar.fill(0);
+    for (const i of this.pillarsFor(relevCells, (j) => g.rail[j] && g.relev[j])) this.railPillar[i] = 1;
     // 道路 BFS（從自己擁有的港口出發）
     const q = new Int32Array(n);
     let comp = 0;
@@ -589,7 +675,8 @@ export class Sim {
     for (const i of zoneList) {
       let best = -1;
       // 只能從地面道路進出（高架不能）
-      for (const j of this.neighbors4(i)) if (this.connected[j] && !g.elev[j] && (best < 0 || this.dist[j] < this.dist[best])) best = j;
+      for (const j of this.neighbors4(i)) if (this.connected[j] && this.hasGroundRoad(j) && (best < 0 || this.dist[j] < this.dist[best])) best = j;
+      this.accessRoad[i] = best;
       if (best >= 0) { this.access[i] = 1; this.comp[i] = this.comp[best]; this.dist[i] = this.dist[best] + 1; }
     }
     // 交通加成：範圍內取最大
@@ -642,6 +729,7 @@ export class Sim {
     }
     this.updateUtility('water', WATER_KEYS, 'pipe', this.waterCov, this.waterOK);
     this.updateUtility('power', POWER_KEYS, 'wire', this.powerCov, this.powerOK);
+    updateServices(this);
     this.updateHappiness();
     this.infraDirty = false;
   }
@@ -733,6 +821,7 @@ export class Sim {
       v += Math.max(H.industryNearMax, ind * H.industryNear);
       if (shop) v += H.commerceNear;
       v += this.plantPen[i] + this.landmark[i] + this.transit[i] * 0.3;
+      v -= this.crime[i] * CRIME.happiness + this.pollution[i] * POLLUTION.happiness + (this.jammed(i) ? TRAFFIC.jamHappiness : 0);
       this.happy[i] = clamp(Math.round(v), 0, 100);
     }
   }
@@ -742,12 +831,14 @@ export class Sim {
     if (!this.access[i] || !this.waterOK[i]) return false;
     if (this.powerNeeded() && !this.powerOK[i]) return false;
     if (g.zone[i] === ZONE.R && this.happy[i] < GROWTH.happinessMin) return false;
+    if (g.zone[i] === ZONE.R && this.crime[i] >= CRIME.growthBlock) return false;
+    if (g.zone[i] === ZONE.R && this.health[i] < HEALTH.growthBlock) return false;
     return true;
   }
 
   // ---------- 人口、工作、需求 ----------
   // 每格的稅收權重：縣市 taxMult × 交通加成
-  taxWeight(i) { return this.regionType(this.map.county[i]).taxMult * (1 + this.transit[i] / 100); }
+  taxWeight(i) { return this.regionType(this.map.county[i]).taxMult * (1 + this.transit[i] / 100) * (0.7 + 0.6 * this.landValue[i] / 100); }
   computeTotals() {
     const g = this.s.grid;
     let pop = 0, capC = 0, capI = 0, wR = 0, wC = 0, wI = 0;
@@ -769,6 +860,8 @@ export class Sim {
       C: clamp((pop * ECON.shopNeed - capC + 10) / Math.max(20, pop * ECON.shopNeed * 0.5), -1, 1),
       I: clamp((capC * ECON.goodsNeed + ECON.industryBase + pop * 0.05 - capI) / Math.max(30, capI * 0.5 + 30), -1, 1),
     };
+    // 稅率：高於預設 → 需求下降
+    for (const z of ['R', 'C', 'I']) this.demand[z] = clamp(this.demand[z] - (this.s.taxRates[z] - TAX.default) * TAX.demandPerPoint, -1, 1);
     return this.totals;
   }
 
@@ -797,7 +890,7 @@ export class Sim {
   monthTick() {
     const s = this.s, g = s.grid;
     if (this.infraDirty) this.updateInfra();
-    else { this.refreshUtilities(); this.updateHappiness(); }
+    else { this.refreshUtilities(); updateServices(this); this.updateHappiness(); }
     this.computeTotals();
     const era = s.era;
     let needC = this.totals.pop * ECON.shopNeed - this.totals.capC + 10;
@@ -810,8 +903,9 @@ export class Sim {
     for (const i of list) {
       if (!this.growthOK(i)) continue;
       const z = g.zone[i], lv = g.level[i];
-      const boost = 1 + 2 * this.transit[i] / 100;
-      const maxLv = this.maxLevelAt(i);
+      // 交通加成、稅率、塞車都會影響成長機率
+      const boost = (1 + 2 * this.transit[i] / 100) * this.taxGrowthMult(z0(g, i)) * (this.jammed(i) ? TRAFFIC.jamGrowth : 1);
+      const maxLv = this.growthLevelCap(i);
       // （預設關閉）舊樣式自動改建成新時代樣式；Sonny 決定舊建築要付錢才升級
       if (ERA_UPGRADES.autoRebuild && lv && this.beraAt(i) < era && rng() < ERA_UPGRADES.rebuildChance * boost) {
         const before = this.capAt(i);
@@ -826,7 +920,7 @@ export class Sim {
         } else {
           if (lv < maxLv && g.pop[i] >= cap * GROWTH.fullRatio && this.demand.R > 0 && rng() < GROWTH.levelUpChance * boost) { g.level[i] = lv + 1; this.markDirty(i); }
           if (g.pop[i] > 0 && g.pop[i] < cap) {
-            const add = g.pop[i] * GROWTH.naturalGrowth;
+            const add = g.pop[i] * GROWTH.naturalGrowth * (0.5 + this.health[i] / 100); // 健康影響自然增加
             const whole = Math.floor(add) + (rng() < add % 1 ? 1 : 0);
             g.pop[i] += Math.min(whole, cap - g.pop[i]);
           }
@@ -860,14 +954,21 @@ export class Sim {
   maintenance() {
     const lc = this.lineCount, era = this.s.era;
     let fac = 0;
-    for (const [k, list] of Object.entries(this.bldList)) if (FACILITIES[k]) fac += this.facMaintenance(k) * list.length;
-    let transport = lc.metro * TRANSPORT.metro.maintenance + lc.rail * RAIL.maintenance + lc.railBridge * RAIL.bridgeMaintenance + lc.elev * ELEVATED.maintenance;
+    const services = { edu: 0, police: 0, health: 0 };
+    for (const [k, list] of Object.entries(this.bldList)) {
+      const f = FACILITIES[k];
+      if (!f || !list.length) continue;
+      if (f.kind === 'service') services[f.svc] += this.facMaintenance(k) * list.length;
+      else fac += this.facMaintenance(k) * list.length;
+    }
+    let transport = lc.metro * TRANSPORT.metro.maintenance + lc.rail * RAIL.maintenance + lc.railBridge * RAIL.bridgeMaintenance + (lc.elev + (lc.relev || 0)) * ELEVATED.maintenance;
     for (const tr of Object.values(TRANSPORT)) if (tr.level) transport += (lc.trans[tr.level] || 0) * tr.maintenance;
     return {
-      roads: lc.road * ROAD.maintenance + lc.bridge * ROAD.bridgeMaintenance[era],
+      roads: (lc.road * ROAD.maintenance + lc.bridge * ROAD.bridgeMaintenance[era]) * this.s.budget.roads / 100,
       facilities: fac,
       lines: lc.pipe * LINES.pipe.maintenance + lc.wire * LINES.wire.maintenance,
       transport,
+      edu: services.edu, police: services.police, health: services.health,
       loan: this.s.loan.taken && this.s.loan.monthsLeft > 0 ? FINANCE.loan.monthlyPayment : 0,
     };
   }
@@ -878,9 +979,9 @@ export class Sim {
     let land = 0;
     for (const id of this.s.owned) land += this.landIncomeOf(id);
     return {
-      R: (t.wR ?? t.pop) * tax.R * em * this.eff('taxR'),
-      C: (t.wC ?? t.filledC) * tax.C * em * this.eff('taxC') * this.specialEff('taxC'),
-      I: (t.wI ?? t.filledI) * tax.I * em * this.eff('taxI'),
+      R: (t.wR ?? t.pop) * tax.R * em * this.eff('taxR') * this.s.taxRates.R / TAX.default,
+      C: (t.wC ?? t.filledC) * tax.C * em * this.eff('taxC') * this.specialEff('taxC') * this.s.taxRates.C / TAX.default,
+      I: (t.wI ?? t.filledI) * tax.I * em * this.eff('taxI') * this.s.taxRates.I / TAX.default,
       trade: this.bldList.port.length ? t.filledI * ECON.tradePerIndustryJob * em * this.eff('trade') * this.specialEff('trade') : 0,
       land,
     };
@@ -1063,7 +1164,9 @@ export class Sim {
       s.shipTimer += sh.intervalMonths;
       const port = ports[s.portRR % ports.length];
       s.portRR++;
-      const capacity = Math.round(sh.capacity * this.eff('immigration'));
+      // 住宅稅越高，願意來的移民越少
+      const taxImm = clamp(1 - (this.s.taxRates.R - TAX.default) * TAX.immigrationPerPoint, 0.1, 1 + TAX.maxBonus);
+      const capacity = Math.max(1, Math.round(sh.capacity * this.eff('immigration') * taxImm));
       const attract = Math.min(1, Math.min(this.vacancy(), this.jobRoom()) / capacity);
       const passengers = Math.max(1, Math.round(capacity * (0.3 + 0.7 * attract)));
       s.ships.push({ id: (s.shipSeq = (s.shipSeq || 0) + 1), port: port.name, era: s.era, t: 0, phase: 'in', passengers, capacity, travel: sh.travelMonths });

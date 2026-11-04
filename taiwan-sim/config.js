@@ -4,7 +4,7 @@
 export const SAVE_KEY = 'taiwanSim.save';
 // v2：第二版（時代 3–5、建築隨時代演進、縣市平衡）。v1 存檔讀進來會自動遷移（save.js migrate），
 // 遷移前的原檔另存一份在 `${SAVE_KEY}.v1-backup`，不會被覆蓋。
-export const SAVE_VERSION = 2;
+export const SAVE_VERSION = 3;   // v3：第三版（城市服務、稅率、預算）；v2 存檔自動遷移，原檔另存在 `${SAVE_KEY}.v2-backup`
 
 // ---- 時間 ----
 export const TIME = {
@@ -124,11 +124,13 @@ export const RAIL = {
   radius: 3, bonus: 0.15,
 };
 
-// ---- 高架（任何道路種類都可以蓋成高架）----
-// 工具列「高架」切換打開時，鋪路、公路、高速公路都蓋成高架。高架底下的格子可以蓋其他東西（劃區、蓋設施），
+// ---- 高架（任何道路種類和鐵路都可以蓋成高架）----
+// 工具列「高架」切換打開時，鋪路、公路、高速公路、鐵路都蓋成高架。高架一路接過去不用先降回地面：
+// 碰到地面道路就從上面跨過（地面道路保留，兩層交叉）；高架鐵路比高架道路高一層，兩者可以交叉。高架底下的格子可以蓋其他東西（劃區、蓋設施），
 // 但柱子所在的格子不行。柱子規則：每一段連續的高架（上下左右相連），從端點（編號最小的端點）起算，
 // 第 1、8、15…格（每 pillarEvery 格）有一根柱子。高架只能從兩端或旁邊的地面道路上下，旁邊的區塊不能從高架進出。
-// 費用 = 該格原本的道路造價 + cost（每格）；維護費 = 原本的 + maintenance（每格每月）。
+// 高架鐵路一樣要整條連到車站才有效果，和地面鐵路相接的地方是引道。
+// 費用 = 該格原本的道路／鐵路造價（過河不用另外架橋）+ cost（每格）；維護費 = 原本的 + maintenance（每格每月）。
 export const ELEVATED = { era: 4, cost: 2500, maintenance: 12, pillarEvery: 7 };
 
 // ---- 分區 ----
@@ -302,6 +304,98 @@ export const REGIONS = {
   花蓮縣: { type: 'east', note: '有花蓮港；中央山脈很難穿越' },
   臺東縣: { type: 'east', note: '有富岡港；最晚才好開發' },
   澎湖縣: { type: 'island', note: '離島，有馬公港；沒辦法鋪路連回本島' },
+};
+
+// =====================================================================
+// ---- 第三版（T-TW-03）：城市服務系統 ----
+// =====================================================================
+
+// ---- 稅收：可調稅率（住宅／商業／工業分開，單位 %）----
+// 收入 = 原本的稅收公式 × (稅率 / default)。稅率高於 default 每 1 個百分點：該類需求 −demandPerPoint、成長機率 −growthPerPoint；
+// 住宅稅另外讓願意下船的移民 −immigrationPerPoint。低於 default 則反過來（加成最多到 maxBonus）。
+export const TAX = {
+  default: 9, min: 0, max: 20, step: 1,
+  demandPerPoint: 0.1,
+  growthPerPoint: 0.08,
+  immigrationPerPoint: 0.08,
+  maxBonus: 0.3,
+};
+
+// ---- 預算（%）：教育、治安、醫療、道路維護 ----
+// 服務效果 × (預算 / 100) 的平方根（加碼的效果遞減）；該類設施維護費 × (預算 / 100)。
+// 道路維護預算影響道路容量：容量 × (0.7 + 0.3 × 預算/100)。
+export const BUDGET = {
+  default: 100, min: 0, max: 150, step: 10,
+  keys: { edu: '教育', police: '治安', health: '醫療', roads: '道路維護' },
+};
+
+// ---- 服務建築（配合時代開放）----
+// svc：edu 教育、police 治安、health 醫療；strength：服務強度（0–100，範圍內取最大值）；radius：服務半徑
+export const SERVICE_BUILDINGS = {
+  shufang: { name: '書房', svc: 'edu', era: 1, cost: 6000, maintenance: 60, radius: 4, strength: 30 },
+  gongxue: { name: '公學校', svc: 'edu', era: 2, cost: 40000, maintenance: 400, radius: 6, strength: 55 },
+  middle: { name: '中學', svc: 'edu', era: 3, cost: 150000, maintenance: 1500, radius: 7, strength: 75 },
+  university: { name: '大學', svc: 'edu', era: 4, cost: 900000, maintenance: 6000, radius: 11, strength: 100 },
+  baojia: { name: '保甲局', svc: 'police', era: 1, cost: 4000, maintenance: 50, radius: 4, strength: 35 },
+  paichu: { name: '派出所', svc: 'police', era: 2, cost: 25000, maintenance: 300, radius: 5, strength: 60 },
+  policehq: { name: '警察局', svc: 'police', era: 3, cost: 150000, maintenance: 1500, radius: 9, strength: 100 },
+  herbal: { name: '漢藥舖', svc: 'health', era: 1, cost: 5000, maintenance: 50, radius: 4, strength: 30 },
+  hospital: { name: '醫院', svc: 'health', era: 2, cost: 50000, maintenance: 600, radius: 6, strength: 60 },
+  medcenter: { name: '醫學中心', svc: 'health', era: 4, cost: 800000, maintenance: 5000, radius: 11, strength: 100 },
+};
+
+// 服務建築也是設施（要緊鄰接到港口的路），維護費再乘該類預算
+for (const [k, v] of Object.entries(SERVICE_BUILDINGS)) FACILITIES[k] = { kind: 'service', needs: 'road', ...v };
+
+// ---- 教育：教育程度（0–100）影響商業/工業能長到幾級、土地價值 ----
+// levelReq：商業與工業要長到這一級，所在格子的教育程度至少要多少
+export const EDUCATION = { levelReq: { 3: 15, 4: 35, 5: 55, 6: 75 } };
+
+// ---- 犯罪（0–100）----
+// 犯罪 = base + 密度(等級/6)×density + 失業率×unemployment − 教育×education − 警力×police
+// 超過 growthBlock 的住宅停止成長（商業/工業不擋，才不會因為失業→犯罪→沒工作而卡死）；住宅幸福度 −犯罪×happiness
+export const CRIME = { base: 8, density: 60, unemployment: 40, education: 0.15, police: 0.7, growthBlock: 60, happiness: 0.15 };
+
+// ---- 污染（0–100）與健康（0–100）----
+// 污染：工業區每級 perLevel（範圍 radius，越遠越少；科技園區樣式 ×techMult）、電廠和港口見 sources
+export const POLLUTION = {
+  industry: { perLevel: 7, radius: 3, techMult: 0.3 },
+  sources: { coal: [55, 4], nuclear: [25, 3], hydro: [0, 0], modernplant: [8, 2], port: [15, 2] },   // [強度, 半徑]
+  happiness: 0.2,      // 住宅幸福度 −污染×0.2
+};
+// 健康 = base + 醫療×care + 有水 water − 污染×pollution；自然增加率 × (0.5 + 健康/100)；住宅健康低於 growthBlock 停止成長
+export const HEALTH = { base: 45, care: 0.5, water: 10, pollution: 0.6, growthBlock: 20 };
+
+// ---- 交通：每格道路的車流量與壅塞 ----
+// 每個區塊每月產生的車流：住宅 人口×perPop、商工 工作×perJob，再乘時代的汽車普及率 carShare；
+// 有鐵路（連到車站）或捷運的範圍，車流 ×(1 − transitShare)。
+// 車流進入旁邊的道路，沿著往港口的方向累積（每格衰減 decay；優先走容量大的路）。
+// 容量：一般道路依時代 road、橋 bridge；公路、高速公路依 trans；高架橋面另外 +elevated（兩層分流）。
+// 壅塞 = 車流 / 容量：< 0.6 綠、< 1 黃、≥ 1 紅。區塊門口的路壅塞 ≥ 1 時成長機率 ×jamGrowth、住宅幸福度 −jamHappiness。
+export const TRAFFIC = {
+  perPop: 0.4, perJob: 0.4,
+  carShare: { 1: 0.15, 2: 0.3, 3: 0.55, 4: 0.85, 5: 1 },
+  transitShare: 0.35,
+  decay: 0.9,
+  capacity: { road: { 1: 250, 2: 350, 3: 450, 4: 550, 5: 600 }, bridge: 300, trans: { 1: 1400, 2: 3000 }, elevated: 1500 },
+  green: 0.6, yellow: 1,
+  jamGrowth: 0.6, jamHappiness: 8,
+};
+
+// ---- 土地價值（0–100）：影響稅收（×(0.7 + 0.6 × 地價/100)）；住宅第 5 級以上要 highLevelMin ----
+export const LAND_VALUE = { base: 50, education: 0.15, health: 0.1, crime: 0.3, pollution: 0.4, transit: 0.4, jam: 10, landmark: 1, highLevelMin: 48 };
+
+// ---- 路上的行人和交通工具（只是畫面效果，不影響模擬）----
+// 數量上限（手機用 mobile）；只在放大到看得到細節時、畫面範圍內出現。
+export const AGENTS = {
+  cars: { desktop: 160, mobile: 60 },
+  trains: { desktop: 6, mobile: 3 },
+  peds: { desktop: 120, mobile: 45 },
+  minZoom: 0.45,
+  spawnPerSecond: 40,     // 每秒最多新增幾個
+  carSpeed: 2.2,          // 格/秒（不塞車時）；壅塞時 ÷ (1 + 壅塞)
+  trainSpeed: 4, trainStopSeconds: 2.5, trainCars: 4,
+  pedSpeed: 0.35,
 };
 
 // ---- 破產、預警、緊急貸款 ----
