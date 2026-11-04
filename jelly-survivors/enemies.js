@@ -49,6 +49,7 @@ export class Enemies {
     this.dead = new Uint8Array(max);
     this.uid = new Uint32Array(max); // 不會因交換位置而改變的編號
     this.lastProj = new Uint32Array(max); // 最後打中它的子彈編號（貫穿子彈不重複打）
+    this.wave = new Uint8Array(max); // 1 = 包圍突襲生成的怪（經驗打折）
     this.nextUid = 1;
 
     const cat = CONFIG.enemies.caterpillar;
@@ -119,6 +120,7 @@ export class Enemies {
     this.dead[i] = 0;
     this.uid[i] = this.nextUid++;
     this.lastProj[i] = 0;
+    this.wave[i] = 0;
     if (RENDER_CAT[this.type[i]]) {
       const sp = CONFIG.enemies.caterpillar.segmentSpacing * SCALE[this.type[i]];
       for (let k = 0; k < this.segs; k++) {
@@ -142,6 +144,32 @@ export class Enemies {
       }
     }
     return this.spawn(typeKey, x, z, hpMult, 1, 1);
+  }
+
+  // 包圍突襲要用的空位：把離 (px,pz) 超過 minDist 的一般怪（非精英／王／突襲怪）由遠到近收掉，
+  // 不掉落、不算擊殺。最多收 n 隻，回傳實際收掉幾隻。
+  recycleFar(n, px, pz, minDist) {
+    if (n <= 0) return 0;
+    const cand = [];
+    const min2 = minDist * minDist;
+    for (let i = 0; i < this.count; i++) {
+      const d = DEFS[this.type[i]];
+      if (d.elite || d.boss || this.wave[i] || this.dead[i]) continue;
+      const dx = this.x[i] - px;
+      const dz = this.z[i] - pz;
+      const d2 = dx * dx + dz * dz;
+      if (d2 > min2) cand.push([d2, this.uid[i]]);
+    }
+    cand.sort((a, b) => b[0] - a[0]);
+    const kill = new Set(cand.slice(0, n).map((c) => c[1]));
+    let removed = 0;
+    for (let i = this.count - 1; i >= 0; i--) {
+      if (!kill.has(this.uid[i])) continue;
+      this.moveSlot(this.count - 1, i);
+      this.count--;
+      removed++;
+    }
+    return removed;
   }
 
   // 造成傷害；回傳是否打死。kb = 擊退倍率
@@ -365,6 +393,7 @@ export class Enemies {
     this.dead[to] = this.dead[from];
     this.uid[to] = this.uid[from];
     this.lastProj[to] = this.lastProj[from];
+    this.wave[to] = this.wave[from];
     const s = this.segs;
     this.segX.copyWithin(to * s, from * s, from * s + s);
     this.segZ.copyWithin(to * s, from * s, from * s + s);
