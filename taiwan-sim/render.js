@@ -1107,7 +1107,7 @@ export class Renderer {
     // 路上的車、火車、行人
     const dt = (now - (this._agentT || now)) / 1000;
     this._agentT = now;
-    this.agents.update(dt, now);
+    this.agents.update(dt, now, this.timeRunning !== false);
     this.agents.draw(ctx, now);
     // 煙
     this.drawEffects(ctx, now);

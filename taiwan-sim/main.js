@@ -537,6 +537,57 @@ function gameOverModal() {
 }
 
 // ---------- 查看格子 ----------
+// ---------- 建築資訊面板（第四版：住宅的住戶、公司的員工、公共建築）----------
+function buildingPanel(i) {
+  const sim = game.sim, g = sim.s.grid;
+  const rec = sim.infoOf(i);
+  if (!rec) return '';
+  const link = (cell, text) => `<button class="linkbtn" data-goto="${cell}">${esc(text)}</button>`;
+  const cov = `教育 ${sim.edu[i]}・治安（警力）${sim.police[i]}・醫療 ${sim.care[i]}`;
+  if (rec.k === 'R') {
+    const z = ZONE_KEY[g.zone[i]];
+    const people = sim.residentsOf(i);
+    const groups = sim.commute.byHome.get(i) || [];
+    const modes = {};
+    for (const gr of groups) modes[gr.mode] = (modes[gr.mode] || 0) + gr.count;
+    const modeTxt = Object.entries(modes).map(([k, v]) => `${{ walk: '走路', road: '開車/騎車', rail: '火車/捷運' }[k]} ${v}`).join('、') || '—';
+    const list = people.map((p) => `<li><b>${esc(p.name)}</b> <span class="small">${p.female ? '女' : '男'}・${p.age} 歲・${esc(p.edu)}</span><br>
+      ${p.job >= 0 ? `在 ${link(p.job, p.jobName || '公司')} 上班・${esc(p.mode)} ${p.minutes} 分鐘` : p.age >= 65 ? '<span class="small">已退休</span>' : '<span class="small">待業中</span>'}</li>`).join('');
+    return `<div class="bpanel" data-kind="R"><h3>🏠 ${esc(rec.n)}</h3>
+      <p class="small">${esc(styleName(z, sim.beraAt(i), g.level[i]) || '')}・第 ${g.level[i]} 級・${TIME.startYear + Math.floor(rec.t / 12)} 年落成</p>
+      <div class="kv"><span>住戶</span><span>${g.pop[i].toLocaleString()} / ${sim.capAt(i).toLocaleString()} 人</span>
+      <span>上班</span><span>${(sim.workers[i] || 0).toLocaleString()} 人，有工作 ${(Math.min(sim.employed[i], sim.workers[i]) || 0).toLocaleString()} 人</span>
+      <span>通勤</span><span>平均 ${sim.commuteMin[i] || '—'} 分鐘・${esc(modeTxt)}</span>
+      <span>地價</span><span>${sim.landValue[i]}</span><span>滿意度</span><span>${sim.happy[i]}</span>
+      <span>服務</span><span>${cov}・犯罪 ${sim.crime[i]}</span></div>
+      <p class="small">共 ${g.pop[i].toLocaleString()} 人，以下是 ${people.length} 位代表住戶（虛構人物）：</p>
+      <ul class="people">${list || '<li class="small">還沒有人住</li>'}</ul></div>`;
+  }
+  if (rec.k === 'C' || rec.k === 'I') {
+    const c = sim.companyOf(i);
+    const from = c.from.slice(0, 12).map((f) => `<li>${link(f.home, f.name)} <span class="small">${f.count.toLocaleString()} 人</span></li>`).join('');
+    return `<div class="bpanel" data-kind="${rec.k}"><h3>${rec.k === 'C' ? '🏪' : '🏭'} ${esc(c.name)}</h3>
+      <p class="small">${c.kind}・${esc(c.industry)}・第 ${g.level[i]} 級・${TIME.startYear + Math.floor(rec.t / 12)} 年開業</p>
+      <div class="kv"><span>員工</span><span>${c.employees.toLocaleString()} / ${c.jobs.toLocaleString()} 人（職缺 ${c.openings.toLocaleString()}）</span>
+      <span>需要的教育</span><span>${c.eduReq}（這裡的教育 ${sim.edu[i]}）</span>
+      <span>稅收貢獻</span><span>約 ${fmt(c.tax)} / 月</span><span>地價</span><span>${sim.landValue[i]}</span>
+      <span>服務</span><span>${cov}</span></div>
+      <p class="small">員工從這些住宅來：</p><ul class="people">${from || '<li class="small">還沒有員工</li>'}</ul>
+      ${c.from.length > 12 ? `<p class="small">…還有 ${c.from.length - 12} 棟</p>` : ''}</div>`;
+  }
+  const p = sim.publicInfoOf(i);
+  if (!p) return '';
+  return `<div class="bpanel" data-kind="B"><h3>🏛 ${esc(p.name)}</h3><p class="small">${esc(p.type)}・維護 ${fmt(p.maintenance)} / 月</p>
+    <div class="kv">${p.rows.map(([k, v]) => `<span>${esc(k)}</span><span>${esc(v)}</span>`).join('')}</div></div>`;
+}
+// 跳到某一棟（移動畫面並打開它的面板）
+function gotoCell(i) {
+  const w = game.map.w, x = i % w, y = (i / w) | 0;
+  game.renderer.centerOnCell(x, y);
+  game.renderer.clampCam();
+  inspect({ x, y, i });
+}
+
 function inspect(cell) {
   const sim = game.sim, m = game.map, g = sim.s.grid, i = cell.i;
   const t = m.terrain[i];
@@ -587,7 +638,8 @@ function inspect(cell) {
   }
   if (g.pipe[i] || g.wire[i]) rows.push(['管線', [g.pipe[i] && '水管', g.wire[i] && '電線'].filter(Boolean).join('、')]);
   const sheet = $('#sheet');
-  sheet.innerHTML = `<button class="x" aria-label="關閉">✕</button><h3>格子 (${cell.x}, ${cell.y})</h3>
+  const bp = buildingPanel(i);
+  sheet.innerHTML = `<button class="x" aria-label="關閉">✕</button>${bp}<h3 class="${bp ? 'sub' : ''}">格子 (${cell.x}, ${cell.y})</h3>
     <div class="kv">${rows.map(([k, v]) => `<span>${esc(k)}</span><span>${esc(v)}</span>`).join('')}</div>
     ${why.length ? `<ul class="why">${why.map((w) => `<li>${esc(w)}</li>`).join('')}</ul>` : ''}
     ${actions.length ? `<p>${actions.join(' ')}</p>` : ''}
@@ -595,6 +647,8 @@ function inspect(cell) {
   sheet.hidden = false;
   sheet.querySelector('.x').addEventListener('click', closeSheet);
   sheet.querySelector('[data-buy]')?.addEventListener('click', () => { closeSheet(); openRegions(); });
+  sheet.querySelectorAll('[data-goto]').forEach((b) => b.addEventListener('click', () => gotoCell(Number(b.dataset.goto))));
+  sheet.scrollTop = 0;
   sheet.querySelector('[data-rebuild]')?.addEventListener('click', () => {
     const r = sim.rebuildZones([i]);
     if (!r.ok) toast(`不能改建：${r.reason}`, 'bad'); else inspect(cell);
@@ -667,7 +721,7 @@ function updateHud() {
   ne.textContent = `${net >= 0 ? '+' : ''}${fmt(net)}/月`;
   ne.className = net >= 0 ? 'pos' : 'neg';
   $('#pop').textContent = sim.totals.pop.toLocaleString('zh-TW');
-  $('#date').textContent = sim.dateText();
+  $('#date').textContent = `${sim.dateText()} 🕗${game.renderer.agents.clockText()}`;
   $('#era-name').textContent = eraInfo(s.era).name;
   for (const k of ['R', 'C', 'I']) {
     const v = sim.demand[k];
@@ -754,7 +808,9 @@ function loop(now) {
   const sim = game.sim;
   const speed = TIME.speeds[game.speedIdx];
   const modalOpen = !$('#modal-wrap').hidden && !game.modalClosable;
-  if (speed > 0 && !modalOpen && !sim.s.gameOver && !sim.s.pendingLoan) sim.advance((dt * speed) / TIME.monthSeconds);
+  const running = speed > 0 && !modalOpen && !sim.s.gameOver && !sim.s.pendingLoan;
+  game.renderer.timeRunning = running;
+  if (running) sim.advance((dt * speed) / TIME.monthSeconds);
   if (sim.events.length) handleEvents();
   if (sim.dirtyCells.size || sim.dirtyAll) {
     game.renderer.applyDirty([...sim.dirtyCells], sim.dirtyAll);
@@ -827,7 +883,7 @@ async function boot() {
       get sim() { return game.sim; }, get renderer() { return game.renderer; }, map: game.map, game,
       advance: (months) => { game.sim.advance(months); handleEvents(); },
       build: (...a) => game.sim.build(...a),
-      buyRegion, setTool, undo, doSave, restart, openEra, inspect, openMoney, openLayers, setOverlay, setAgents,
+      buyRegion, setTool, undo, doSave, restart, openEra, inspect, gotoCell, openMoney, openLayers, setOverlay, setAgents,
       get loaded() { return loaded; },
       screenOf: (x, y) => game.renderer.cellToScreen(x, y),
       serialize: () => serialize(game.sim),
