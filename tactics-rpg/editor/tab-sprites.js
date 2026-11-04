@@ -1,7 +1,7 @@
 // 素材分頁：48×48 像素編輯器
 import { TILE, SPRITE_CATEGORIES, UNDO_LIMIT, MAX_PALETTE } from '../config.js';
 import { decodePixels, encodePixels, blankPixels, toRGBA, floodFill, flipH, flipV, addColor, PIXEL_COUNT } from '../pixels.js';
-import { genId, byId, paletteOf, findReferences } from '../model.js';
+import { genId, byId, paletteOf, findReferences, removeSpriteFromCharacters } from '../model.js';
 import { drawThumb, clearSpriteCache } from '../render.js';
 import { h, select, toast, downloadBlob, safeFileName, confirmDelete } from './dom.js';
 
@@ -18,7 +18,7 @@ export default {
   title: '素材',
   render(el, app) {
     const p = app.project;
-    const ts = (app.tabState.sprites ||= { selId: null, filter: 'all', color: 1, tool: 'pencil', zoom: 10, grid: true });
+    const ts = (app.tabState.sprites = { selId: null, filter: 'all', color: 1, tool: 'pencil', zoom: 10, grid: true, ...(app.tabState.sprites || {}) });
     if (!byId(p.sprites, ts.selId)) ts.selId = (p.sprites.find((s) => ts.filter === 'all' || s.category === ts.filter) || p.sprites[0])?.id || null;
     const sprite = () => byId(p.sprites, ts.selId);
     let pixels = sprite() ? decodePixels(sprite().pixels) : null;
@@ -62,10 +62,7 @@ export default {
           const s = sprite();
           const refs = findReferences(p, 'sprite', s.id);
           if (!confirmDelete(s.name, refs)) return;
-          for (const c of p.characters) {
-            for (const d of ['down', 'up', 'left', 'right']) if (c.sprites?.[d] === s.id) c.sprites[d] = null;
-            if (c.portrait === s.id) c.portrait = null;
-          }
+          removeSpriteFromCharacters(p, s.id);
           for (const m of p.maps) for (const k of ['ground', 'objects']) m[k] = m[k].map((x) => (x === s.id ? null : x));
           p.sprites.splice(p.sprites.indexOf(s), 1);
           history.delete(s.id);
@@ -77,6 +74,10 @@ export default {
     );
     renderList();
     el.append(h('h2', {}, '素材（48×48 像素編輯器）'));
+    if (ts.returnTo) {
+      const back = ts.returnTo;
+      el.append(h('div', { class: 'row' }, h('button', { type: 'button', id: 'sprite-return', class: 'primary', onclick: () => { ts.returnTo = null; app.goTab(back.tab); } }, `← ${back.label}`)));
+    }
     if (!sprite()) {
       el.append(h('div', { class: 'split' }, left, h('div', { class: 'card grow' }, '還沒有素材，按「新增」開始畫。')));
       return;

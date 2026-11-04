@@ -2,6 +2,7 @@
 import { TILE } from './config.js';
 import { decodePixels, toRGBA, flipH } from './pixels.js';
 import { byId, paletteOf, terrainAt } from './model.js';
+import { resolveFrame } from './anim.js';
 
 const cache = new Map(); // key: sprite id → { key, canvas }
 
@@ -24,11 +25,10 @@ export function spriteCanvas(project, spriteId, flip = false) {
 }
 export const clearSpriteCache = () => cache.clear();
 
-// 角色依方向取圖：右可設為左的翻轉；缺圖時退回下 → 任何一張
-export function unitSprite(project, sprites, flipRight, dir) {
-  const s = sprites || {};
-  if (dir === 'right' && (flipRight || !s.right) && s.left) return spriteCanvas(project, s.left, true);
-  return spriteCanvas(project, s[dir], false) || spriteCanvas(project, s.down) || spriteCanvas(project, s.left) || spriteCanvas(project, s.up) || spriteCanvas(project, s.right);
+// 角色（或戰場單位）某動作 / 方向 / 第 k 格的圖；缺圖依 anim.js 的退回規則，完全沒圖回傳 null
+export function unitFrame(project, c, action = 'walk', dir = 'down', k = 0) {
+  const f = resolveFrame(c, action, dir, k, (id) => !!byId(project.sprites, id));
+  return f ? spriteCanvas(project, f.id, f.flip) : null;
 }
 
 // 畫一張縮圖到 canvas 元素
