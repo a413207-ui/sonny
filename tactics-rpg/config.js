@@ -9,7 +9,7 @@ export const AUTOSAVE_MS = 2000;
 export const MAX_PALETTE = 64; // 調色盤上限（含透明）
 export const STORAGE_PREFIX = 'tacticsRpg.';
 export const PROJECT_FORMAT = 'tactics-rpg-project';
-export const PROJECT_VERSION = 1;
+export const PROJECT_VERSION = 2; // v2：角色動作（anims）
 
 export const GRADES = ['X', 'S', 'A', 'B', 'C', 'D'];
 // 預設值，可在「相剋表」分頁修改
@@ -37,5 +37,20 @@ export const STAT_KEYS = ['武力', '統帥', '智力', '血量'];
 
 // 試玩畫面
 export const BATTLE_ZOOMS = [0.5, 0.75, 1, 1.5, 2];
-export const MOVE_STEP_MS = 90; // 每走一格的動畫時間
+export const MOVE_STEP_MS = 150; // 每走一格的動畫時間（×1 速度）
 export const AI_PAUSE_MS = 250;
+export const ANIM_SPEEDS = [1, 2, 0]; // 試玩「動畫速度」：×1、×2、0 = 跳過
+export const DEATH_FADE_MS = 400; // 倒下後淡出時間
+
+// 角色動作（v2）。走路固定 3 格；其他每方向 1～6 格。ms = 每格毫秒（預設值，可在角色分頁改）
+export const ANIM_ACTIONS = [
+  { id: 'walk', name: '走路', count: 3, ms: 150, fixedCount: true },
+  { id: 'attack', name: '攻擊', count: 3, ms: 120 },
+  { id: 'cast', name: '施放計策', count: 3, ms: 120 },
+  { id: 'defeat', name: '戰敗倒下', count: 2, ms: 120 },
+];
+export const ANIM_DIRS = ['down', 'up', 'left', 'right'];
+export const ANIM_FRAME_MIN = 1;
+export const ANIM_FRAME_MAX = 6;
+export const ANIM_MS_MIN = 30;
+export const ANIM_MS_MAX = 2000;

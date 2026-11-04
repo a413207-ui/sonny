@@ -1,7 +1,7 @@
 // 地圖分頁：地面層 / 物件層 / 地形覆寫 / 關卡配置（出擊點、敵人）
 import { TILE, MAP_MIN, MAP_MAX, UNDO_LIMIT } from '../config.js';
 import { byId, createMap, resizeMap, terrainAt, findReferences } from '../model.js';
-import { drawMap, drawThumb, unitSprite, clampCam, screenToCell, cellToScreen } from '../render.js';
+import { drawMap, drawThumb, unitFrame, clampCam, screenToCell, cellToScreen } from '../render.js';
 import { h, select, numInput, toast, confirmDelete } from './dom.js';
 
 const ZOOMS = [0.5, 0.75, 1, 1.5, 2];
@@ -166,7 +166,7 @@ export default {
           const c = byId(p.characters, e.char);
           const [sx, sy] = cellToScreen(cam, e.at[0], e.at[1]);
           g.fillStyle = 'rgba(232,88,74,.45)'; g.fillRect(sx + 2, sy + 2, tsz - 4, tsz - 4);
-          const img = c && unitSprite(p, c.sprites, c.flipRight, 'left');
+          const img = c && unitFrame(p, c, 'walk', 'left', 0);
           if (img) g.drawImage(img, sx, sy, tsz, tsz);
         }
       }

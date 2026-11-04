@@ -2,6 +2,7 @@
 import { TILE } from './config.js';
 import { encodePixels } from './pixels.js';
 import { createEmptyProject } from './model.js';
+import { defaultAnims } from './anim.js';
 
 // 調色盤索引（對應 DEFAULT_COLORS）
 const C = {
@@ -119,7 +120,9 @@ const TEAM = {
   ally: { body: C.BL, dark: C.NV, hat: C.DB },
   enemy: { body: C.R, dark: C.DR, hat: C.K },
 };
-function figure(kind, team, dir) {
+// pose：step 走路（0 站立、1 左腳、2 右腳）、atk 攻擊（1 舉起、2 出手、3 收回）、cast 施放計策（1～3）
+function figure(kind, team, dir, pose = {}) {
+  const step = pose.step || 0, atk = pose.atk || 0, cast = pose.cast || 0;
   const px = canvas();
   const t = TEAM[team];
   const mounted = kind === 'cav';
@@ -131,28 +134,47 @@ function figure(kind, team, dir) {
       rect(px, 4, 22, 9, 8, C.BR);
       dot(px, 6, 24, C.K);
       rect(px, 34, 26, 6, 3, C.DB);
-      for (const x of [11, 16, 30, 35]) rect(px, x, 37, 3, 8, C.DB);
+      const legs = [[11, 16, 30, 35], [8, 18, 27, 37], [13, 14, 32, 33]][step];
+      for (const x of legs) rect(px, x, 37, 3, 8, C.DB);
     } else {
       rect(px, 17, 26, 14, 14, C.BR);
-      for (const x of [18, 28]) rect(px, x, 39, 3, 6, C.DB);
+      [18, 28].forEach((x, i) => rect(px, x, 39 - (step === i + 1 ? 2 : 0), 3, 6, C.DB));
       if (dir === 'down') { rect(px, 20, 34, 8, 11, C.BR); dot(px, 21, 37, C.K); dot(px, 26, 37, C.K); rect(px, 22, 43, 4, 2, C.DB); }
       else rect(px, 22, 38, 4, 7, C.DB);
     }
   }
   // 腿
   if (!mounted) {
-    rect(px, 18, 37, 5, 8, t.dark);
-    rect(px, 25, 37, 5, 8, t.dark);
-    rect(px, 17, 44, 6, 2, C.K);
-    rect(px, 25, 44, 6, 2, C.K);
+    if (dir === 'left' && step) {
+      // 側面跨步：前腳往左、後腳往右（後腳顏色深一點）
+      const [front, back] = step === 1 ? [14, 29] : [29, 14];
+      rect(px, back, 37, 5, 8, C.K); rect(px, back - 1, 44, 6, 2, C.K);
+      rect(px, front, 37, 5, 8, t.dark); rect(px, front - 1, 44, 6, 2, C.K);
+    } else {
+      // 正面 / 背面：抬起一隻腳（短 2 格）
+      const lift = (i) => (step === i + 1 ? 2 : 0);
+      rect(px, 18, 37, 5, 8 - lift(0), t.dark);
+      rect(px, 25, 37, 5, 8 - lift(1), t.dark);
+      rect(px, 17, 44 - lift(0), 6, 2, C.K);
+      rect(px, 25, 44 - lift(1), 6, 2, C.K);
+    }
   }
   // 身體
   rect(px, 16, 22 + oy, 16, 16, t.body);
   rect(px, 16, 34 + oy, 16, 2, C.DB); // 腰帶
-  rect(px, 12, 23 + oy, 4, 11, t.body); // 手臂
-  rect(px, 32, 23 + oy, 4, 11, t.body);
-  rect(px, 12, 33 + oy, 4, 3, C.SK);
-  rect(px, 32, 33 + oy, 4, 3, C.SK);
+  if (cast) {
+    // 施放計策：雙手舉高
+    const up = cast === 1 ? 6 : 11;
+    rect(px, 12, 23 + oy - up, 4, 11, t.body);
+    rect(px, 32, 23 + oy - up, 4, 11, t.body);
+    rect(px, 12, 21 + oy - up, 4, 3, C.SK);
+    rect(px, 32, 21 + oy - up, 4, 3, C.SK);
+  } else {
+    rect(px, 12, 23 + oy, 4, 11, t.body); // 手臂
+    rect(px, 32, 23 + oy, 4, 11, t.body);
+    rect(px, 12, 33 + oy, 4, 3, C.SK);
+    rect(px, 32, 33 + oy, 4, 3, C.SK);
+  }
   // 頭
   disc(px, 23.5, 13 + oy, 8, C.SK);
   if (dir === 'up') disc(px, 23.5, 13 + oy, 8, t.hat);
@@ -169,27 +191,69 @@ function figure(kind, team, dir) {
       rect(px, 18, 13 + oy, 2, 3, C.K);
     }
   }
-  // 武器
+  // 武器（攻擊時：1 舉起、2 往面向方向出手、3 收回一半）
+  const fwd = { left: [-1, 0], down: [0, 1], up: [0, -1] }[dir];
+  const [ax, ay] = atk === 1 ? [0, -6] : atk === 2 ? [fwd[0] * 6, fwd[1] * 6 + (dir === 'left' ? 2 : 0)] : atk === 3 ? [fwd[0] * 3, fwd[1] * 3] : [0, 0];
   if (kind === 'inf') {
-    const x = dir === 'left' ? 10 : 37;
-    rect(px, x, 14 + oy, 2, 20, C.LG);
-    rect(px, x - 2, 32 + oy, 6, 2, C.GO);
-    rect(px, x, 34 + oy, 2, 4, C.DB);
+    const x = (dir === 'left' ? 10 : 37) + ax, y0 = 14 + oy + ay;
+    rect(px, x, y0, 2, 20, C.LG);
+    rect(px, x - 2, y0 + 18, 6, 2, C.GO);
+    rect(px, x, y0 + 20, 2, 4, C.DB);
+    if (atk) rect(px, x - 1, y0 + 20, 4, 3, C.SK); // 握劍的手
+    if (atk === 2) for (let k = 0; k < 3; k++) dot(px, x + (dir === 'left' ? -2 - k : 3 + k), y0 + 2 + k * 5, C.W); // 揮劍光
   } else if (kind === 'cav') {
-    const x = dir === 'left' ? 9 : 37;
-    line(px, x, 2 + oy + 6, x, 40, C.BR);
-    rect(px, x - 1, 3 + oy + 4, 3, 5, C.WW);
+    const x = (dir === 'left' ? 9 : 37) + ax;
+    line(px, x, 8 + oy + ay, x, 40 + ay, C.BR);
+    rect(px, x - 1, 7 + oy + ay, 3, 5, C.WW);
+    if (atk) rect(px, x - 1, 28 + oy + ay, 3, 3, C.SK);
   } else {
-    // 弓
+    // 弓：1 拉弓、2 放箭（箭飛出去）、3 收弓
     const x = dir === 'left' ? 9 : 37;
     for (let y = 16; y <= 38; y++) {
       const bend = Math.round(Math.sin(((y - 16) / 22) * Math.PI) * 4);
       dot(px, dir === 'left' ? x - bend : x + bend, y + oy, C.BR);
     }
-    line(px, x, 16 + oy, x, 38 + oy, C.W);
+    const pull = atk === 1 ? (dir === 'left' ? 5 : -5) : 0;
+    line(px, x, 16 + oy, x + pull, 27 + oy, C.W);
+    line(px, x + pull, 27 + oy, x, 38 + oy, C.W);
+    if (atk === 1) line(px, x + pull, 27 + oy, x + pull + (dir === 'left' ? -9 : 9), 27 + oy, C.LG);
+    if (atk === 2) {
+      if (dir === 'left') line(px, 0, 27 + oy, 6, 27 + oy, C.LG);
+      else if (dir === 'down') line(px, x, 38, x, 47, C.LG);
+      else line(px, x, 0, x, 10, C.LG);
+    }
     if (dir !== 'up') rect(px, 30, 20 + oy, 3, 12, C.DB); // 箭袋
   }
+  // 計策的光點
+  if (cast >= 2) {
+    const r = rng(cast * 13);
+    for (let k = 0; k < (cast === 2 ? 6 : 14); k++) {
+      const a = r() * Math.PI * 2, d = 6 + r() * (cast === 2 ? 6 : 12);
+      dot(px, Math.round(24 + Math.cos(a) * d), Math.round(6 + oy + Math.sin(a) * d * 0.5), k % 2 ? C.PY : C.LP);
+    }
+  }
   return px;
+}
+
+// 戰敗倒下：1 跪下（往下沉）、2 倒在地上（轉 90°）
+function shifted(src, dx, dy) {
+  const px = canvas();
+  for (let y = 0; y < TILE; y++) for (let x = 0; x < TILE; x++) {
+    const sx = x - dx, sy = y - dy;
+    if (sx >= 0 && sy >= 0 && sx < TILE && sy < TILE) px[y * TILE + x] = src[sy * TILE + sx];
+  }
+  return px;
+}
+function knocked(kind, team, k) {
+  const stand = figure(kind, team, 'down');
+  if (k === 1) {
+    const px = shifted(stand, 0, 6);
+    for (let i = 46 * TILE; i < TILE * TILE; i++) px[i] = 0;
+    return px;
+  }
+  const rot = canvas();
+  for (let y = 0; y < TILE; y++) for (let x = 0; x < TILE; x++) rot[x * TILE + (TILE - 1 - y)] = stand[y * TILE + x];
+  return shifted(rot, 0, 10);
 }
 
 function portrait(team, boss) {
@@ -204,6 +268,19 @@ function portrait(team, boss) {
   if (boss) { rect(px, 15, 18, 7, 2, C.K); rect(px, 27, 18, 7, 2, C.K); rect(px, 18, 31, 13, 3, C.DB); }
   else rect(px, 21, 30, 7, 2, C.DR);
   return px;
+}
+
+// 範例角色的動作：4 方向走路 3 格 + 攻擊 3 格 + 倒下 2 格（右 = 左翻轉，所以右邊留空）
+function sampleAnims(team, kind, withCast) {
+  const a = defaultAnims();
+  const id = (dir, suf) => `spr_${team}_${kind}_${dir}${suf}`;
+  for (const dir of ['down', 'up', 'left']) {
+    a.walk.frames[dir] = [id(dir, ''), id(dir, '_w2'), id(dir, '_w3')];
+    a.attack.frames[dir] = [id(dir, '_a1'), id(dir, '_a2'), id(dir, '_a3')];
+    a.defeat.frames[dir] = [`spr_${team}_${kind}_ko1`, `spr_${team}_${kind}_ko2`];
+    if (withCast) a.cast.frames[dir] = [1, 2, 3].map((k) => `spr_ally_inf_${dir}_c${k}`);
+  }
+  return a;
 }
 
 export function createSampleProject() {
@@ -224,9 +301,18 @@ export function createSampleProject() {
   sp('spr_house', '民房', 'object', house(), null);
   const kinds = { inf: '步兵', cav: '騎兵', arc: '弓兵' };
   const teams = { ally: '我方', enemy: '敵方' };
-  for (const team of Object.keys(teams)) for (const kind of Object.keys(kinds)) for (const dir of ['down', 'up', 'left']) {
-    sp(`spr_${team}_${kind}_${dir}`, `${teams[team]}${kinds[kind]}-${{ down: '下', up: '上', left: '左' }[dir]}`, 'unit', figure(kind, team, dir));
+  const DIR3 = { down: '下', up: '上', left: '左' };
+  for (const team of Object.keys(teams)) for (const kind of Object.keys(kinds)) {
+    const base = `${teams[team]}${kinds[kind]}`;
+    for (const dir of Object.keys(DIR3)) {
+      sp(`spr_${team}_${kind}_${dir}`, `${base}-${DIR3[dir]}`, 'unit', figure(kind, team, dir));
+      for (const k of [2, 3]) sp(`spr_${team}_${kind}_${dir}_w${k}`, `${base}-走${DIR3[dir]}${k}`, 'unit', figure(kind, team, dir, { step: k - 1 }));
+      for (const k of [1, 2, 3]) sp(`spr_${team}_${kind}_${dir}_a${k}`, `${base}-攻${DIR3[dir]}${k}`, 'unit', figure(kind, team, dir, { atk: k }));
+    }
+    for (const k of [1, 2]) sp(`spr_${team}_${kind}_ko${k}`, `${base}-倒下${k}`, 'unit', knocked(kind, team, k));
   }
+  // 主角另外畫施放計策 3 格（計策系統下一版做，可在角色分頁預覽）
+  for (const dir of Object.keys(DIR3)) for (const k of [1, 2, 3]) sp(`spr_ally_inf_${dir}_c${k}`, `我方步兵-計${DIR3[dir]}${k}`, 'unit', figure('inf', 'ally', dir, { cast: k }));
   sp('spr_pt_hero', '頭像-阿誠', 'portrait', portrait('ally', false));
   sp('spr_pt_boss', '頭像-山賊頭目', 'portrait', portrait('enemy', true));
 
@@ -246,11 +332,12 @@ export function createSampleProject() {
     p.characters.push({
       id, name, faction, unitType, level: extra.level || 1, isLeader: !!extra.isLeader, mp: 0, portrait: extra.portrait || null,
       sprites: { down: `spr_${team}_${kind}_down`, up: `spr_${team}_${kind}_up`, left: `spr_${team}_${kind}_left`, right: null },
+      anims: sampleAnims(team, kind, !!extra.cast),
       flipRight: true,
       stats,
     });
   };
-  chr('chr_hero', '阿誠', 'ally', 'ut_inf', 'inf', { 武力: 13, 統帥: 9, 智力: 7, 血量: 38 }, { isLeader: true, portrait: 'spr_pt_hero', level: 3 });
+  chr('chr_hero', '阿誠', 'ally', 'ut_inf', 'inf', { 武力: 13, 統帥: 9, 智力: 7, 血量: 38 }, { isLeader: true, portrait: 'spr_pt_hero', level: 3, cast: true });
   chr('chr_tiger', '小虎', 'ally', 'ut_cav', 'cav', { 武力: 14, 統帥: 7, 智力: 4, 血量: 34 }, { level: 2 });
   chr('chr_bell', '小鈴', 'ally', 'ut_arc', 'arc', { 武力: 12, 統帥: 5, 智力: 9, 血量: 28 }, { level: 2 });
   chr('chr_bandit', '山賊', 'enemy', 'ut_inf', 'inf', { 武力: 10, 統帥: 5, 智力: 2, 血量: 24 });

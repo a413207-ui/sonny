@@ -1,14 +1,28 @@
 // 試玩戰鬥畫面（編輯器「試玩」分頁與匯出遊戲共用）：canvas 繪製、點擊操作、動畫、AI 回合、戰鬥紀錄。
-import { TILE, BATTLE_ZOOMS, MOVE_STEP_MS, AI_PAUSE_MS } from './config.js';
-import { drawMap, unitSprite, spriteCanvas, clampCam, screenToCell, cellToScreen, visibleRange } from './render.js';
+import { TILE, BATTLE_ZOOMS, MOVE_STEP_MS, AI_PAUSE_MS, ANIM_SPEEDS, DEATH_FADE_MS, STORAGE_PREFIX } from './config.js';
+import { drawMap, unitFrame, spriteCanvas, clampCam, screenToCell, cellToScreen, visibleRange } from './render.js';
+import { byId } from './model.js';
+import { actionTiming, frameAt, resolveFrame, dirToward } from './anim.js';
 import * as B from './battle.js';
+
+// 試玩設定「動畫速度」：存在 localStorage（只記這一個數字），讀不到就用 ×1
+const SPEED_KEY = `${STORAGE_PREFIX}animSpeed`;
+function loadSpeed() {
+  try { const v = Number(localStorage.getItem(SPEED_KEY)); return ANIM_SPEEDS.includes(v) && localStorage.getItem(SPEED_KEY) !== null ? v : 1; } catch { return 1; }
+}
+function saveSpeed(v) {
+  try { localStorage.setItem(SPEED_KEY, String(v)); } catch { /* 忽略 */ }
+}
+const speedLabel = (v) => (v ? `動畫 ×${v}` : '動畫 跳過');
 
 const FACTION_COLOR = { ally: '#4a9ae8', enemy: '#e8584a', guest: '#68b040' };
 const esc = (s) => String(s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]);
 
 export function mountBattle(root, project, stageId, opts = {}) {
-  const fast = !!opts.fast;
-  const ms = (v) => (fast ? 0 : v);
+  const fast = !!opts.fast; // ?fast=1（測試用）= 一律跳過動畫
+  let speed = fast ? 0 : loadSpeed(); // 1、2 或 0（跳過）
+  const skip = () => fast || speed === 0;
+  const ms = (v) => (skip() ? 0 : v / speed);
   root.innerHTML = `
   <div class="bv">
     <div class="bv-top">
@@ -19,6 +33,7 @@ export function mountBattle(root, project, stageId, opts = {}) {
       <button type="button" data-act="auto" title="讓電腦替我方所有還沒行動的角色行動">全軍委任</button>
       <button type="button" data-act="end">結束回合</button>
       <button type="button" data-act="zoom" title="縮放"></button>
+      <button type="button" data-act="speed" title="動畫速度：×1 → ×2 → 跳過"></button>
       ${opts.onExit ? '<button type="button" data-act="exit">離開試玩</button>' : ''}
     </div>
     <div class="bv-main">
@@ -45,13 +60,13 @@ export function mountBattle(root, project, stageId, opts = {}) {
   let vw = 0, vh = 0, dpr = 1;
   let raf = 0, destroyed = false;
   let floats = [];
-  const disp = new Map(); // uid → {x,y}
+  const disp = new Map(); // uid → { x, y, anim }；anim = { action, t0 } 播放中的動作（null = 走路第 1 格站著）
 
   function start() {
     st = B.createBattle(project, stageId, { seed: opts.seed });
     ui = { mode: 'idle', sel: null, reach: null, atkCells: null, targets: [], target: null, inspect: null, hover: null, busy: false };
     disp.clear();
-    for (const u of st.units) disp.set(u.uid, { x: u.x, y: u.y });
+    for (const u of st.units) disp.set(u.uid, { x: u.x, y: u.y, anim: null });
     floats = [];
     $('.bv-title').textContent = st.stage.name;
     $('.bv-result').classList.add('hidden');
@@ -80,6 +95,11 @@ export function mountBattle(root, project, stageId, opts = {}) {
     clampCam(st.map, cam, vw, vh);
   }
   function updateZoomBtn() { $('[data-act="zoom"]').textContent = `縮放 ${cam.scale}×`; }
+  function updateSpeedBtn() {
+    const b = $('[data-act="speed"]');
+    b.textContent = speedLabel(fast ? 0 : speed);
+    b.disabled = fast;
+  }
   function centerOn(u) {
     if (!u) return;
     cam.x = (u.x + 0.5) * TILE - vw / cam.scale / 2;
@@ -121,16 +141,17 @@ export function mountBattle(root, project, stageId, opts = {}) {
     }
     const r = visibleRange(st.map, cam, vw, vh);
     for (const u of st.units) {
-      if (!u.alive && !u.fading) continue;
+      if (!u.alive && !u.dying) continue;
       const d = disp.get(u.uid);
       if (d.x < r.x0 - 1 || d.x > r.x1 + 1 || d.y < r.y0 - 1 || d.y > r.y1 + 1) continue;
       const [sx, sy] = cellToScreen(cam, d.x, d.y);
-      g.globalAlpha = u.fading ? Math.max(0, 1 - (now - u.fading) / 400) : 1;
+      g.globalAlpha = u.fading ? Math.max(0, 1 - ((now - u.fading) * (speed || 1)) / DEATH_FADE_MS) : 1;
       g.fillStyle = FACTION_COLOR[u.faction];
       g.beginPath();
       g.ellipse(sx + ts / 2, sy + ts * 0.86, ts * 0.36, ts * 0.12, 0, 0, Math.PI * 2);
       g.fill();
-      const img = unitSprite(project, u.sprites, u.flipRight, u.dir);
+      const fr = currentFrame(u, now);
+      const img = unitFrame(project, u, fr.action, u.dir, fr.k);
       if (img) g.drawImage(img, Math.round(sx), Math.round(sy), Math.round(ts), Math.round(ts));
       else { g.fillStyle = FACTION_COLOR[u.faction]; g.fillRect(sx + ts * 0.2, sy + ts * 0.2, ts * 0.6, ts * 0.6); }
       if (u.acted && st.phase === u.faction) { g.fillStyle = 'rgba(0,0,0,.45)'; g.fillRect(sx, sy, ts, ts); }
@@ -162,42 +183,79 @@ export function mountBattle(root, project, stageId, opts = {}) {
       g.globalAlpha = 1;
     }
   }
-  const float = (x, y, text, color) => floats.push({ x, y, text, color, t0: performance.now(), dur: fast ? 300 : 900 });
+  const float = (x, y, text, color) => floats.push({ x, y, text, color, t0: performance.now(), dur: skip() ? 300 : 900 / Math.max(1, speed) });
   const sleep = (t) => new Promise((res) => setTimeout(res, ms(t)));
+
+  // ---- 角色動作 ----
+  // 目前該畫哪個動作的第幾格：攻擊 / 計策播完回到走路第 1 格；倒下停在最後一格
+  function currentFrame(u, now) {
+    const a = disp.get(u.uid)?.anim;
+    if (skip()) return u.dying ? { action: 'defeat', k: actionTiming(u, 'defeat').count - 1 } : { action: 'walk', k: 0 };
+    if (!a) return { action: 'walk', k: 0 };
+    const { count, ms: fms } = actionTiming(u, a.action);
+    const k = frameAt(a.action, (now - a.t0) * speed, count, fms);
+    return k < 0 ? { action: 'walk', k: 0 } : { action: a.action, k };
+  }
+  function setAnim(u, action) {
+    const d = disp.get(u.uid);
+    d.anim = action ? { action, t0: performance.now() } : null;
+  }
+  // 播一次動作（攻擊 / 計策 / 倒下），回傳播完的 Promise；hitAt(總時間) 可在中途觸發（例如顯示傷害）
+  async function playAction(u, action, onHit) {
+    const { count, ms: fms } = actionTiming(u, action);
+    setAnim(u, action);
+    const hitAt = Math.max(0, count - 1) * fms; // 最後一格出手
+    await sleep(hitAt);
+    onHit?.();
+    await sleep(fms);
+    if (action !== 'defeat') setAnim(u, null);
+  }
 
   async function animateMove(u, path) {
     const d = disp.get(u.uid);
-    if (!path || path.length < 2 || fast) { d.x = u.x; d.y = u.y; return; }
-    const finalDir = u.dir;
+    const endDir = B.lastStepDir(path) || u.dir;
+    if (!path || path.length < 2 || skip()) { d.x = u.x; d.y = u.y; u.dir = endDir; return; }
+    setAnim(u, 'walk');
+    const stepMs = MOVE_STEP_MS / speed;
     for (let k = 1; k < path.length; k++) {
       const [x0, y0] = path[k - 1], [x1, y1] = path[k];
-      u.dir = x1 > x0 ? 'right' : x1 < x0 ? 'left' : y1 > y0 ? 'down' : 'up';
+      u.dir = dirToward(x1 - x0, y1 - y0) || u.dir;
       const t0 = performance.now();
       await new Promise((res) => {
         const step = () => {
           if (destroyed) return res();
-          const t = Math.min(1, (performance.now() - t0) / MOVE_STEP_MS);
+          const t = Math.min(1, (performance.now() - t0) / stepMs);
           d.x = x0 + (x1 - x0) * t; d.y = y0 + (y1 - y0) * t;
           if (t < 1) requestAnimationFrame(step); else res();
         };
         step();
       });
     }
-    u.dir = finalDir;
+    setAnim(u, null);
+    u.dir = endDir; // 面向最後一步的方向
     d.x = u.x; d.y = u.y;
   }
   async function playEvents(events) {
+    // 會倒下的單位在動畫播完前都要畫出來
+    for (const ev of events) if (ev.type === 'defeat') ev.unit.dying = true;
     for (const ev of events) {
       if (ev.type === 'strike') {
-        const d = ev.defender;
-        if (ev.hit) float(d.x, d.y, `-${ev.damage}`, ev.counter ? '#ffd080' : '#ffffff');
-        else float(d.x, d.y, '閃避！', '#a0d8ff');
-        refresh();
-        await sleep(450);
+        const a = ev.attacker, d = ev.defender;
+        a.dir = dirToward(d.x - a.x, d.y - a.y) || a.dir; // 出手前轉向目標（反擊者轉向攻擊者）
+        await playAction(a, 'attack', () => {
+          if (ev.hit) float(d.x, d.y, `-${ev.damage}`, ev.counter ? '#ffd080' : '#ffffff');
+          else float(d.x, d.y, '閃避！', '#a0d8ff');
+          refresh();
+        });
+        await sleep(300);
       } else if (ev.type === 'defeat') {
-        ev.unit.fading = performance.now();
-        await sleep(400);
-        ev.unit.fading = 0;
+        const u = ev.unit;
+        await playAction(u, 'defeat');
+        u.fading = performance.now();
+        await sleep(DEATH_FADE_MS);
+        u.fading = 0;
+        u.dying = false;
+        setAnim(u, null);
       } else if (ev.type === 'heal') {
         float(ev.unit.x, ev.unit.y, `+${ev.amount}`, '#a8e070');
       }
@@ -413,6 +471,10 @@ export function mountBattle(root, project, stageId, opts = {}) {
       cam.x = cx - vw / cam.scale / 2; cam.y = cy - vh / cam.scale / 2;
       clampCam(st.map, cam, vw, vh);
       updateZoomBtn();
+    } else if (act === 'speed') {
+      speed = ANIM_SPEEDS[(ANIM_SPEEDS.indexOf(speed) + 1) % ANIM_SPEEDS.length];
+      saveSpeed(speed);
+      updateSpeedBtn();
     } else if (act === 'restart') start();
     else if (act === 'next') {
       const idx = project.stages.indexOf(st.stage);
@@ -478,6 +540,7 @@ export function mountBattle(root, project, stageId, opts = {}) {
   ro.observe(stageEl);
 
   start();
+  updateSpeedBtn();
   raf = requestAnimationFrame(frame);
 
   return {
@@ -493,6 +556,17 @@ export function mountBattle(root, project, stageId, opts = {}) {
       return [r.left + sx + (TILE * cam.scale) / 2, r.top + sy + (TILE * cam.scale) / 2];
     },
     centerOn: (x, y) => centerOn({ x, y }),
+    get speed() { return fast ? 0 : speed; },
+    // 測試用：某單位目前的朝向與畫面上的動作格
+    animOf(uid) {
+      const u = st.units.find((x) => x.uid === uid);
+      if (!u) return null;
+      const fr = currentFrame(u, performance.now());
+      const f = resolveFrame(u, fr.action, u.dir, fr.k, (id) => !!byId(project.sprites, id));
+      return { dir: u.dir, action: fr.action, k: fr.k, sprite: f?.id || null, flip: !!f?.flip, alive: u.alive, dying: !!u.dying };
+    },
+    // 播放某單位的動作（計策系統完成前，用來預覽「施放計策」；測試也會用）
+    playAction: async (uid, action) => { const u = st.units.find((x) => x.uid === uid); if (!u) return; await playAction(u, action); setAnim(u, null); },
     destroy() {
       destroyed = true;
       cancelAnimationFrame(raf);

@@ -9,7 +9,7 @@ button:hover:not(:disabled) { background: #eef1f8; }
 button.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
 button.primary:hover { background: #1f4a96; }
 button.danger { color: var(--danger); }
-button.active { background: var(--accent); color: #fff; border-color: var(--accent); }
+button.active, button.active:hover:not(:disabled) { background: var(--accent); color: #fff; border-color: var(--accent); }
 button:disabled { opacity: .5; cursor: default; }
 input, select, textarea { font: inherit; padding: 4px 6px; border: 1px solid var(--line); border-radius: 5px; background: #fff; color: var(--text); }
 input[type=checkbox] { width: auto; }
@@ -86,3 +86,11 @@ canvas.pix { image-rendering: pixelated; }
   .topbar button { padding: 4px 8px; }
   .map-wrap { width: 100%; height: 50vh; }
 }
+/* 角色動作編輯 */
+.anim-row { align-items: flex-start; gap: 10px; padding: 6px 0; border-top: 1px solid var(--line); flex-wrap: wrap; }
+.anim-dir { width: 3.5em; padding-top: 18px; }
+.anim-slot { align-items: center; gap: 3px; width: 124px; }
+.anim-slot .thumb { width: 64px; height: 64px; }
+.anim-slot select { width: 120px; }
+.anim-preview { width: 96px; height: 96px; }
+button.small { padding: 2px 6px; font-size: 12px; }

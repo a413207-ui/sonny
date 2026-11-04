@@ -1,10 +1,11 @@
 // 專案資料模型：建立、驗證（含版本遷移）、查找與引用檢查。不碰 DOM。
 import {
   PROJECT_FORMAT, PROJECT_VERSION, TILE, DEFAULT_MAP_SIZE, MAP_MIN, MAP_MAX, GRADES,
-  DEFAULT_GRADE_MULT, DEFAULT_DAMAGE_FORMULA, DEFAULT_HIT_FORMULA, MAX_PALETTE, SPRITE_CATEGORIES, FACTIONS, STAT_KEYS,
+  DEFAULT_GRADE_MULT, DEFAULT_DAMAGE_FORMULA, DEFAULT_HIT_FORMULA, MAX_PALETTE, SPRITE_CATEGORIES, FACTIONS, STAT_KEYS, ANIM_ACTIONS,
 } from './config.js';
 import { DEFAULT_COLORS, decodePixels, isValidColor } from './pixels.js';
 import { checkFormula } from './formula.js';
+import { normalizeAnims, animsFromV1 } from './anim.js';
 
 let idCounter = 0;
 export function genId(prefix) {
@@ -112,7 +113,12 @@ export function findReferences(project, kind, id) {
   const nameOf = (x) => `「${x.name}」`;
   if (kind === 'sprite') {
     for (const c of project.characters) {
-      for (const d of ['down', 'up', 'left', 'right']) if (c.sprites?.[d] === id) refs.push(`角色${nameOf(c)}的${dirName(d)}圖`);
+      for (const d of ['down', 'up', 'left', 'right']) if (c.sprites?.[d] === id) refs.push(`角色${nameOf(c)}的${dirName(d)}靜止圖`);
+      for (const [act, a] of Object.entries(c.anims || {})) {
+        let n = 0;
+        for (const list of Object.values(a?.frames || {})) if (Array.isArray(list)) n += list.filter((x) => x === id).length;
+        if (n) refs.push(`角色${nameOf(c)}的${actionName(act)}動作 ${n} 格`);
+      }
       if (c.portrait === id) refs.push(`角色${nameOf(c)}的頭像`);
     }
     for (const m of project.maps) {
@@ -143,6 +149,18 @@ export function findReferences(project, kind, id) {
   return refs;
 }
 export const dirName = (d) => ({ down: '下', up: '上', left: '左', right: '右' })[d];
+export const actionName = (a) => ANIM_ACTIONS.find((x) => x.id === a)?.name || a;
+
+// 刪除素材時把角色的引用清掉（靜止圖、動作格；動作格保留位置改成空白）
+export function removeSpriteFromCharacters(project, id) {
+  for (const c of project.characters) {
+    for (const d of ['down', 'up', 'left', 'right']) if (c.sprites?.[d] === id) c.sprites[d] = null;
+    if (c.portrait === id) c.portrait = null;
+    for (const a of Object.values(c.anims || {})) {
+      for (const list of Object.values(a?.frames || {})) if (Array.isArray(list)) list.forEach((x, i) => { if (x === id) list[i] = null; });
+    }
+  }
+}
 
 // ---- 驗證與遷移 ----
 // 回傳 { ok, errors, project }；ok 時 project 為補齊預設值後的新物件（未知欄位保留）
@@ -232,6 +250,7 @@ export function validateProject(input) {
       if (!Number.isFinite(c.stats[k])) err(`角色「${c.name}」的${k}不是數字`);
     }
     if (!isObj(c.sprites)) c.sprites = { down: null, up: null, left: null, right: null };
+    c.anims = normalizeAnims(c.anims);
     if (!factionIds.includes(c.faction)) c.faction = 'ally';
     c.level = Number.isFinite(Number(c.level)) ? Number(c.level) : 1;
     c.mp = Number.isFinite(Number(c.mp)) ? Number(c.mp) : 0;
@@ -264,8 +283,14 @@ export function validateProject(input) {
   return errors.length ? { ok: false, errors } : { ok: true, errors: [], project: p };
 }
 
-// 版本遷移：目前只有 v1，未來新版本在這裡逐版升級
-function migrate(p) {
-  // if (p.version === 1) { ...; p.version = 2; }
+// 版本遷移：逐版升級（只改複本，不動原始資料）
+export function migrate(p) {
+  if (p.version === 1) {
+    // v1 → v2：角色多了動作（anims）。舊的 4 方向靜止圖放進走路第 1 格，c.sprites 保留當退回用。
+    for (const c of Array.isArray(p.characters) ? p.characters : []) {
+      if (c && typeof c === 'object' && !Array.isArray(c) && !c.anims) c.anims = animsFromV1(c.sprites);
+    }
+    p.version = 2;
+  }
   return p;
 }

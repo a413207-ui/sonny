@@ -3,7 +3,7 @@
 // 規則：執行用模組只能用 `import { a, b } from './x.js'`、`import * as X from './x.js'`
 // 和 `export function / const / let / class`，否則匯出時會報錯。
 
-export const RUNTIME_MODULES = ['config.js', 'formula.js', 'pixels.js', 'model.js', 'render.js', 'battle.js', 'battle-view.js', 'game-main.js'];
+export const RUNTIME_MODULES = ['config.js', 'formula.js', 'pixels.js', 'anim.js', 'model.js', 'render.js', 'battle.js', 'battle-view.js', 'game-main.js'];
 
 export function bundleModules(sources) {
   let out = "'use strict';\nconst __mods = Object.create(null);\n";

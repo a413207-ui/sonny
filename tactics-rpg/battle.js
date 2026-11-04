@@ -1,6 +1,7 @@
 // 戰鬥規則（純邏輯，不碰 DOM）：陣營輪流回合、移動、攻擊、反擊、命中/閃避、地形回血、勝敗、AI 主動進攻。
 import { byId, terrainAt, gradeOf, gradeMult } from './model.js';
 import { evalFormula } from './formula.js';
+import { dirToward } from './anim.js';
 
 export const PHASES = ['ally', 'enemy', 'guest'];
 export const PHASE_NAMES = { ally: '我方', enemy: '敵方', guest: '友軍' };
@@ -31,7 +32,7 @@ function makeUnit(project, charId, faction, x, y, uid) {
     typeId: ut.id, typeName: ut.name, move: Math.max(0, Number(ut.move) || 0),
     range: [Math.max(0, Number(ut.range?.[0]) || 1), Math.max(0, Number(ut.range?.[1]) || 1)],
     terrainCost: ut.terrainCost || {},
-    isLeader: !!c.isLeader, sprites: c.sprites || {}, flipRight: !!c.flipRight, portrait: c.portrait || null,
+    isLeader: !!c.isLeader, sprites: c.sprites || {}, anims: c.anims || null, flipRight: !!c.flipRight, portrait: c.portrait || null,
     dir: faction === 'enemy' ? 'left' : 'right', acted: false, alive: true, origin: null,
   };
 }
@@ -191,21 +192,23 @@ export function forecast(st, a, d, from = [a.x, a.y]) {
   return { atk, counter };
 }
 
-const faceToward = (u, tx, ty) => {
-  const dx = tx - u.x, dy = ty - u.y;
-  if (dx === 0 && dy === 0) return;
-  u.dir = Math.abs(dx) >= Math.abs(dy) ? (dx > 0 ? 'right' : 'left') : (dy > 0 ? 'down' : 'up');
-};
+export function faceToward(u, tx, ty) {
+  const d = dirToward(tx - u.x, ty - u.y);
+  if (d) u.dir = d;
+}
+// 路徑最後一步的方向（沒移動回傳 null）
+export function lastStepDir(path) {
+  if (!path || path.length < 2) return null;
+  const [x0, y0] = path[path.length - 2], [x1, y1] = path[path.length - 1];
+  return dirToward(x1 - x0, y1 - y0);
+}
 
+// 移動：走完後面向最後一步的方向
 export function moveUnit(st, unit, x, y, reach = reachable(st, unit)) {
   if (!reach.stops.has(y * st.w + x)) return null;
   const path = pathTo(st, reach, x, y);
   unit.origin = { x: unit.x, y: unit.y, dir: unit.dir };
-  if (path.length > 1) {
-    const [px, py] = path[path.length - 2];
-    unit.x = px; unit.y = py;
-    faceToward(unit, x, y);
-  }
+  unit.dir = lastStepDir(path) || unit.dir;
   unit.x = x; unit.y = y;
   return path;
 }
@@ -241,13 +244,15 @@ function strike(st, a, d, isCounter) {
   return events;
 }
 
-// 攻擊（含一次反擊）。回傳事件清單給畫面播動畫
+// 攻擊（含一次反擊）。回傳事件清單給畫面播動畫。攻擊者先轉向目標；會反擊時反擊者轉向攻擊者。
 export function attack(st, a, d) {
   if (!a.alive || !d.alive || !isFoe(a, d) || !canHit(a, a.x, a.y, d.x, d.y)) return [];
   faceToward(a, d.x, d.y);
-  faceToward(d, a.x, a.y);
   const events = strike(st, a, d, false);
-  if (d.alive && st.counterAttack && canHit(d, d.x, d.y, a.x, a.y)) events.push(...strike(st, d, a, true));
+  if (d.alive && st.counterAttack && canHit(d, d.x, d.y, a.x, a.y)) {
+    faceToward(d, a.x, a.y);
+    events.push(...strike(st, d, a, true));
+  }
   a.acted = true;
   a.origin = null;
   checkResult(st);
