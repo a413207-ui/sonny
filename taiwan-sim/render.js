@@ -1,8 +1,8 @@
 // 斜角 2.5D（等角）繪圖。全部用程式畫，沒有外部圖檔。
 // 效能：靜態畫面（地形＋建築）畫進快取畫布，只有拖曳/縮放超出範圍或地圖變動時才重畫；
 // 縮很小時改畫整張地圖的總覽快取（變動時只重畫變動的區域）。每一幀只另外畫船、移民、預覽。
-import { TERRAIN, ERAS } from './config.js';
-import { BLD, ZONE } from './sim.js';
+import { TERRAIN, ERAS, FACILITIES } from './config.js';
+import { BLD, BLD_KEY, ZONE } from './sim.js';
 
 export const TW = 64;
 export const TH = 32;
@@ -20,6 +20,20 @@ const shade = (c, f) => [Math.min(255, c[0] * f), Math.min(255, c[1] * f), Math.
 const SEA_DEEP = '#1f5d8c';
 const SEA_SHALLOW = [70, 140, 190];
 const ZONE_TINT = { 1: [96, 186, 92], 2: [80, 140, 220], 3: [228, 190, 60] };
+// 簡化版（縮小、detail = false）的區塊顏色：[頂, 左, 右]，依分區與樣式時代
+const SIMPLE_STYLE = {
+  1: { 1: ['#c0563e', '#c9a77a', '#a8875c'], 2: ['#5a5752', '#b5653e', '#96502f'], 3: ['#d6cfbf', '#ddd6c6', '#bfb7a6'], 4: ['#efd9c7', '#e6c9b2', '#c6a68e'], 5: ['#a9d0ec', '#7fb2d9', '#5a8fbf'] },
+  2: { 1: ['#d84a3a', '#c9b48a', '#a8946c'], 2: ['#e8e4dc', '#d6d0c4', '#b4ad9f'], 3: ['#d8d2c4', '#cfc6b4', '#aea592'], 4: ['#e46a4a', '#e8e2d6', '#c4bcae'], 5: ['#9fc3e2', '#6f9ccc', '#4f78a6'] },
+  3: { 1: ['#5e5550', '#a0784f', '#82603d'], 2: ['#6a6f78', '#9a9890', '#7b7972'], 3: ['#c8c6be', '#b4b1a8', '#96938a'], 4: ['#4a7ab8', '#d8d8d4', '#b2b2ac'], 5: ['#2f4a6a', '#f2f2ee', '#d2d2cc'] },
+};
+const ELEV_LIFT = 24; // 高架離地高度（zoom = 1 時 px）
+const SIMPLE_BLD = {
+  railstop: ['#c86a3a', 8],
+  port: ['#7a5a3a', 10], well: ['#5a8ad8', 10], waterworks: ['#3a6ad8', 10], waterpoint: ['#6a9ae0', 6], purifier: ['#3f9ad8', 10],
+  coal: ['#444', 14], hydro: ['#8aa0b8', 12], nuclear: ['#d8d8d4', 26], modernplant: ['#eef0f2', 14],
+  lighthouse: ['#fff', 30], station: ['#c84', 14], dam: ['#c8c4b8', 14], epz: ['#e8e2d2', 24], skyscraper: ['#8fc0e0', 110],
+};
+
 
 export class Renderer {
   constructor(canvas, sim) {
@@ -238,49 +252,145 @@ export class Renderer {
       if (y < m.h - 1 && m.county[i + w] && m.county[i + w] !== cty) { ctx.beginPath(); ctx.moveTo(sx - hw, sy); ctx.lineTo(sx, sy + hh); ctx.stroke(); }
     }
     // 道路
-    if (g.road[i] || g.bld[i] === BLD.PORT) this.drawRoad(ctx, i, sx, sy, z);
+    const elevRoad = g.road[i] && g.elev[i];
+    if ((g.road[i] && !elevRoad) || g.bld[i] === BLD.PORT) this.drawRoad(ctx, i, sx, sy, z);
+    if (g.rail[i]) this.drawRail(ctx, i, sx, sy, z);
     // 管線、電線
     if (this.overlay === 'water' && g.pipe[i]) this.drawLine(ctx, i, sx, sy, z, 'pipe', '#1f6fe0', 0.16);
     if (g.wire[i] && (this.overlay === 'power' || z >= 0.35)) this.drawLine(ctx, i, sx, sy, z, 'wire', this.overlay === 'power' ? '#e0a000' : 'rgba(40,40,40,0.7)', this.overlay === 'power' ? 0.14 : 0.04, true);
     // 建築
+    if (g.metro[i] && z >= 0.2) this.drawMetro(ctx, i, sx, sy, z);
     if (g.bld[i]) this.drawBuilding(ctx, i, sx, sy, z, detail);
     else if (zt && g.level[i]) this.drawZoneBuildings(ctx, i, sx, sy, z, detail);
+    // 高架在建築上面（底下的格子可以蓋東西）
+    if (elevRoad) this.drawRoad(ctx, i, sx, sy, z);
   }
 
   drawRoad(ctx, i, sx, sy, z) {
     const g = this.sim.s.grid, m = this.map, w = m.w, x = i % w, y = (i / w) | 0;
     const era = this.sim.s.era;
     const bridge = g.road[i] === 2;
-    const col = bridge ? (era >= 2 ? '#a8a49c' : '#8b5a2b') : era >= 2 ? '#a39e95' : '#b8956a';
+    const tr = g.trans[i];
+    // 顏色：土路 → 石板路 → 柏油路；公路/高速公路/高架道路更寬
+    const col = bridge ? (era >= 3 ? '#b4b2aa' : era >= 2 ? '#a8a49c' : '#8b5a2b') : tr ? '#4a4d52' : era >= 3 ? '#5c5f64' : era >= 2 ? '#a39e95' : '#b8956a';
     const isNode = (j) => g.road[j] || g.bld[j] === BLD.PORT;
     const dirs = [];
-    if (x < w - 1 && isNode(i + 1)) dirs.push([TW / 4, TH / 4]);
-    if (x > 0 && isNode(i - 1)) dirs.push([-TW / 4, -TH / 4]);
-    if (y < m.h - 1 && isNode(i + w)) dirs.push([-TW / 4, TH / 4]);
-    if (y > 0 && isNode(i - w)) dirs.push([TW / 4, -TH / 4]);
+    if (x < w - 1 && isNode(i + 1)) dirs.push([TW / 4, TH / 4, i + 1]);
+    if (x > 0 && isNode(i - 1)) dirs.push([-TW / 4, -TH / 4, i - 1]);
+    if (y < m.h - 1 && isNode(i + w)) dirs.push([-TW / 4, TH / 4, i + w]);
+    if (y > 0 && isNode(i - w)) dirs.push([TW / 4, -TH / 4, i - w]);
     ctx.lineCap = 'round';
-    const lw = Math.max(1.2, (bridge ? 12 : 10) * z);
-    if (bridge && z >= 0.3) {
-      ctx.strokeStyle = 'rgba(40,25,10,0.7)';
-      ctx.lineWidth = lw + 3 * z;
+    const lw = Math.max(1.2, (bridge ? 12 : tr === 1 ? 12 : tr >= 2 ? 15 : 10) * z);
+    const el = !!g.elev[i];
+    const lift = el ? ELEV_LIFT * z : 0; // 高架抬高
+    const stroke = (color, width, dash = null, up = lift) => {
+      ctx.strokeStyle = color; ctx.lineWidth = width;
+      if (dash) ctx.setLineDash(dash);
       ctx.beginPath();
-      for (const [dx, dy] of dirs) { ctx.moveTo(sx, sy); ctx.lineTo(sx + dx * z * 2, sy + dy * z * 2); }
+      if (!dirs.length) { ctx.moveTo(sx - 0.1, sy - up); ctx.lineTo(sx + 0.1, sy - up); }
+      for (const [dx, dy, j] of dirs) { const up2 = el && !g.elev[j] ? 0 : up; ctx.moveTo(sx, sy - up); ctx.lineTo(sx + dx * z * 2, sy + dy * z * 2 - up2); }
+      ctx.stroke();
+      if (dash) ctx.setLineDash([]);
+    };
+    if (bridge && z >= 0.3) stroke('rgba(40,25,10,0.7)', lw + 3 * z, null, 0);
+    if (el) {
+      // 高架：柱子（每 N 格一根，看得到）→ 和地面道路相接的地方畫引道 → 橋面側邊
+      if (this.sim.pillar[i]) {
+        const pw = Math.max(1.5, 5 * z);
+        ctx.fillStyle = '#b8b6ae'; ctx.fillRect(sx - pw, sy - lift, pw, lift);
+        ctx.fillStyle = '#8e8c84'; ctx.fillRect(sx, sy - lift, pw, lift);
+        ctx.fillStyle = '#cfcdc4'; ctx.fillRect(sx - pw * 1.8, sy - lift - 2 * z, pw * 3.6, 3 * z);
+      }
+      ctx.lineCap = 'butt';
+      for (const [dx, dy, j] of dirs) {
+        if (g.elev[j]) continue;
+        ctx.strokeStyle = '#9a9890'; ctx.lineWidth = lw;
+        ctx.beginPath(); ctx.moveTo(sx, sy - lift); ctx.lineTo(sx + dx * z * 2, sy + dy * z * 2); ctx.stroke();
+      }
+      ctx.lineCap = 'round';
+      stroke('#8a8880', lw + 3 * z, null, lift - 3 * z);
+    }
+    if (tr === 2 && z >= 0.3) stroke('#3f8a4a', lw + 3 * z); // 高速公路：綠色路肩
+    stroke(col, lw);
+    if (bridge && era >= 5 && z >= 0.5) {
+      // 斜張橋：橋塔
+      ctx.strokeStyle = '#e8e8e8'; ctx.lineWidth = Math.max(1, 2 * z);
+      ctx.beginPath(); ctx.moveTo(sx, sy); ctx.lineTo(sx, sy - 18 * z); ctx.moveTo(sx, sy - 18 * z); ctx.lineTo(sx - 10 * z, sy - 4 * z); ctx.moveTo(sx, sy - 18 * z); ctx.lineTo(sx + 10 * z, sy - 4 * z); ctx.stroke();
+    }
+    if (era >= 2 && !bridge && z >= 0.5) {
+      if (tr) stroke(tr === 1 ? '#f0c040' : '#ffffff', Math.max(0.6, 1.2 * z), tr === 1 ? null : [4 * z, 4 * z]);
+      else stroke(era >= 3 ? 'rgba(255,255,255,0.7)' : 'rgba(255,255,255,0.35)', Math.max(0.5, 1 * z), [3 * z, 4 * z]);
+    }
+  }
+
+  // 鐵路：枕木＋兩條鐵軌（原創畫法）；鐵橋多畫一層鋼樑
+  drawRail(ctx, i, sx, sy, z) {
+    const g = this.sim.s.grid, m = this.map, w = m.w, x = i % w, y = (i / w) | 0;
+    const ex = [TW / 2 * z, TH / 2 * z], ey = [-TW / 2 * z, TH / 2 * z];
+    // 每個方向：沿線向量 a（半格）、垂直向量 p（格子單位）
+    const segs = [];
+    if (x < w - 1 && g.rail[i + 1]) segs.push([ex, ey, 1]);
+    if (x > 0 && g.rail[i - 1]) segs.push([ex, ey, -1]);
+    if (y < m.h - 1 && g.rail[i + w]) segs.push([ey, ex, 1]);
+    if (y > 0 && g.rail[i - w]) segs.push([ey, ex, -1]);
+    if (!segs.length) segs.push([ex, ey, 1], [ex, ey, -1]);
+    const active = this.sim.railActive[i];
+    if (g.rail[i] === 2 && z >= 0.3) {
+      ctx.strokeStyle = '#5a5048'; ctx.lineWidth = Math.max(2, 14 * z); ctx.lineCap = 'butt';
+      ctx.beginPath();
+      for (const [a, , sg] of segs) { ctx.moveTo(sx, sy); ctx.lineTo(sx + a[0] * 0.5 * sg, sy + a[1] * 0.5 * sg); }
       ctx.stroke();
     }
-    ctx.strokeStyle = col;
-    ctx.lineWidth = lw;
-    ctx.beginPath();
-    if (!dirs.length) { ctx.moveTo(sx - 0.1, sy); ctx.lineTo(sx + 0.1, sy); }
-    for (const [dx, dy] of dirs) { ctx.moveTo(sx, sy); ctx.lineTo(sx + dx * z * 2, sy + dy * z * 2); }
-    ctx.stroke();
-    if (era >= 2 && !bridge && z >= 0.5) {
-      ctx.strokeStyle = 'rgba(255,255,255,0.35)';
-      ctx.lineWidth = Math.max(0.5, 1 * z);
-      ctx.setLineDash([3 * z, 4 * z]);
+    if (z < 0.3) {
+      ctx.strokeStyle = active ? '#5a4030' : '#6a6058'; ctx.lineWidth = Math.max(1, 3 * z); ctx.lineCap = 'round';
       ctx.beginPath();
-      for (const [dx, dy] of dirs) { ctx.moveTo(sx, sy); ctx.lineTo(sx + dx * z * 2, sy + dy * z * 2); }
+      for (const [a, , sg] of segs) { ctx.moveTo(sx, sy); ctx.lineTo(sx + a[0] * 0.5 * sg, sy + a[1] * 0.5 * sg); }
       ctx.stroke();
-      ctx.setLineDash([]);
+      return;
+    }
+    // 道碴
+    ctx.strokeStyle = '#9a9286'; ctx.lineWidth = 9 * z; ctx.lineCap = 'butt';
+    ctx.beginPath();
+    for (const [a, , sg] of segs) { ctx.moveTo(sx, sy); ctx.lineTo(sx + a[0] * 0.5 * sg, sy + a[1] * 0.5 * sg); }
+    ctx.stroke();
+    // 枕木
+    ctx.strokeStyle = '#6b4a2e'; ctx.lineWidth = Math.max(1, 2 * z);
+    ctx.beginPath();
+    for (const [a, p, sg] of segs) for (const t of [0.08, 0.25, 0.42]) {
+      const cx = sx + a[0] * t * sg, cy = sy + a[1] * t * sg;
+      ctx.moveTo(cx - p[0] * 0.13, cy - p[1] * 0.13); ctx.lineTo(cx + p[0] * 0.13, cy + p[1] * 0.13);
+    }
+    ctx.stroke();
+    // 鐵軌
+    ctx.strokeStyle = active ? '#3a3c40' : '#6e6c68'; ctx.lineWidth = Math.max(0.8, 1.3 * z);
+    ctx.beginPath();
+    for (const [a, p, sg] of segs) for (const o of [-0.08, 0.08]) {
+      ctx.moveTo(sx + p[0] * o, sy + p[1] * o); ctx.lineTo(sx + a[0] * 0.5 * sg + p[0] * o, sy + a[1] * 0.5 * sg + p[1] * o);
+    }
+    ctx.stroke();
+    ctx.lineCap = 'round';
+  }
+
+  // 捷運：地面上畫一條彩色線，每隔幾格一個站
+  drawMetro(ctx, i, sx, sy, z) {
+    const g = this.sim.s.grid, m = this.map, w = m.w, x = i % w, y = (i / w) | 0;
+    ctx.strokeStyle = '#d0342c';
+    ctx.lineWidth = Math.max(1, 3 * z);
+    ctx.lineCap = 'round';
+    ctx.beginPath();
+    let any = false;
+    const seg = (dx, dy) => { ctx.moveTo(sx, sy); ctx.lineTo(sx + dx * z * 2, sy + dy * z * 2); any = true; };
+    if (x < w - 1 && g.metro[i + 1]) seg(TW / 4, TH / 4);
+    if (x > 0 && g.metro[i - 1]) seg(-TW / 4, -TH / 4);
+    if (y < m.h - 1 && g.metro[i + w]) seg(-TW / 4, TH / 4);
+    if (y > 0 && g.metro[i - w]) seg(TW / 4, -TH / 4);
+    if (!any) { ctx.moveTo(sx - 1, sy); ctx.lineTo(sx + 1, sy); }
+    ctx.stroke();
+    if ((x + y) % 4 === 0 && z >= 0.35) {
+      ctx.fillStyle = '#fff';
+      ctx.strokeStyle = '#d0342c';
+      ctx.lineWidth = Math.max(1, 1.5 * z);
+      ctx.beginPath(); ctx.ellipse(sx, sy, 5 * z, 2.6 * z, 0, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
     }
   }
 
@@ -336,21 +446,50 @@ export class Renderer {
     ctx.beginPath(); ctx.moveTo(...A); ctx.lineTo(...B); ctx.lineTo(...R2); ctx.lineTo(...R1); ctx.fill();
   }
 
+  // 樓層線（畫在方塊的兩個側面上）
+  floorLines(ctx, cx, cy, z, u, v, h, floors, color, cols = 0) {
+    if (z < 0.45 || floors < 2) return;
+    const ex = [TW / 2 * z, TH / 2 * z], ey = [-TW / 2 * z, TH / 2 * z];
+    const P = (a, b, up) => [cx + a * ex[0] + b * ey[0], cy + a * ex[1] + b * ey[1] - up * z];
+    ctx.strokeStyle = color;
+    ctx.lineWidth = Math.max(0.5, 0.8 * z);
+    ctx.beginPath();
+    for (let f = 1; f < floors; f++) {
+      const y = (h * f) / floors;
+      const A = P(-u, v, y), B = P(u, v, y), C = P(u, -v, y);
+      ctx.moveTo(...A); ctx.lineTo(...B); ctx.lineTo(...C);
+    }
+    for (let k = 1; k < cols; k++) {
+      const a = -u + (2 * u * k) / cols, b = v - (2 * v * k) / cols;
+      const p0 = P(a, v, 0), p1 = P(a, v, h);
+      ctx.moveTo(...p0); ctx.lineTo(...p1);
+      const q0 = P(u, b, 0), q1 = P(u, b, h);
+      ctx.moveTo(...q0); ctx.lineTo(...q1);
+    }
+    ctx.stroke();
+  }
+
+  // 區塊建築：依「樣式時代（bera）＋等級」畫，對照 config.js 的 BUILDING_STYLES
   drawZoneBuildings(ctx, i, sx, sy, z, detail) {
-    const g = this.sim.s.grid;
+    const sim = this.sim, g = sim.s.grid;
     const zt = g.zone[i], lv = g.level[i];
+    const era = Math.min(5, sim.beraAt(i));
     const ex = [TW / 2 * z, TH / 2 * z], ey = [-TW / 2 * z, TH / 2 * z];
     if (!detail) {
-      // 簡化：一個方塊，高度看等級
-      const col = zt === ZONE.R ? ['#e9d8b4', '#b9a57f', '#9a8866'] : zt === ZONE.C ? ['#c7dcf5', '#86a6cc', '#6b88ad'] : ['#e8d48a', '#b39c50', '#94803f'];
-      this.box(ctx, sx, sy, z, 0.32, 0.32, 4 + lv * 5, ...col);
+      // 簡化：一個方塊，顏色看時代、高度看等級與時代
+      const pal = SIMPLE_STYLE[zt][era];
+      const hMul = [0, 1, 1.2, 1.8, 2.6, 3.4][era];
+      this.box(ctx, sx, sy, z, 0.32, 0.32, 4 + lv * 5 * hMul, ...pal);
       return;
     }
-    // 依等級排列小建築
-    const slots = lv <= 1 ? [[-0.22, -0.18], [0.2, 0.2]] : lv === 2 ? [[-0.25, -0.25], [0.25, -0.22], [-0.22, 0.25], [0.25, 0.25]]
-      : [[-0.26, -0.26], [0.26, -0.26], [-0.26, 0.26], [0.26, 0.26]];
-    const modern = lv >= 3;
-    const fullness = zt === ZONE.R ? Math.min(1, g.pop[i] / Math.max(1, this.sim.capAt(i))) : 1;
+    // 依等級與時代決定棟數（越現代、越高級，棟數越少但越高）
+    let slots;
+    if (era >= 4 && lv >= 5) slots = [[0, 0]];
+    else if (era >= 3 && lv >= 3) slots = [[-0.22, -0.2], [0.22, 0.22]];
+    else if (lv <= 1) slots = [[-0.22, -0.18], [0.2, 0.2]];
+    else if (lv === 2) slots = [[-0.25, -0.25], [0.25, -0.22], [-0.22, 0.25], [0.25, 0.25]];
+    else slots = [[-0.26, -0.26], [0.26, -0.26], [-0.26, 0.26], [0.26, 0.26]];
+    const fullness = zt === ZONE.R ? Math.min(1, g.pop[i] / Math.max(1, sim.capAt(i))) : 1;
     const shown = zt === ZONE.R ? Math.max(1, Math.ceil(slots.length * Math.max(0.25, fullness))) : slots.length;
     for (let k = 0; k < shown; k++) {
       const [a, b] = slots[k];
@@ -358,97 +497,255 @@ export class Renderer {
       const cx = sx + (a + jx) * ex[0] + (b + jy) * ey[0];
       const cy = sy + (a + jx) * ex[1] + (b + jy) * ey[1];
       const r = hash(i, k + 3);
-      if (zt === ZONE.R) {
-        if (!modern) {
-          const wall = r < 0.5 ? ['#efe0bf', '#cdb98f', '#b09c74'] : ['#e6d2a8', '#c4ad7f', '#a68f64'];
-          this.box(ctx, cx, cy, z, 0.13, 0.1, 7, null, wall[1], wall[2]);
-          const roof = r < 0.6 ? ['#b5523b', '#8e3c2a'] : ['#c9a45c', '#a3833f'];
-          this.gable(ctx, cx, cy, z, 0.13, 0.1, 7, 6, roof[0], roof[1]);
-        } else {
-          const floors = lv === 3 ? 2 : 3;
-          this.box(ctx, cx, cy, z, 0.16, 0.14, 7 * floors, null, '#b5653e', '#96502f');
-          this.gable(ctx, cx, cy, z, 0.16, 0.14, 7 * floors, 5, '#6d6a66', '#57544f');
-        }
-      } else if (zt === ZONE.C) {
-        if (!modern) {
-          // 市集攤位：彩色遮棚
-          this.box(ctx, cx, cy, z, 0.12, 0.1, 5, null, '#c9b48a', '#a8946c');
-          const aw = r < 0.33 ? ['#d84a3a', '#a83426'] : r < 0.66 ? ['#3a7fd8', '#2a5fa8'] : ['#e0b030', '#b08820'];
-          this.gable(ctx, cx, cy, z, 0.14, 0.12, 5, 4, aw[0], aw[1]);
-        } else {
-          const h = lv === 3 ? 16 : 24;
-          this.box(ctx, cx, cy, z, 0.17, 0.15, h, '#e8e4dc', '#d6d0c4', '#b4ad9f');
-          // 招牌
-          const { P } = { P: (u, v, up) => [cx + u * ex[0] + v * ey[0], cy + u * ex[1] + v * ey[1] - up * z] };
-          ctx.fillStyle = r < 0.5 ? '#2f6fd0' : '#d04a2f';
-          const s1 = P(-0.1, 0.15, h * 0.55), s2 = P(0.1, 0.15, h * 0.55);
-          ctx.fillRect(Math.min(s1[0], s2[0]), s1[1] - 3 * z, Math.abs(s2[0] - s1[0]) + 1, 4 * z);
-        }
-      } else if (zt === ZONE.I) {
-        if (!modern) {
-          this.box(ctx, cx, cy, z, 0.15, 0.12, 6, null, '#a0784f', '#82603d');
-          this.gable(ctx, cx, cy, z, 0.15, 0.12, 6, 4, '#5e5550', '#4a423e');
-          if (k === 0) this.box(ctx, cx + 0.08 * ex[0], cy - 0.02 * ey[1], z, 0.025, 0.025, 14, '#555', '#6b5a4a', '#55473a');
-        } else {
-          this.box(ctx, cx, cy, z, 0.18, 0.16, 12, null, '#9a9890', '#7b7972');
-          // 鋸齒屋頂
-          for (let s = -1; s <= 1; s++) this.gable(ctx, cx + s * 0.11 * ey[0], cy + s * 0.11 * ey[1], z, 0.18, 0.05, 12, 4, '#6a6f78', '#555a62');
-          if (k === 0) this.box(ctx, cx + 0.12 * ex[0], cy, z, 0.03, 0.03, 30, '#7a3a2a', '#a04c35', '#843e2b');
-        }
+      const one = slots.length === 1;
+      if (zt === ZONE.R) this.drawHouse(ctx, cx, cy, z, era, lv, r, k, one);
+      else if (zt === ZONE.C) this.drawShop(ctx, cx, cy, z, era, lv, r, k, one, ex, ey);
+      else this.drawFactory(ctx, cx, cy, z, era, lv, r, k, one, ex, ey);
+    }
+  }
+
+  drawHouse(ctx, cx, cy, z, era, lv, r, k, one) {
+    if (era === 1) {
+      // 土角厝：土黃牆、紅瓦（等級 1 有些是茅草頂）
+      const wall = r < 0.5 ? ['#d8b98a', '#b8956a'] : ['#cfae7c', '#a98a5e'];
+      this.box(ctx, cx, cy, z, 0.13, 0.1, 7, null, ...wall);
+      const roof = lv >= 2 || r < 0.55 ? ['#b5523b', '#8e3c2a'] : ['#c9a45c', '#a3833f'];
+      this.gable(ctx, cx, cy, z, 0.13, 0.1, 7, 6, ...roof);
+    } else if (era === 2) {
+      // 磚造街屋：紅磚牆、黑瓦，高等級兩三層
+      const floors = lv <= 2 ? 1 : lv === 3 ? 2 : 3;
+      this.box(ctx, cx, cy, z, 0.16, 0.14, 7 * floors, null, '#b5653e', '#96502f');
+      this.floorLines(ctx, cx, cy, z, 0.16, 0.14, 7 * floors, floors, 'rgba(240,220,190,0.55)');
+      this.gable(ctx, cx, cy, z, 0.16, 0.14, 7 * floors, 5, '#55524e', '#45423f');
+    } else if (era === 3) {
+      // 公寓：水泥牆、平頂、頂樓水塔
+      const floors = lv <= 1 ? 1 : lv === 2 ? 2 : lv + 1;
+      const h = 6.5 * floors;
+      const wall = r < 0.5 ? ['#ddd6c6', '#e2dccd', '#bfb7a6'] : ['#e8dfc2', '#e6dbbd', '#c4b897'];
+      this.box(ctx, cx, cy, z, 0.17, 0.15, h, wall[0], wall[1], wall[2]);
+      this.floorLines(ctx, cx, cy, z, 0.17, 0.15, h, floors, 'rgba(90,90,100,0.45)');
+      if (floors >= 3) this.box(ctx, cx, cy - h * z, z, 0.04, 0.04, 5, '#5a8ac0', '#4a78ac', '#3a6290');
+    } else if (era === 4) {
+      // 大樓：磁磚外牆、高樓
+      const floors = lv <= 2 ? lv * 3 : lv === 3 ? 8 : lv === 4 ? 11 : lv === 5 ? 15 : 18;
+      const h = 4.6 * floors;
+      const u = one ? 0.24 : 0.17;
+      const tile = r < 0.5 ? ['#efd9c7', '#e6c9b2', '#c6a68e'] : ['#e9e2cf', '#ddd3bb', '#b9ae95'];
+      this.box(ctx, cx, cy, z, u, u * 0.9, h, tile[0], tile[1], tile[2]);
+      this.floorLines(ctx, cx, cy, z, u, u * 0.9, h, floors, 'rgba(120,90,70,0.4)');
+      if (lv >= 4) this.box(ctx, cx, cy - h * z, z, 0.06, 0.05, 6, '#c9c4b8', '#b8b2a4', '#9a9486');
+    } else {
+      // 玻璃帷幕：藍綠色玻璃、直線分割
+      const floors = lv <= 2 ? lv * 3 : lv === 3 ? 10 : lv === 4 ? 16 : lv === 5 ? 22 : 30;
+      const h = 4 * floors;
+      const u = one ? 0.22 : 0.16;
+      const gl = r < 0.5 ? ['#a9d0ec', '#7fb2d9', '#5a8fbf'] : ['#b5e0d8', '#86c4b8', '#5e9e94'];
+      this.box(ctx, cx, cy, z, u, u, h, gl[0], gl[1], gl[2]);
+      this.floorLines(ctx, cx, cy, z, u, u, h, Math.ceil(floors / 3), 'rgba(255,255,255,0.35)', 4);
+      if (lv >= 5) this.box(ctx, cx, cy - h * z, z, 0.015, 0.015, 14, '#ddd', '#ccc', '#aaa');
+    }
+  }
+
+  drawShop(ctx, cx, cy, z, era, lv, r, k, one, ex, ey) {
+    const P = (u, v, up) => [cx + u * ex[0] + v * ey[0], cy + u * ex[1] + v * ey[1] - up * z];
+    const sign = (h, col, w = 0.1) => {
+      const s1 = P(-w, 0.16, h), s2 = P(w, 0.16, h);
+      ctx.fillStyle = col;
+      ctx.fillRect(Math.min(s1[0], s2[0]), s1[1] - 3 * z, Math.abs(s2[0] - s1[0]) + 1, 4 * z);
+    };
+    const signCol = r < 0.33 ? '#d84a3a' : r < 0.66 ? '#2f6fd0' : '#e0a020';
+    if (era === 1) {
+      // 市集攤位：彩色遮棚
+      this.box(ctx, cx, cy, z, 0.12, 0.1, 5, null, '#c9b48a', '#a8946c');
+      const aw = r < 0.33 ? ['#d84a3a', '#a83426'] : r < 0.66 ? ['#3a7fd8', '#2a5fa8'] : ['#e0b030', '#b08820'];
+      this.gable(ctx, cx, cy, z, 0.14, 0.12, 5, 4, aw[0], aw[1]);
+    } else if (era === 2) {
+      // 商行：亭仔腳街屋＋招牌
+      const h = lv <= 2 ? 10 : lv === 3 ? 16 : 22;
+      this.box(ctx, cx, cy, z, 0.17, 0.15, h, '#e8e4dc', '#d6d0c4', '#b4ad9f');
+      this.floorLines(ctx, cx, cy, z, 0.17, 0.15, h, Math.round(h / 7), 'rgba(120,100,80,0.5)');
+      sign(h * 0.55, signCol);
+    } else if (era === 3) {
+      // 百貨：方正水泥樓、整排招牌
+      const h = lv <= 2 ? 12 : 8 + lv * 6;
+      this.box(ctx, cx, cy, z, 0.18, 0.16, h, '#d8d2c4', '#cfc6b4', '#aea592');
+      this.floorLines(ctx, cx, cy, z, 0.18, 0.16, h, Math.max(2, Math.round(h / 6.5)), 'rgba(60,60,70,0.35)');
+      sign(h * 0.8, signCol, 0.14);
+      sign(h * 0.45, r < 0.5 ? '#e0a020' : '#d84a3a', 0.12);
+    } else if (era === 4) {
+      // 商場：寬大低樓＋彩色屋頂（高等級加一棟塔）
+      const u = one ? 0.36 : 0.2;
+      const h = lv <= 2 ? 12 : 14 + lv * 3;
+      this.box(ctx, cx, cy, z, u, u * 0.85, h, r < 0.5 ? '#e46a4a' : '#4a8ae4', '#e8e2d6', '#c4bcae');
+      this.floorLines(ctx, cx, cy, z, u, u * 0.85, h, 3, 'rgba(90,80,70,0.35)');
+      sign(h * 0.7, signCol, u * 0.7);
+      if (lv >= 5) this.box(ctx, cx, cy - h * z, z, 0.12, 0.1, 30, '#ddd8cc', '#d0c9bb', '#ada595');
+    } else {
+      // 商辦大樓：玻璃帷幕＋頂樓招牌
+      const floors = lv <= 2 ? 4 : lv * 5;
+      const h = 4 * floors;
+      const u = one ? 0.24 : 0.17;
+      this.box(ctx, cx, cy, z, u, u, h, '#9fc3e2', '#6f9ccc', '#4f78a6');
+      this.floorLines(ctx, cx, cy, z, u, u, h, Math.ceil(floors / 2), 'rgba(255,255,255,0.4)', 3);
+      sign(h - 3, signCol, u * 0.8);
+    }
+  }
+
+  drawFactory(ctx, cx, cy, z, era, lv, r, k, one, ex, ey) {
+    if (era === 1) {
+      // 小作坊：木造＋小煙囪
+      this.box(ctx, cx, cy, z, 0.15, 0.12, 6, null, '#a0784f', '#82603d');
+      this.gable(ctx, cx, cy, z, 0.15, 0.12, 6, 4, '#5e5550', '#4a423e');
+      if (k === 0) this.box(ctx, cx + 0.08 * ex[0], cy - 0.02 * ey[1], z, 0.025, 0.025, 14, '#555', '#6b5a4a', '#55473a');
+    } else if (era === 2) {
+      // 製糖工廠：鋸齒屋頂＋高煙囪
+      this.box(ctx, cx, cy, z, 0.18, 0.16, 12, null, '#9a9890', '#7b7972');
+      for (let s = -1; s <= 1; s++) this.gable(ctx, cx + s * 0.11 * ey[0], cy + s * 0.11 * ey[1], z, 0.18, 0.05, 12, 4, '#6a6f78', '#555a62');
+      if (k === 0) this.box(ctx, cx + 0.12 * ex[0], cy, z, 0.03, 0.03, 30 + lv * 3, '#7a3a2a', '#a04c35', '#843e2b');
+    } else if (era === 3) {
+      // 加工廠：水泥廠房、平頂、水塔
+      const h = 10 + lv * 2;
+      this.box(ctx, cx, cy, z, 0.19, 0.16, h, '#c8c6be', '#b4b1a8', '#96938a');
+      this.floorLines(ctx, cx, cy, z, 0.19, 0.16, h, 2, 'rgba(60,60,60,0.35)');
+      if (k === 0) {
+        const [tx, ty] = [cx - 0.1 * ex[0], cy - 0.1 * ex[1]];
+        this.box(ctx, tx, ty - h * z, z, 0.04, 0.04, 8, '#7aa0c8', '#6a8cb0', '#56789a');
+        this.box(ctx, cx + 0.12 * ex[0], cy, z, 0.025, 0.025, 26, '#666', '#8a8a8a', '#707070');
       }
+    } else if (era === 4) {
+      // 加工出口區：大型鐵皮廠房（藍屋頂）
+      const u = one ? 0.36 : 0.2;
+      const h = 9 + lv * 2;
+      this.box(ctx, cx, cy, z, u, u * 0.8, h, '#4a7ab8', '#d8d8d4', '#b2b2ac');
+      this.floorLines(ctx, cx, cy, z, u, u * 0.8, h, 2, 'rgba(70,90,120,0.4)', 4);
+      if (k === 0 && lv >= 4) this.box(ctx, cx + 0.2 * ex[0], cy, z, 0.03, 0.03, 34, '#bbb', '#d0d0d0', '#a8a8a8');
+    } else {
+      // 科技園區：白色低樓＋玻璃帶＋屋頂太陽能板，沒有煙囪
+      const u = one ? 0.34 : 0.2;
+      const h = 10 + lv * 3;
+      this.box(ctx, cx, cy, z, u, u * 0.8, h, '#2f4a6a', '#f2f2ee', '#d2d2cc');
+      const ex2 = [TW / 2 * z, TH / 2 * z], ey2 = [-TW / 2 * z, TH / 2 * z];
+      const P = (a, b, up) => [cx + a * ex2[0] + b * ey2[0], cy + a * ex2[1] + b * ey2[1] - up * z];
+      ctx.fillStyle = 'rgba(90,150,210,0.85)';
+      const A = P(-u, u * 0.8, h * 0.6), B = P(u, u * 0.8, h * 0.6), B2 = P(u, u * 0.8, h * 0.4), A2 = P(-u, u * 0.8, h * 0.4);
+      ctx.beginPath(); ctx.moveTo(...A); ctx.lineTo(...B); ctx.lineTo(...B2); ctx.lineTo(...A2); ctx.fill();
     }
   }
 
   drawBuilding(ctx, i, sx, sy, z, detail) {
     const b = this.sim.s.grid.bld[i];
     const era = this.sim.s.era;
+    const key = BLD_KEY[b];
     if (!detail) {
-      const col = { [BLD.PORT]: '#7a5a3a', [BLD.WELL]: '#5a8ad8', [BLD.WATERWORKS]: '#3a6ad8', [BLD.COAL]: '#444', [BLD.LIGHTHOUSE]: '#fff', [BLD.STATION]: '#c84' }[b];
-      this.box(ctx, sx, sy, z, 0.3, 0.3, b === BLD.LIGHTHOUSE ? 30 : 10, col, col, col);
+      const [col, h] = SIMPLE_BLD[key] || ['#888', 10];
+      this.box(ctx, sx, sy, z, 0.3, 0.3, h, this.sim.isObsolete(key) ? '#ffb020' : col, col, col); // 過時設施：橘色頂
       return;
     }
     const ex = [TW / 2 * z, TH / 2 * z], ey = [-TW / 2 * z, TH / 2 * z];
     const at = (u, v) => [sx + u * ex[0] + v * ey[0], sy + u * ex[1] + v * ey[1]];
-    if (b === BLD.PORT) {
-      // 碼頭 + 倉庫 + （日據時代起）吊車
-      this.box(ctx, sx, sy, z, 0.42, 0.42, 2, '#8a6a48', '#6e5238', '#5a4330');
+    const tank = (cx, cy, r, h, top, side, dark) => {
+      ctx.fillStyle = side;
+      ctx.fillRect(cx - r * z, cy - h * z, 2 * r * z, h * z);
+      ctx.fillStyle = top;
+      ctx.beginPath(); ctx.ellipse(cx, cy - h * z, r * z, r * 0.5 * z, 0, 0, Math.PI * 2); ctx.fill();
+      ctx.fillStyle = dark;
+      ctx.beginPath(); ctx.ellipse(cx, cy, r * z, r * 0.5 * z, 0, 0, Math.PI); ctx.fill();
+    };
+    const smoke = (x, y, n, dark) => {
+      for (let k = 0; k < n; k++) {
+        ctx.fillStyle = dark ? `rgba(40,40,40,${0.55 - k * 0.12})` : `rgba(220,220,220,${0.6 - k * 0.14})`;
+        ctx.beginPath(); ctx.arc(x + k * 5 * z, y - k * 7 * z, (4 + k * 2.5) * z, 0, Math.PI * 2); ctx.fill();
+      }
+    };
+    if (key === 'port') {
+      // 碼頭 + 倉庫；日據起吊車；光復起貨櫃；經濟起飛起門式起重機
+      this.box(ctx, sx, sy, z, 0.42, 0.42, 2, era >= 3 ? '#8a8a86' : '#8a6a48', era >= 3 ? '#6e6e6a' : '#6e5238', era >= 3 ? '#5a5a56' : '#5a4330');
       const [wx, wy] = at(-0.15, -0.1);
-      this.box(ctx, wx, wy, z, 0.2, 0.15, 9, null, '#c8b48a', '#a8946a');
-      this.gable(ctx, wx, wy, z, 0.2, 0.15, 9, 5, '#7b4a32', '#5e3826');
-      if (era >= 2) {
+      if (era >= 3) {
+        const cols = ['#c44', '#36a', '#ca3', '#3a6'];
+        for (let k = 0; k < 4; k++) { const [cx, cy] = at(-0.25 + (k % 2) * 0.16, -0.2 + ((k / 2) | 0) * 0.14); this.box(ctx, cx, cy, z, 0.07, 0.05, 5 + (k % 2) * 5, cols[k], cols[k], cols[(k + 1) % 4]); }
+      } else {
+        this.box(ctx, wx, wy, z, 0.2, 0.15, 9, null, '#c8b48a', '#a8946a');
+        this.gable(ctx, wx, wy, z, 0.2, 0.15, 9, 5, '#7b4a32', '#5e3826');
+      }
+      if (era >= 4) {
+        const [cx, cy] = at(0.22, 0.15);
+        ctx.strokeStyle = '#2f6fd0'; ctx.lineWidth = Math.max(1, 2.5 * z);
+        ctx.beginPath(); ctx.moveTo(cx - 8 * z, cy); ctx.lineTo(cx - 8 * z, cy - 34 * z); ctx.moveTo(cx + 8 * z, cy + 2 * z); ctx.lineTo(cx + 8 * z, cy - 32 * z);
+        ctx.moveTo(cx - 14 * z, cy - 34 * z); ctx.lineTo(cx + 24 * z, cy - 31 * z); ctx.stroke();
+      } else if (era >= 2) {
         const [cx, cy] = at(0.2, 0.2);
         this.box(ctx, cx, cy, z, 0.03, 0.03, 26, '#c33', '#d44', '#a22');
         ctx.strokeStyle = '#c33'; ctx.lineWidth = Math.max(1, 2 * z);
         ctx.beginPath(); ctx.moveTo(cx, cy - 26 * z); ctx.lineTo(cx + 18 * z, cy - 20 * z); ctx.stroke();
       }
-    } else if (b === BLD.WELL) {
+    } else if (key === 'well') {
+      const dry = this.sim.isObsolete('well');
       ctx.fillStyle = '#8a8a8a';
       ctx.beginPath(); ctx.ellipse(sx, sy, 9 * z, 4.5 * z, 0, 0, Math.PI * 2); ctx.fill();
-      ctx.fillStyle = '#2a5a9a';
+      ctx.fillStyle = dry ? '#6a7a8a' : '#2a5a9a';
       ctx.beginPath(); ctx.ellipse(sx, sy - 1 * z, 6 * z, 3 * z, 0, 0, Math.PI * 2); ctx.fill();
       this.box(ctx, sx - 7 * z, sy, z, 0.015, 0.015, 12, null, '#6b4a2a', '#5a3d22');
       this.box(ctx, sx + 7 * z, sy, z, 0.015, 0.015, 12, null, '#6b4a2a', '#5a3d22');
       this.gable(ctx, sx, sy, z, 0.16, 0.08, 12, 4, '#a0522d', '#7a3e22');
-    } else if (b === BLD.WATERWORKS) {
+    } else if (key === 'railstop') {
+      // 車站：月台＋雨棚＋站名牌
+      this.box(ctx, sx, sy, z, 0.36, 0.16, 3, '#c8c2b4', '#aaa496', '#8e887a');
+      this.box(ctx, ...at(-0.05, 0.02), z, 0.18, 0.1, 9, null, '#e8dcc4', '#c8bca4');
+      this.gable(ctx, ...at(-0.05, 0.02), z, 0.2, 0.12, 9, 5, '#a64a32', '#843a26');
+      const [px, py] = at(0.26, 0.1);
+      ctx.fillStyle = '#fff'; ctx.fillRect(px - 5 * z, py - 16 * z, 10 * z, 5 * z);
+      ctx.fillStyle = '#2f6fd0'; ctx.fillRect(px - 0.6 * z, py - 11 * z, 1.2 * z, 11 * z);
+    } else if (key === 'waterpoint') {
+      // 自來水接點：小機房＋藍色管線
+      this.box(ctx, sx, sy, z, 0.14, 0.12, 7, '#d8dce0', '#c4c8cc', '#a4a8ac');
+      tank(...at(0.18, 0.12), 5, 9, '#4a8ae0', '#2a64b8', '#1e4a8a');
+    } else if (key === 'waterworks') {
       this.box(ctx, ...at(-0.15, 0.1), z, 0.2, 0.14, 10, '#ddd', '#c8c4bc', '#a8a49c');
-      for (const [u, v] of [[0.22, -0.18], [0.22, 0.18]]) {
+      for (const [u, v] of [[0.22, -0.18], [0.22, 0.18]]) tank(...at(u, v), 8, 10, '#4a8ae0', '#2a64b8', '#1e4a8a');
+    } else if (key === 'purifier') {
+      // 淨水廠：圓形沉澱池＋現代機房
+      for (const [u, v] of [[-0.2, -0.18], [-0.2, 0.2], [0.18, -0.18]]) {
         const [cx, cy] = at(u, v);
-        ctx.fillStyle = '#2a64b8';
-        ctx.fillRect(cx - 8 * z, cy - 10 * z, 16 * z, 10 * z);
-        ctx.fillStyle = '#4a8ae0';
-        ctx.beginPath(); ctx.ellipse(cx, cy - 10 * z, 8 * z, 4 * z, 0, 0, Math.PI * 2); ctx.fill();
-        ctx.fillStyle = '#1e4a8a';
-        ctx.beginPath(); ctx.ellipse(cx, cy, 8 * z, 4 * z, 0, 0, Math.PI); ctx.fill();
+        ctx.fillStyle = '#c8ccd0'; ctx.beginPath(); ctx.ellipse(cx, cy, 11 * z, 5.5 * z, 0, 0, Math.PI * 2); ctx.fill();
+        ctx.fillStyle = '#3f9ad8'; ctx.beginPath(); ctx.ellipse(cx, cy - 1 * z, 9 * z, 4.5 * z, 0, 0, Math.PI * 2); ctx.fill();
       }
-    } else if (b === BLD.COAL) {
+      this.box(ctx, ...at(0.2, 0.2), z, 0.14, 0.12, 14, '#f0f2f4', '#dfe3e6', '#bcc2c8');
+    } else if (key === 'coal') {
+      const old = this.sim.isObsolete('coal');
       this.box(ctx, sx, sy, z, 0.32, 0.25, 16, '#666', '#7a5040', '#5f3e32');
       for (const u of [-0.12, 0.12]) { const [cx, cy] = at(u, -0.12); this.box(ctx, cx, cy - 16 * z, z, 0.04, 0.04, 26, '#333', '#9a5a40', '#7a4632'); }
       ctx.fillStyle = '#222';
       const [px, py] = at(0.3, 0.32);
       ctx.beginPath(); ctx.moveTo(px - 10 * z, py); ctx.lineTo(px, py - 6 * z); ctx.lineTo(px + 10 * z, py); ctx.fill();
-    } else if (b === BLD.LIGHTHOUSE) {
+      if (old) { const [cx, cy] = at(-0.12, -0.12); smoke(cx, cy - 46 * z, 4, true); }
+    } else if (key === 'hydro') {
+      // 水力發電廠：河邊機房＋藍色引水管
+      this.box(ctx, sx, sy, z, 0.28, 0.2, 14, '#c8c2b4', '#b6ae9c', '#948c7a');
+      ctx.strokeStyle = '#3f7fd0'; ctx.lineWidth = Math.max(1, 4 * z);
+      const [a0, b0] = at(-0.4, -0.3), [a1, b1] = at(-0.1, -0.05);
+      ctx.beginPath(); ctx.moveTo(a0, b0 - 22 * z); ctx.lineTo(a1, b1 - 6 * z); ctx.stroke();
+      this.box(ctx, ...at(0.1, 0.18), z, 0.03, 0.03, 20, '#999', '#bbb', '#888');
+    } else if (key === 'nuclear') {
+      // 核能／火力電廠：雙曲線冷卻塔＋機房
+      this.box(ctx, ...at(0.18, 0.15), z, 0.18, 0.14, 14, '#e4e4e0', '#d0d0cc', '#aeaeaa');
+      for (const u of [-0.2, 0.05]) {
+        const [cx, cy] = at(u, -0.18);
+        const h = 34 * z;
+        ctx.fillStyle = '#d8d8d4';
+        ctx.beginPath(); ctx.moveTo(cx - 11 * z, cy); ctx.quadraticCurveTo(cx - 5 * z, cy - h * 0.6, cx - 7 * z, cy - h);
+        ctx.lineTo(cx + 7 * z, cy - h); ctx.quadraticCurveTo(cx + 5 * z, cy - h * 0.6, cx + 11 * z, cy); ctx.fill();
+        ctx.fillStyle = '#b8b8b4'; ctx.beginPath(); ctx.ellipse(cx, cy - h, 7 * z, 3 * z, 0, 0, Math.PI * 2); ctx.fill();
+        smoke(cx, cy - h - 4 * z, 3, false);
+      }
+    } else if (key === 'modernplant') {
+      // 新型電廠：白色機房＋細煙囪＋太陽能板
+      this.box(ctx, sx, sy, z, 0.3, 0.22, 12, '#f4f4f0', '#e2e4e6', '#c2c6ca');
+      this.box(ctx, ...at(0.2, -0.15), z, 0.025, 0.025, 34, '#e8e8e8', '#d4d4d4', '#b0b0b0');
+      ctx.fillStyle = '#2f4a7a';
+      for (const v of [-0.12, 0.08]) { const [cx, cy] = at(-0.08, v); ctx.fillRect(cx - 8 * z, cy - 15 * z, 14 * z, 3 * z); }
+    } else if (key === 'lighthouse') {
       this.box(ctx, sx, sy, z, 0.2, 0.2, 4, '#bbb', '#aaa', '#999');
-      // 白色塔身（上窄下寬）
       const h = 44 * z;
       ctx.fillStyle = '#f4f4f0';
       ctx.beginPath(); ctx.moveTo(sx - 7 * z, sy - 3 * z); ctx.lineTo(sx + 7 * z, sy - 3 * z); ctx.lineTo(sx + 4 * z, sy - h); ctx.lineTo(sx - 4 * z, sy - h); ctx.fill();
@@ -458,13 +755,64 @@ export class Renderer {
       ctx.fillRect(sx - 5 * z, sy - h - 8 * z, 10 * z, 8 * z);
       ctx.fillStyle = '#ffe680';
       ctx.fillRect(sx - 3 * z, sy - h - 7 * z, 6 * z, 5 * z);
-    } else if (b === BLD.STATION) {
+    } else if (key === 'station') {
       this.box(ctx, sx, sy, z, 0.4, 0.22, 14, null, '#c8794a', '#a8603a');
       this.gable(ctx, sx, sy, z, 0.4, 0.22, 14, 7, '#5a5a62', '#46464e');
       const [tx, ty] = at(0, 0.05);
       this.box(ctx, tx, ty, z, 0.08, 0.08, 34, '#5a5a62', '#d08a5a', '#b06c40');
       ctx.fillStyle = '#fff';
       ctx.beginPath(); ctx.arc(tx - 3 * z, ty - 28 * z, 3.5 * z, 0, Math.PI * 2); ctx.fill();
+    } else if (key === 'dam') {
+      // 水庫：弧形混凝土壩＋後方藍色水面
+      const [bx, by] = at(-0.15, -0.15);
+      ctx.fillStyle = '#3f8fd8';
+      ctx.beginPath(); ctx.ellipse(bx, by - 2 * z, 26 * z, 12 * z, 0, 0, Math.PI * 2); ctx.fill();
+      const [d0x, d0y] = at(-0.45, 0.3), [d1x, d1y] = at(0.35, -0.45);
+      ctx.fillStyle = '#c8c4b8';
+      ctx.beginPath(); ctx.moveTo(d0x, d0y); ctx.quadraticCurveTo(sx + 6 * z, sy + 6 * z, d1x, d1y); ctx.lineTo(d1x, d1y - 16 * z);
+      ctx.quadraticCurveTo(sx + 6 * z, sy - 10 * z, d0x, d0y - 16 * z); ctx.fill();
+      ctx.fillStyle = '#e8e4d8';
+      ctx.beginPath(); ctx.moveTo(d0x, d0y - 16 * z); ctx.quadraticCurveTo(sx + 6 * z, sy - 10 * z, d1x, d1y - 16 * z); ctx.lineTo(d1x, d1y - 19 * z); ctx.quadraticCurveTo(sx + 6 * z, sy - 13 * z, d0x, d0y - 19 * z); ctx.fill();
+      ctx.fillStyle = 'rgba(220,240,255,0.8)';
+      ctx.fillRect(sx - 2 * z, sy - 12 * z, 4 * z, 14 * z);
+    } else if (key === 'epz') {
+      // 加工出口區管理處：辦公樓＋旗桿＋大門
+      this.box(ctx, ...at(-0.05, -0.05), z, 0.26, 0.18, 26, '#e8e2d2', '#d8cfba', '#b4ab96');
+      this.floorLines(ctx, ...at(-0.05, -0.05), z, 0.26, 0.18, 26, 5, 'rgba(80,90,110,0.5)', 5);
+      const [fx, fy] = at(0.32, 0.3);
+      ctx.strokeStyle = '#ddd'; ctx.lineWidth = Math.max(1, 1.5 * z);
+      ctx.beginPath(); ctx.moveTo(fx, fy); ctx.lineTo(fx, fy - 40 * z); ctx.stroke();
+      ctx.fillStyle = '#d33'; ctx.fillRect(fx, fy - 40 * z, 12 * z, 7 * z);
+    } else if (key === 'skyscraper') {
+      // 摩天大樓：分段收窄的玻璃塔＋尖頂（原創造型）
+      let h = 0, u = 0.3;
+      const segs = [[0.3, 40], [0.25, 36], [0.21, 32], [0.17, 28], [0.13, 22]];
+      for (const [uu, hh] of segs) {
+        u = uu;
+        this.box(ctx, sx, sy - h * z, z, u, u, hh, '#b8dcef', '#6fa8d0', '#4a80ad');
+        this.floorLines(ctx, sx, sy - h * z, z, u, u, hh, 4, 'rgba(255,255,255,0.4)', 3);
+        h += hh;
+      }
+      this.box(ctx, sx, sy - h * z, z, 0.02, 0.02, 30, '#eee', '#ddd', '#bbb');
+      ctx.fillStyle = '#ff5050';
+      ctx.beginPath(); ctx.arc(sx, sy - (h + 30) * z, 2 * z, 0, Math.PI * 2); ctx.fill();
+    }
+    // 過時設施：⚠ 標記（照常運作但效果變差）
+    if (this.sim.isObsolete(key) && z >= 0.35) {
+      ctx.font = `bold ${Math.max(9, Math.round(14 * z))}px system-ui, sans-serif`;
+      ctx.textAlign = 'center';
+      ctx.lineWidth = 3; ctx.strokeStyle = 'rgba(0,0,0,0.6)';
+      ctx.strokeText('⚠', sx + 14 * z, sy - 22 * z);
+      ctx.fillStyle = '#ffb020';
+      ctx.fillText('⚠', sx + 14 * z, sy - 22 * z);
+    }
+    // 已過了時代的特殊建築：地標標記
+    const f = FACILITIES[key];
+    if (f?.specialOf && f.specialOf < era && z >= 0.5) {
+      ctx.fillStyle = '#ffd34a';
+      ctx.font = `${Math.round(11 * z)}px system-ui, sans-serif`;
+      ctx.textAlign = 'center';
+      ctx.fillText('★', sx + 16 * z, sy - 6 * z);
     }
   }
 
@@ -474,7 +822,7 @@ export class Renderer {
     const m = this.map, w = m.w, h = m.h;
     // 等角：x+y = s, x−y = d；s 由 wy、d 由 wx 決定
     const sMin = Math.max(0, Math.floor((wy0 - TH) / (TH / 2)) - 1);
-    const sMax = Math.min(w + h - 2, Math.ceil((wy1 + REL_MAX + 90) / (TH / 2)) + 1);
+    const sMax = Math.min(w + h - 2, Math.ceil((wy1 + REL_MAX + 240) / (TH / 2)) + 1);
     const dMin = Math.floor(wx0 / (TW / 2)) - 2, dMax = Math.ceil(wx1 / (TW / 2)) + 2;
     let count = 0;
     for (let s = sMin; s <= sMax; s++) {
@@ -514,7 +862,7 @@ export class Renderer {
     for (const i of cells) {
       const p = this.cellWorld(i);
       x0 = Math.min(x0, p.x - TW); x1 = Math.max(x1, p.x + TW);
-      y0 = Math.min(y0, p.y - 80); y1 = Math.max(y1, p.y + TH);
+      y0 = Math.min(y0, p.y - 140); y1 = Math.max(y1, p.y + TH);
     }
     void m;
     const ctx = this.overview.getContext('2d');
@@ -704,6 +1052,7 @@ export class Renderer {
     ctx.fillStyle = 'rgba(255,255,255,0.35)';
     ctx.beginPath(); ctx.ellipse(-2, 4, 30, 5, 0, 0, Math.PI * 2); ctx.fill();
     if (ship.era <= 1) {
+      // 帆船
       ctx.fillStyle = '#6b4226';
       ctx.beginPath(); ctx.moveTo(-26, -4); ctx.lineTo(26, -6); ctx.lineTo(18, 4); ctx.lineTo(-20, 4); ctx.fill();
       ctx.fillStyle = '#7a4a2a'; ctx.fillRect(-1, -40, 3, 36);
@@ -711,18 +1060,40 @@ export class Renderer {
       ctx.beginPath(); ctx.moveTo(2, -38); ctx.quadraticCurveTo(22, -24, 2, -8); ctx.fill();
       ctx.beginPath(); ctx.moveTo(-2, -34); ctx.quadraticCurveTo(-20, -20, -2, -8); ctx.fill();
       ctx.fillStyle = '#c33'; ctx.fillRect(1, -46, 8, 5);
-    } else {
+    } else if (ship.era === 2) {
+      // 蒸汽船
       ctx.fillStyle = '#2b2b30';
       ctx.beginPath(); ctx.moveTo(-32, -6); ctx.lineTo(32, -8); ctx.lineTo(24, 4); ctx.lineTo(-26, 4); ctx.fill();
       ctx.fillStyle = '#e8e2d4'; ctx.fillRect(-16, -16, 26, 10);
       ctx.fillStyle = '#c4382a'; ctx.fillRect(-4, -30, 8, 15);
       ctx.fillStyle = '#222'; ctx.fillRect(-4, -32, 8, 3);
-      // 煙
       for (let k = 0; k < 3; k++) {
         const ph = ((now / 900 + k / 3) % 1);
         ctx.fillStyle = `rgba(90,90,90,${0.5 * (1 - ph)})`;
         ctx.beginPath(); ctx.arc(-ph * 18, -36 - ph * 18, 4 + ph * 6, 0, Math.PI * 2); ctx.fill();
       }
+    } else if (ship.era === 3) {
+      // 貨輪：紅色船底、黑色船身、船尾白色駕駛艙、吊桿
+      ctx.fillStyle = '#9a2a22';
+      ctx.beginPath(); ctx.moveTo(-36, 0); ctx.lineTo(38, -1); ctx.lineTo(30, 5); ctx.lineTo(-30, 5); ctx.fill();
+      ctx.fillStyle = '#26282c';
+      ctx.beginPath(); ctx.moveTo(-38, -8); ctx.lineTo(40, -10); ctx.lineTo(38, 0); ctx.lineTo(-36, 0); ctx.fill();
+      ctx.fillStyle = '#f0ece4'; ctx.fillRect(-32, -22, 14, 13);
+      ctx.fillStyle = '#d8a040'; ctx.fillRect(-28, -30, 6, 8);
+      ctx.strokeStyle = '#d8a040'; ctx.lineWidth = 2;
+      ctx.beginPath(); ctx.moveTo(4, -10); ctx.lineTo(4, -30); ctx.lineTo(18, -14); ctx.moveTo(24, -10); ctx.lineTo(24, -26); ctx.stroke();
+    } else {
+      // 貨櫃輪（現代更長）：彩色貨櫃
+      const L = ship.era >= 5 ? 1.25 : 1;
+      ctx.save(); ctx.scale(L, 1);
+      ctx.fillStyle = '#a02a24';
+      ctx.beginPath(); ctx.moveTo(-40, 0); ctx.lineTo(42, -1); ctx.lineTo(34, 6); ctx.lineTo(-34, 6); ctx.fill();
+      ctx.fillStyle = ship.era >= 5 ? '#1f3f6a' : '#2c3036';
+      ctx.beginPath(); ctx.moveTo(-42, -8); ctx.lineTo(44, -10); ctx.lineTo(42, 0); ctx.lineTo(-40, 0); ctx.fill();
+      const cols = ['#d04a3a', '#2f6fd0', '#e0a020', '#3a9a5a', '#8a5ac0'];
+      for (let r = 0; r < 2; r++) for (let c = 0; c < 8; c++) { ctx.fillStyle = cols[(c * 3 + r * 2 + ship.id) % cols.length]; ctx.fillRect(-26 + c * 8, -16 - r * 6, 7.5, 5.5); }
+      ctx.fillStyle = '#f2f2ee'; ctx.fillRect(-38, -26, 10, 18);
+      ctx.restore();
     }
     ctx.restore();
     if (ship.phase === 'dock' && ship.unloaded != null) {

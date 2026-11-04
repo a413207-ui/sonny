@@ -2,7 +2,9 @@
 // 金額單位：元。時間單位：月（遊戲內）。
 
 export const SAVE_KEY = 'taiwanSim.save';
-export const SAVE_VERSION = 1;
+// v2：第二版（時代 3–5、建築隨時代演進、縣市平衡）。v1 存檔讀進來會自動遷移（save.js migrate），
+// 遷移前的原檔另存一份在 `${SAVE_KEY}.v1-backup`，不會被覆蓋。
+export const SAVE_VERSION = 2;
 
 // ---- 時間 ----
 export const TIME = {
@@ -19,59 +21,69 @@ export const START = {
   port: '高雄港',
 };
 
-// ---- 買地：第 n 塊 = base × ratio^(n−1)（Sonny 已確認） ----
+// ---- 買地：第 n 塊 = base × ratio^(n−1)（Sonny 已確認，不改） ----
 export const LAND = {
   base: 500000,
   ratio: 1.5,
-  // 第一版建議開放購買的縣市；其餘縣市也能買，但數值沒有細調（介面上標「未細調」）
-  mvpRegions: ['臺南市'],
   allowOthers: true,
 };
 
-// ---- 時代（交給 Claude 決定的部分）----
+// ---- 時代 ----
 // popToNext：進入下一時代需要的人口；special：本時代的「時代特殊建築」（蓋好它 + 人口達標 → 進入下一時代）
-// maxLevel：本時代區塊最多能長到幾級；ship：本時代的船
+// maxLevel：本時代區塊最多能長到幾級；ship：本時代的船；taxMult：本時代的稅收倍率（物價與所得成長，收入面的平衡）
+// portUnload：本時代每個港口每月最多卸下幾人（船變大、碼頭跟著現代化）
 export const ERAS = [
   {
-    id: 1, name: '清末時代', years: '1860–1895', maxLevel: 2, popToNext: 2500,
+    id: 1, name: '清末時代', years: '1860–1895', maxLevel: 2, popToNext: 2500, taxMult: 1, portUnload: 120,
     ship: { name: '帆船', capacity: 40, intervalMonths: 2, travelMonths: 1 },
     special: 'lighthouse',
-    unlocks: ['土路', '木橋', '農舍（住）', '市集（商）', '小作坊（工）', '水井', '燈塔（特殊）'],
-    zoneNames: { R: '農舍', C: '市集', I: '小作坊' },
+    unlocks: ['土路', '木橋', '土角厝（住）', '市集（商）', '小作坊（工）', '水井', '燈塔（特殊）'],
+    zoneNames: { R: '土角厝', C: '市集', I: '小作坊' },
   },
   {
-    id: 2, name: '日據時代', years: '1895–1945', maxLevel: 4, popToNext: 20000,
+    id: 2, name: '日據時代', years: '1895–1945', maxLevel: 4, popToNext: 20000, taxMult: 1.25, portUnload: 250,
+    featured: ['rail', 'railstop'], featuredText: '鋪設鐵路、蓋車站：沿線區塊稅收與成長加成',
     ship: { name: '蒸汽船', capacity: 150, intervalMonths: 1.5, travelMonths: 0.8 },
     special: 'station',
-    unlocks: ['石板路', '石橋', '磚造街屋（住）', '商行（商）', '製糖工廠（工）', '燃煤發電廠', '電線', '自來水廠', '水管', '火車站（特殊）'],
+    unlocks: ['鐵路（主打）', '車站', '石板路', '石橋', '磚造街屋（住）', '商行（商）', '製糖工廠（工）', '燃煤發電廠', '電線', '自來水廠', '水管', '火車站（特殊）'],
     zoneNames: { R: '磚造街屋', C: '商行', I: '製糖工廠' },
   },
   {
-    id: 3, name: '民國光復時代', years: '1945–1970', maxLevel: 5, popToNext: 80000, locked: true,
+    id: 3, name: '民國光復時代', years: '1945–1970', maxLevel: 5, popToNext: 60000, taxMult: 1.7, portUnload: 600,
     ship: { name: '貨輪', capacity: 400, intervalMonths: 1, travelMonths: 0.6 },
     special: 'dam',
-    unlocks: ['柏油路', '公路', '公寓（住）', '百貨（商）', '加工廠（工）', '水力發電廠', '水庫（特殊）'],
-    zoneNames: { R: '公寓', C: '百貨', I: '加工廠' },
+    unlocks: ['柏油路', '公路', '水泥橋', '公寓（住）', '百貨（商）', '加工區（工）', '水力發電廠', '自來水接點', '水庫（特殊）'],
+    zoneNames: { R: '公寓', C: '百貨', I: '加工區' },
   },
   {
-    id: 4, name: '經濟起飛時代', years: '1970–1990', maxLevel: 6, popToNext: 250000, locked: true,
+    id: 4, name: '經濟起飛時代', years: '1970–1990', maxLevel: 6, popToNext: 150000, taxMult: 2.4, portUnload: 1200,
+    featured: ['freeway'], featuredText: '把路升級成高速公路：範圍 3 格稅收 +20%、長得更快；所有道路也可以蓋成高架',
     ship: { name: '貨櫃輪', capacity: 800, intervalMonths: 1, travelMonths: 0.5 },
     special: 'epz',
-    unlocks: ['高速公路', '大樓住宅（住）', '商場（商）', '加工出口區（工）', '核能／火力電廠', '加工出口區管理處（特殊）'],
-    zoneNames: { R: '大樓住宅', C: '商場', I: '加工出口區' },
+    unlocks: ['高速公路（主打）', '高架（任何道路）', '高樓住宅（住）', '商場（商）', '加工出口區（工）', '核能／火力電廠', '加工出口區管理處（特殊）'],
+    zoneNames: { R: '高樓住宅', C: '商場', I: '加工出口區' },
   },
   {
-    id: 5, name: '現代', years: '1990–', maxLevel: 6, popToNext: null, locked: true,
+    id: 5, name: '現代', years: '1990–', maxLevel: 6, popToNext: null, taxMult: 3.3, portUnload: 2000,
     ship: { name: '大型貨櫃輪', capacity: 1500, intervalMonths: 1, travelMonths: 0.5 },
     special: 'skyscraper',
-    unlocks: ['高架道路', '捷運', '商辦大樓（商）', '科技園區（工）', '新型電廠', '淨水廠', '摩天大樓（特殊）'],
-    zoneNames: { R: '高樓住宅', C: '商辦大樓', I: '科技園區' },
+    unlocks: ['捷運', '玻璃帷幕住宅（住）', '商辦大樓（商）', '科技園區（工）', '新型電廠', '淨水廠', '摩天大樓（特殊）'],
+    zoneNames: { R: '玻璃帷幕住宅', C: '商辦大樓', I: '科技園區' },
   },
 ];
-// 第一版只開放到第幾個時代（之後的時代先列表，不能升級）
-export const MAX_PLAYABLE_ERA = 2;
+// 可以玩到第幾個時代（第二版：全部 5 個）
+export const MAX_PLAYABLE_ERA = 5;
 // 從第幾個時代開始，區塊需要電才會成長（清末還沒有電）
 export const POWER_REQUIRED_FROM_ERA = 2;
+
+// ---- 完成條件（破關；交給 Claude 決定）----
+// 在「現代」同時達成：人口、蓋好摩天大樓、里程碑「蓋到台北」→ 跳結算畫面，可以繼續玩。
+export const VICTORY = {
+  era: 5,
+  pop: 300000,
+  special: 'skyscraper',
+  milestone: 'taipei',
+};
 
 // ---- 地形 ----
 export const TERRAIN = { SEA: 0, PLAIN: 1, HILL: 2, MOUNTAIN: 3, RIVER: 4 };
@@ -80,14 +92,44 @@ export const TERRAIN_NAMES = ['海', '平原', '丘陵', '高山', '河流'];
 export const HILL_DENSITY = 0.5;
 
 // ---- 道路 ----
+// 橋的造價/維護依「蓋的當下」的時代；維護費依目前時代
 export const ROAD = {
   cost: { plain: 300, hill: 700, mountain: 3000 },   // 高山 = 山路/隧道
-  bridgeCost: { 1: 2500, 2: 1500 },                  // 木橋 / 石橋（依時代）
+  bridgeCost: { 1: 2500, 2: 1500, 3: 2500, 4: 4000, 5: 6000 },
   maintenance: 4,                                     // 每格每月
-  bridgeMaintenance: { 1: 40, 2: 20 },
-  names: { 1: '土路', 2: '石板路' },
-  bridgeNames: { 1: '木橋', 2: '石橋' },
+  bridgeMaintenance: { 1: 40, 2: 20, 3: 25, 4: 35, 5: 45 },
+  names: { 1: '土路', 2: '石板路', 3: '柏油路', 4: '柏油路', 5: '柏油路' },
+  bridgeNames: { 1: '木橋', 2: '石橋', 3: '水泥橋', 4: '鋼筋混凝土橋', 5: '斜張橋' },
 };
+
+// ---- 交通（時代 3 以後；簡化版：只做「加速通勤 → 範圍內的區塊稅收、成長變好」）----
+// on：'road' = 要蓋在已有的道路上（把路升級）；'land' = 地下，任何陸地都能蓋
+// bonus：範圍內區塊的交通加成（稅收 ×(1+bonus)、成長機率 ×(1+2×bonus)、住宅幸福度 +bonus×30）
+// 同一格被多種交通涵蓋時取最大的加成。level：存在格子上的值（數字大的蓋在數字小的上面）
+export const TRANSPORT = {
+  highway: { name: '公路', era: 3, level: 1, on: 'road', cost: 1200, maintenance: 8, radius: 2, bonus: 0.1 },
+  freeway: { name: '高速公路', era: 4, level: 2, on: 'road', cost: 3500, maintenance: 20, radius: 3, bonus: 0.2 },
+  metro: { name: '捷運', era: 5, on: 'land', cost: 12000, maintenance: 60, radius: 3, bonus: 0.35 },
+};
+
+// ---- 鐵路（日據時代的主打建築；之後的時代繼續可用）----
+// 像道路一樣一格一格鋪（可以穿過道路＝平交道，不能壓在分區或建築上）。
+// 鐵路要連到「車站」（或火車站）才有效果：同一條連通的鐵路上有車站，沿線 radius 格內的區塊得到交通加成 bonus
+// （稅收 ×(1+bonus)、成長較快、住宅幸福度加分，和 TRANSPORT 一樣取最大值）。
+export const RAIL = {
+  name: '鐵路', era: 2,
+  cost: { plain: 600, hill: 1400, mountain: 6000 },   // 高山 = 鐵路隧道
+  bridgeCost: 4000,                                   // 鐵橋
+  maintenance: 5, bridgeMaintenance: 30,
+  radius: 3, bonus: 0.15,
+};
+
+// ---- 高架（任何道路種類都可以蓋成高架）----
+// 工具列「高架」切換打開時，鋪路、公路、高速公路都蓋成高架。高架底下的格子可以蓋其他東西（劃區、蓋設施），
+// 但柱子所在的格子不行。柱子規則：每一段連續的高架（上下左右相連），從端點（編號最小的端點）起算，
+// 第 1、8、15…格（每 pillarEvery 格）有一根柱子。高架只能從兩端或旁邊的地面道路上下，旁邊的區塊不能從高架進出。
+// 費用 = 該格原本的道路造價 + cost（每格）；維護費 = 原本的 + maintenance（每格每月）。
+export const ELEVATED = { era: 4, cost: 2500, maintenance: 12, pillarEvery: 7 };
 
 // ---- 分區 ----
 // 每級的容量：住宅 = 可住人數；商業/工業 = 工作數
@@ -105,7 +147,48 @@ export const GROWTH = {
 };
 export const HAPPINESS = {
   base: 60, water: 10, power: 10, commerceNear: 6,
-  industryNear: -12, industryNearMax: -48, plantNear: -15, radius: 2,
+  industryNear: -12, industryNearMax: -48, radius: 2,
+  // 電廠太近的扣分在 FACILITIES[x].nearPenalty（燃煤電廠過時後加倍，見 OBSOLETE）
+};
+
+// ---- 建築隨時代演進（Sonny 2026-11-04 改決定：舊建築不自動改建，付錢才升級，保留舊建築）----
+// 每個區塊記得自己是「哪個時代的樣式」。換時代後：
+// 1. 舊樣式的建築永久維持原樣（外觀、容量都不變），直到玩家付錢「改建」。區塊在原本的樣式裡長高也不會換樣式；
+//    只有空地第一次蓋起來時，才會直接蓋成目前時代的樣式。
+// 2. 舊樣式最多只能長到「它那個時代」的最高等級，要付錢改建後才能再長高。
+// 3. 容量依樣式時代乘上 capMult（新樣式住得比較多、工作比較多）。
+// 4. 付錢改建（單格或「全部改建」）：每格 (base + perLevel × 等級) × 目前時代 taxMult × 縣市建造倍率，立刻改建。
+// autoRebuild / rebuildChance：舊的「每月自動改建」機制，預設關閉（Sonny 決定不要）；要打開才會用到 rebuildChance。
+export const ERA_UPGRADES = {
+  capMult: { 1: 1, 2: 1.1, 3: 1.25, 4: 1.45, 5: 1.7 },
+  autoRebuild: false,
+  rebuildChance: 0,
+  rebuildCost: { base: 200, perLevel: 250 },
+};
+
+// 「時代＋等級」的樣式表（名稱；畫法在 render.js 依同一張表的時代分支）
+export const BUILDING_STYLES = {
+  R: {
+    1: ['土角厝', '紅瓦三合院'],
+    2: ['竹管厝', '磚造平房', '磚造街屋', '洋樓街屋'],
+    3: ['水泥平房', '透天厝', '四層公寓', '五層公寓', '五層公寓群'],
+    4: ['透天厝', '公寓', '電梯大樓', '十二層大樓', '高樓住宅', '高樓社區'],
+    5: ['透天厝', '電梯公寓', '電梯大樓', '玻璃帷幕大樓', '玻璃帷幕高樓', '豪宅塔樓'],
+  },
+  C: {
+    1: ['路邊攤', '市集'],
+    2: ['雜貨店', '商行', '亭仔腳商店街', '百貨商行'],
+    3: ['柑仔店', '商店街', '市場大樓', '百貨公司', '大百貨公司'],
+    4: ['便利商店', '商店街', '商場', '購物中心', '大型商場', '百貨商圈'],
+    5: ['便利商店', '連鎖商店', '商辦大樓', '玻璃帷幕商辦', '金融大樓', '商辦塔樓'],
+  },
+  I: {
+    1: ['小作坊', '碾米廠'],
+    2: ['手工作坊', '製糖工廠', '大製糖工廠', '製糖會社'],
+    3: ['小工廠', '加工廠', '加工區廠房', '大加工區', '加工區群'],
+    4: ['工廠', '加工廠', '加工出口區廠房', '大型廠房', '加工出口區'],
+    5: ['工作室', '科技廠房', '科技園區', '晶圓廠', '科技園區群', '科學園區'],
+  },
 };
 
 // ---- 人口與需求 ----
@@ -116,30 +199,112 @@ export const ECON = {
   shopNeed: 0.25,        // 每人需要多少商業工作（顧客 → 商業需求）
   goodsNeed: 0.6,        // 每個商業工作需要多少工業工作（貨物）
   industryBase: 30,      // 港口貿易帶來的基本工業需求
-  tax: { R: 2.6, C: 4.2, I: 3.6 },   // 每月：每人 / 每個有人做的工作
+  tax: { R: 2.6, C: 4.2, I: 3.6 },   // 每月：每人 / 每個有人做的工作（再乘時代 taxMult、縣市 taxMult、交通加成）
   tradePerIndustryJob: 2,          // 港口貿易：每個工業工作每月
 };
 
 // ---- 港口與移民 ----
 export const PORT = {
-  unloadPerMonth: 120,   // 每個港口每月最多卸下幾人（之後可升級）
+  unloadPerMonth: 120,   // 舊欄位（第一版）；第二版改看 ERAS[].portUnload
 };
 
 // ---- 水電設施 ----
 // coverRadius：設施本身覆蓋半徑；lineRadius：管線/電線兩側覆蓋半徑；capacity：可供應量（住宅 1 人 = 1，工作 1 個 = 0.5）
+// needs：river 河邊、coast 海邊、road 緊鄰接港口的路、rail 緊鄰鐵路；nearPenalty：附近（HAPPINESS.radius 格內）住宅的幸福度扣分
+// specialOf：第幾個時代的時代特殊建築；water：特殊建築同時供水（水庫）
 export const FACILITIES = {
   well: { name: '水井', kind: 'water', era: 1, cost: 4000, maintenance: 60, capacity: 300, coverRadius: 3, needs: null },
   waterworks: { name: '自來水廠', kind: 'water', era: 2, cost: 30000, maintenance: 450, capacity: 5000, coverRadius: 2, needs: 'river' },
-  coal: { name: '燃煤發電廠', kind: 'power', era: 2, cost: 45000, maintenance: 700, capacity: 6000, coverRadius: 2, needs: null },
+  waterpoint: { name: '自來水接點', kind: 'water', era: 3, cost: 3000, maintenance: 15, capacity: 0, coverRadius: 3, needs: null },
+  purifier: { name: '淨水廠', kind: 'water', era: 5, cost: 600000, maintenance: 3500, capacity: 60000, coverRadius: 3, needs: 'river' },
+  coal: { name: '燃煤發電廠', kind: 'power', era: 2, cost: 45000, maintenance: 700, capacity: 6000, coverRadius: 2, needs: null, nearPenalty: -15 },
+  hydro: { name: '水力發電廠', kind: 'power', era: 3, cost: 220000, maintenance: 1600, capacity: 20000, coverRadius: 2, needs: 'river', nearPenalty: 0 },
+  nuclear: { name: '核能／火力電廠', kind: 'power', era: 4, cost: 900000, maintenance: 6000, capacity: 80000, coverRadius: 2, needs: null, nearPenalty: -20 },
+  modernplant: { name: '新型電廠', kind: 'power', era: 5, cost: 1600000, maintenance: 8000, capacity: 140000, coverRadius: 3, needs: null, nearPenalty: -4 },
   lighthouse: { name: '燈塔', kind: 'special', era: 1, cost: 120000, maintenance: 200, needs: 'coast', specialOf: 1 },
   station: { name: '火車站', kind: 'special', era: 2, cost: 600000, maintenance: 1500, needs: 'road', specialOf: 2 },
+  railstop: { name: '車站', kind: 'rail', era: 2, cost: 12000, maintenance: 120, needs: 'rail' },
+  dam: { name: '水庫', kind: 'special', era: 3, cost: 2500000, maintenance: 6000, needs: 'river', specialOf: 3, water: 30000, coverRadius: 3 },
+  epz: { name: '加工出口區管理處', kind: 'special', era: 4, cost: 6000000, maintenance: 12000, needs: 'road', specialOf: 4 },
+  skyscraper: { name: '摩天大樓', kind: 'special', era: 5, cost: 15000000, maintenance: 25000, needs: 'road', specialOf: 5 },
+};
+// 特殊建築蓋好後的持續效果（收入面）
+export const SPECIAL_EFFECTS = {
+  epz: { trade: 1.5, text: '港口貿易 ×1.5' },
+  skyscraper: { taxC: 1.2, text: '商業稅 ×1.2' },
 };
 export const LINES = {
   pipe: { name: '水管', era: 2, cost: 80, maintenance: 1, radius: 2 },
   wire: { name: '電線', era: 2, cost: 100, maintenance: 1, radius: 2 },
 };
 
-// ---- 破產、預警、緊急貸款（交給 Claude 決定的部分）----
+// ---- 舊設施過時與改建 ----
+// 舊設施不會被強制失效或自動換掉：一直照常運作，玩家付錢「改建」才會換成新版本。
+// 但時代變了效果會變差（介面上的設施清單、點設施的資訊、地圖上的 ⚠ 都會標示）。不想要變差，把下面的倍率改成 1 即可。
+// fromEra 起過時：capacityMult 容量倍率、maintenanceMult 維護費倍率、nearPenaltyMult 附近幸福度扣分倍率。
+// upgradeTo：可以「改建」成哪個設施（依序選第一個已解鎖的），費用 = 新設施造價 × FACILITY_REBUILD.costRatio，不用拆掉重蓋。
+export const OBSOLETE = {
+  well: { fromEra: 3, capacityMult: 0.5, upgradeTo: ['waterpoint'], text: '民國光復後水井容量減半，可改建成自來水接點（接上水管網路）' },
+  coal: { fromEra: 4, nearPenaltyMult: 2, maintenanceMult: 1.6, upgradeTo: ['modernplant', 'nuclear'], text: '經濟起飛後燃煤電廠汙染變嚴重（附近幸福度扣分加倍、維護費 ×1.6），可改建成新型電廠' },
+  waterworks: { fromEra: 5, capacityMult: 0.8, upgradeTo: ['purifier'], text: '現代的舊自來水廠容量剩 8 成，可改建成淨水廠' },
+};
+export const FACILITY_REBUILD = { costRatio: 0.6 };
+// 已經過了時代的特殊建築保留當地標：半徑內住宅幸福度加分
+export const LANDMARK = { happiness: 8, radius: 6 };
+
+// ---- 時代事件（每個時代 1–2 個；atMonth = 進入該時代後第幾個月發生）----
+// effect：持續 months 個月的倍率：immigration 船上移民、portCap 港口卸貨上限、taxR/taxC/taxI 稅、trade 港口貿易、
+//         maintPower 電廠維護費、transportCost 交通建設造價；grant：一次性補助（元）
+export const ERA_EVENTS = [
+  { id: 'treatyPorts', era: 1, atMonth: 18, name: '開港通商', text: '打狗、安平開港，洋行進駐：港口貿易 ×1.5（3 年）', effect: { trade: 1.5 }, months: 36 },
+  { id: 'railway', era: 2, atMonth: 12, name: '縱貫鐵路通車', text: '南北交通變快，移民變多：船上移民 ×1.5（3 年）', effect: { immigration: 1.5 }, months: 36 },
+  { id: 'sugar', era: 2, atMonth: 48, name: '糖業興盛', text: '新式製糖會社成立：工業稅 ×1.3（4 年）', effect: { taxI: 1.3 }, months: 48 },
+  { id: 'postwarWave', era: 3, atMonth: 2, name: '光復後移民潮', text: '大批移民渡海來台：船上移民 ×2、港口卸貨上限 ×2（3 年）', effect: { immigration: 2, portCap: 2 }, months: 36 },
+  { id: 'usAid', era: 3, atMonth: 24, name: '美援', text: '美援物資與貸款到位：一次補助 80 萬', grant: 800000 },
+  { id: 'tenProjects', era: 4, atMonth: 6, name: '十大建設', text: '十大建設：中山高速公路動工！公路、高速公路造價半價（4 年），並補助 200 萬', effect: { transportCost: 0.5 }, months: 48, grant: 2000000 },
+  { id: 'oilCrisis', era: 4, atMonth: 30, name: '石油危機', text: '油價暴漲：電廠維護費 ×1.6、工業稅 ×0.8（2 年）', effect: { maintPower: 1.6, taxI: 0.8 }, months: 24 },
+  { id: 'techBoom', era: 5, atMonth: 12, name: '科技業興起', text: '半導體與電子業起飛：工業稅 ×1.5（5 年）', effect: { taxI: 1.5 }, months: 60 },
+  { id: 'asianCrisis', era: 5, atMonth: 48, name: '亞洲金融風暴', text: '鄰國貨幣大貶：商業稅 ×0.85（1.5 年）', effect: { taxC: 0.85 }, months: 18 },
+];
+
+// ---- 縣市平衡 ----
+// 每個縣市屬於一種類型：buildMult 建造費倍率（依時代，東部與山區越後期越好蓋）、taxMult 稅收倍率、
+// landIncome 買下後原有聚落每月繳的田賦（每格平原/丘陵，乘時代 taxMult；開局的高雄不算）。
+// 買地價格公式不變（Sonny 定的），這裡只調建造與收入面。
+export const REGION_TYPES = {
+  west: { name: '西部平原', buildMult: { 1: 1, 2: 1, 3: 1, 4: 1, 5: 1 }, taxMult: 1, text: '平原多、好開發' },
+  metro: { name: '北部都會', buildMult: { 1: 1.2, 2: 1.2, 3: 1.15, 4: 1.1, 5: 1.1 }, taxMult: 1.3, text: '地小人稠：稅收高、建造較貴' },
+  city: { name: '小城市', buildMult: { 1: 1, 2: 1, 3: 1, 4: 1, 5: 1 }, taxMult: 1.2, text: '面積小，稅收較高' },
+  mountain: { name: '山區', buildMult: { 1: 1.6, 2: 1.5, 3: 1.35, 4: 1.2, 5: 1.1 }, taxMult: 0.9, text: '高山多、平地少；越後期越好開發' },
+  east: { name: '東部', buildMult: { 1: 1.8, 2: 1.6, 3: 1.4, 4: 1.15, 5: 1 }, taxMult: 0.95, text: '中央山脈阻隔：前期建造很貴，經濟起飛（北迴鐵路）後才便宜' },
+  island: { name: '離島', buildMult: { 1: 1.4, 2: 1.3, 3: 1.2, 4: 1.1, 5: 1.1 }, taxMult: 1.15, text: '要船運建材；觀光讓稅收較高' },
+};
+export const REGION_INCOME = { perPlain: 3, perHill: 1 };
+// 縣市 → 類型與建議（note 會顯示在「區域」視窗）
+export const REGIONS = {
+  高雄市: { type: 'west', note: '起點：高雄港' },
+  臺南市: { type: 'west', note: '建議第一塊：平原最多，有安平港' },
+  屏東縣: { type: 'west', note: '平原大、有東港；東邊是山' },
+  嘉義縣: { type: 'west', note: '有布袋港，平原多' },
+  嘉義市: { type: 'city', note: '很小、沒港口：要從嘉義縣或臺南接路過來' },
+  雲林縣: { type: 'west', note: '平原多、沒港口：要從嘉義縣或彰化縣接路' },
+  彰化縣: { type: 'west', note: '平原多、沒港口：要從臺中市接路' },
+  臺中市: { type: 'west', note: '有台中港，東半部是山' },
+  南投縣: { type: 'mountain', note: '台灣唯一不靠海的縣：全是山，適合蓋水庫與水力電廠' },
+  苗栗縣: { type: 'west', note: '丘陵多，有外埔漁港' },
+  新竹縣: { type: 'west', note: '沒港口：要從新竹市接路' },
+  新竹市: { type: 'city', note: '小而平，有新竹漁港' },
+  桃園市: { type: 'metro', note: '有竹圍漁港，往台北的跳板' },
+  新北市: { type: 'metro', note: '有台北港：蓋到台北最快的路線' },
+  臺北市: { type: 'metro', note: '沒港口：要從新北市或基隆市接路（蓋到台北！）' },
+  基隆市: { type: 'city', note: '有基隆港，很小' },
+  宜蘭縣: { type: 'east', note: '有蘇澳港；平原少' },
+  花蓮縣: { type: 'east', note: '有花蓮港；中央山脈很難穿越' },
+  臺東縣: { type: 'east', note: '有富岡港；最晚才好開發' },
+  澎湖縣: { type: 'island', note: '離島，有馬公港；沒辦法鋪路連回本島' },
+};
+
+// ---- 破產、預警、緊急貸款 ----
 export const FINANCE = {
   warnRunwayMonths: 6,     // 赤字下，錢撐不到 6 個月 → 黃色預警
   dangerRunwayMonths: 2,   // 撐不到 2 個月 → 紅色危急

@@ -1,21 +1,41 @@
 // 台灣模擬：模擬核心（純邏輯，不碰 DOM；瀏覽器和 Node 測試共用）。
 import {
   START, LAND, ERAS, MAX_PLAYABLE_ERA, POWER_REQUIRED_FROM_ERA, TERRAIN, HILL_DENSITY, ROAD, ZONES,
-  GROWTH, HAPPINESS, ECON, PORT, FACILITIES, LINES, FINANCE, MILESTONES, UNDO_LIMIT, TIME,
+  GROWTH, HAPPINESS, ECON, FACILITIES, LINES, FINANCE, MILESTONES, UNDO_LIMIT, TIME,
+  TRANSPORT, ERA_UPGRADES, OBSOLETE, FACILITY_REBUILD, LANDMARK, ERA_EVENTS, REGION_TYPES, REGIONS, REGION_INCOME,
+  SPECIAL_EFFECTS, VICTORY, BUILDING_STYLES, SAVE_VERSION, RAIL, ELEVATED,
 } from './config.js';
 
-export const BLD = { NONE: 0, PORT: 1, WELL: 2, WATERWORKS: 3, COAL: 4, LIGHTHOUSE: 5, STATION: 6 };
-export const BLD_KEY = [null, 'port', 'well', 'waterworks', 'coal', 'lighthouse', 'station'];
-const KEY_BLD = Object.fromEntries(BLD_KEY.map((k, i) => [k, i]).filter(([k]) => k));
+// 建築編號（存檔用，只能往後加，不能改舊的）
+export const BLD = {
+  NONE: 0, PORT: 1, WELL: 2, WATERWORKS: 3, COAL: 4, LIGHTHOUSE: 5, STATION: 6,
+  WATERPOINT: 7, PURIFIER: 8, HYDRO: 9, NUCLEAR: 10, MODERNPLANT: 11, DAM: 12, EPZ: 13, SKYSCRAPER: 14, RAILSTOP: 15,
+};
+export const BLD_KEY = [null, 'port', 'well', 'waterworks', 'coal', 'lighthouse', 'station', 'waterpoint', 'purifier', 'hydro', 'nuclear', 'modernplant', 'dam', 'epz', 'skyscraper', 'railstop'];
+export const KEY_BLD = Object.fromEntries(BLD_KEY.map((k, i) => [k, i]).filter(([k]) => k));
 export const ZONE = { NONE: 0, R: 1, C: 2, I: 3 };
 export const ZONE_KEY = [null, 'R', 'C', 'I'];
-export const TOOLS = ['road', 'R', 'C', 'I', 'well', 'waterworks', 'coal', 'pipe', 'wire', 'lighthouse', 'station', 'bulldoze'];
-const LINE_TOOLS = new Set(['road', 'pipe', 'wire']);
+// 每格存的圖層（u8）；pop 另外是 u16
+// bera：這格建築是「哪個時代的樣式」（0 = 沒有）；trans：道路上的交通升級（TRANSPORT.level）；metro：捷運
+// rail：鐵路（1 = 鐵軌、2 = 鐵橋）；elev：這格的道路是高架（底下可以蓋東西，柱子格除外）
+export const U8_LAYERS = ['road', 'zone', 'level', 'bld', 'pipe', 'wire', 'bera', 'trans', 'metro', 'rail', 'elev'];
+export const TOOLS = ['road', 'rail', 'R', 'C', 'I', ...Object.keys(FACILITIES), 'pipe', 'wire', ...Object.keys(TRANSPORT), 'bulldoze'];
+const LINE_TOOLS = new Set(['road', 'rail', 'pipe', 'wire', ...Object.keys(TRANSPORT)]);
+// 可以蓋成高架的工具（任何道路種類）
+export const ELEVATABLE = new Set(['road', ...Object.keys(TRANSPORT).filter((k) => TRANSPORT[k].on === 'road')]);
 const RECT_TOOLS = new Set(['R', 'C', 'I', 'bulldoze']);
+const WATER_KEYS = Object.keys(FACILITIES).filter((k) => FACILITIES[k].kind === 'water' || FACILITIES[k].water);
+const POWER_KEYS = Object.keys(FACILITIES).filter((k) => FACILITIES[k].kind === 'power');
+const SPECIAL_KEYS = Object.keys(FACILITIES).filter((k) => FACILITIES[k].specialOf);
 
 export const landPrice = (n) => Math.round(LAND.base * LAND.ratio ** (n - 1));
 export const eraInfo = (era) => ERAS[era - 1];
 const clamp = (v, a, b) => (v < a ? a : v > b ? b : v);
+export const styleName = (z, bera, level) => {
+  const list = BUILDING_STYLES[z]?.[bera];
+  if (!list || !level) return null;
+  return list[Math.min(level, list.length) - 1];
+};
 
 function mulberry(seed) {
   let a = seed >>> 0;
@@ -28,15 +48,35 @@ function mulberry(seed) {
   };
 }
 
+// 每個縣市的平原/丘陵格數（田賦用），每張地圖算一次
+function countyStats(map) {
+  if (map._countyStats) return map._countyStats;
+  const st = new Map();
+  for (const c of map.meta.counties) st.set(c.id, { plain: 0, hill: 0 });
+  for (let i = 0; i < map.n; i++) {
+    const c = st.get(map.county[i]);
+    if (!c) continue;
+    if (map.terrain[i] === TERRAIN.PLAIN) c.plain++;
+    else if (map.terrain[i] === TERRAIN.HILL) c.hill++;
+  }
+  map._countyStats = st;
+  return st;
+}
+
 export class Sim {
   constructor(map, state = null) {
     this.map = map;
     const n = map.n;
     this.s = state || Sim.newState(map);
+    Sim.fillDefaults(this.s);
     const g = this.s.grid;
-    for (const k of ['road', 'zone', 'level', 'bld', 'pipe', 'wire']) if (!g[k]) g[k] = new Uint8Array(n);
+    for (const k of U8_LAYERS) if (!g[k]) g[k] = new Uint8Array(n);
     if (!g.pop) g.pop = new Uint16Array(n);
     this.rng = mulberry(this.s.rngSeed);
+    // 縣市類型（依 county id）
+    this.ctype = new Map();
+    for (const c of map.meta.counties) this.ctype.set(c.id, REGION_TYPES[REGIONS[c.name]?.type] || REGION_TYPES.west);
+    this.cstats = countyStats(map);
     // 衍生資料（不存檔）
     this.connected = new Uint8Array(n);   // 接到港口的道路節點
     this.comp = new Int32Array(n);        // 道路連通區塊編號
@@ -47,11 +87,16 @@ export class Sim {
     this.powerCov = new Uint8Array(n);
     this.powerOK = new Uint8Array(n);
     this.happy = new Uint8Array(n);
+    this.transit = new Uint8Array(n);     // 交通加成（百分比）
+    this.plantPen = new Int8Array(n);     // 電廠附近的幸福度扣分
+    this.landmark = new Uint8Array(n);    // 地標加分
+    this.pillar = new Uint8Array(n);      // 高架柱子
+    this.railActive = new Uint8Array(n);  // 連到車站的鐵路
     this.stamp = new Int32Array(n);
     this.stampId = 0;
     this.zoneList = [];
     this.bldList = {};
-    this.lineCount = { pipe: 0, wire: 0, road: 0, bridge: 0 };
+    this.lineCount = { pipe: 0, wire: 0, road: 0, bridge: 0, trans: {}, metro: 0 };
     this.util = { water: { cap: 0, use: 0 }, power: { cap: 0, use: 0 } };
     this.totals = { pop: 0, capC: 0, capI: 0, filledC: 0, filledI: 0, jobs: 0, workers: 0, openJobs: 0 };
     this.demand = { R: 0.5, C: 0, I: 0 };
@@ -68,14 +113,25 @@ export class Sim {
     const kao = map.countyByName.get(START.region);
     const n = map.n;
     const s = {
-      version: 1, month: 0, monthFrac: 0, money: START.money, era: 1,
+      version: SAVE_VERSION, month: 0, monthFrac: 0, money: START.money, era: 1, eraStart: 0,
       owned: [kao.id], purchases: 0, rngSeed: 12345,
-      loan: { taken: false, monthsLeft: 0 }, pendingLoan: false, gameOver: null,
+      loan: { taken: false, monthsLeft: 0 }, pendingLoan: false, gameOver: null, victory: null,
       milestones: {}, ships: [], shipTimer: 0.5, portRR: 0, portUnloaded: {},
+      effects: [], eventsDone: {},
       stats: { income: 0, expense: 0, net: 0, breakdown: {}, history: [] }, deficitStreak: 0, warning: null,
-      grid: { road: new Uint8Array(n), zone: new Uint8Array(n), level: new Uint8Array(n), bld: new Uint8Array(n), pipe: new Uint8Array(n), wire: new Uint8Array(n), pop: new Uint16Array(n) },
+      grid: { pop: new Uint16Array(n) },
     };
+    for (const k of U8_LAYERS) s.grid[k] = new Uint8Array(n);
     for (const p of map.ports) if (p.county === kao.id) s.grid.bld[p.y * map.w + p.x] = BLD.PORT;
+    return s;
+  }
+
+  // 第二版新增的欄位（舊狀態缺少時補上預設值）
+  static fillDefaults(s) {
+    if (!Number.isInteger(s.eraStart)) s.eraStart = s.month || 0;
+    if (!Array.isArray(s.effects)) s.effects = [];
+    if (!s.eventsDone || typeof s.eventsDone !== 'object') s.eventsDone = {};
+    if (s.victory === undefined) s.victory = null;
     return s;
   }
 
@@ -86,35 +142,79 @@ export class Sim {
   get era() { return this.s.era; }
   get money() { return this.s.money; }
   ownedPorts() { return this.map.ports.filter((p) => this.s.owned.includes(p.county)); }
-  capAt(i, level = this.s.grid.level[i]) {
+  // 樣式時代（舊存檔或沒記到的格子當作目前時代）
+  beraAt(i) { return this.s.grid.bera[i] || this.s.era; }
+  capAt(i, level = this.s.grid.level[i], bera = this.beraAt(i)) {
     const z = ZONE_KEY[this.s.grid.zone[i]];
     if (!z) return 0;
-    const c = ZONES[z].cap[level] || 0;
+    const c = (ZONES[z].cap[level] || 0) * (ERA_UPGRADES.capMult[bera] || 1);
     return Math.floor(this.map.terrain[i] === TERRAIN.HILL ? c * HILL_DENSITY : c);
   }
+  // 這格目前最多能長到幾級：本時代上限，以及「舊樣式」那個時代的上限
+  maxLevelAt(i) { return Math.min(eraInfo(this.s.era).maxLevel, eraInfo(this.beraAt(i)).maxLevel); }
   powerNeeded() { return this.s.era >= POWER_REQUIRED_FROM_ERA; }
   hasSpecial(key) { return (this.bldList[key] || []).length > 0; }
   nextLandPrice() { return landPrice(this.s.purchases + 1); }
+  regionType(countyId) { return this.ctype.get(countyId) || REGION_TYPES.west; }
+  buildMult(i) { const t = this.regionType(this.map.county[i]); return t.buildMult[this.s.era] ?? 1; }
   regionBuyable(name) {
     const c = this.map.countyByName.get(name);
     if (!c) return { ok: false, reason: '沒有這個縣市' };
     if (this.s.owned.includes(c.id)) return { ok: false, reason: '已經買下' };
-    if (!LAND.allowOthers && !LAND.mvpRegions.includes(name)) return { ok: false, reason: '之後開放' };
+    if (!LAND.allowOthers) return { ok: false, reason: '之後開放' };
     const price = this.nextLandPrice();
     if (this.s.money < price) return { ok: false, reason: '錢不夠', price };
     return { ok: true, price };
   }
+  // 縣市每月田賦（買下後原有聚落繳的；開局縣市不算）
+  landIncomeOf(countyId) {
+    const c = this.map.counties.get(countyId);
+    if (!c || c.name === START.region) return 0;
+    const st = this.cstats.get(countyId);
+    return (st.plain * REGION_INCOME.perPlain + st.hill * REGION_INCOME.perHill) * this.regionType(countyId).taxMult * eraInfo(this.s.era).taxMult;
+  }
+  // 目前生效的時代事件倍率
+  eff(key) {
+    let v = 1;
+    for (const e of this.s.effects) if (e[key] != null) v *= e[key];
+    return v;
+  }
+  specialEff(key) {
+    let v = 1;
+    for (const [k, e] of Object.entries(SPECIAL_EFFECTS)) if (e[key] != null && this.hasSpecial(k)) v *= e[key];
+    return v;
+  }
+  isObsolete(key) { const o = OBSOLETE[key]; return !!(o && this.s.era >= o.fromEra); }
+  facCapacity(key) {
+    const f = FACILITIES[key];
+    const base = f.kind === 'special' ? (f.water || 0) : f.capacity;
+    return this.isObsolete(key) ? base * (OBSOLETE[key].capacityMult ?? 1) : base;
+  }
+  facMaintenance(key) {
+    const f = FACILITIES[key];
+    let m = f.maintenance;
+    if (this.isObsolete(key)) m *= OBSOLETE[key].maintenanceMult ?? 1;
+    if (f.kind === 'power') m *= this.eff('maintPower');
+    return m;
+  }
+  facNearPenalty(key) {
+    const p = FACILITIES[key].nearPenalty || 0;
+    return this.isObsolete(key) ? p * (OBSOLETE[key].nearPenaltyMult ?? 1) : p;
+  }
   cellStatus(i) {
     const g = this.s.grid;
     const z = g.zone[i];
-    const out = { access: !!this.access[i], water: !!this.waterOK[i], waterCov: !!this.waterCov[i], power: !!this.powerOK[i], powerCov: !!this.powerCov[i], happy: this.happy[i] };
+    const out = { access: !!this.access[i], water: !!this.waterOK[i], waterCov: !!this.waterCov[i], power: !!this.powerOK[i], powerCov: !!this.powerCov[i], happy: this.happy[i], transit: this.transit[i] };
     if (!z) return out;
     const why = [];
     if (!out.access) why.push('沒有接到通往港口的路');
     if (!out.water) why.push(out.waterCov ? '水量不足' : '沒有水');
     if (this.powerNeeded() && !out.power) why.push(out.powerCov ? '電力不足' : '沒有電');
     if (z === ZONE.R && out.happy < GROWTH.happinessMin) why.push('幸福度太低（工業或電廠太近）');
-    if (g.level[i] >= eraInfo(this.s.era).maxLevel) why.push('已達本時代最高等級');
+    if (g.level[i] && g.level[i] >= this.maxLevelAt(i)) {
+      if (this.beraAt(i) < this.s.era && g.level[i] < eraInfo(this.s.era).maxLevel) why.push(`還是${eraInfo(this.beraAt(i)).name}的舊樣式：改建後才能再長高`);
+      else why.push('已達本時代最高等級');
+    }
     out.why = why;
     return out;
   }
@@ -152,77 +252,172 @@ export class Sim {
     if (y < h - 1) out.push(i + w);
     return out;
   }
+  // 設施擺放條件（新蓋、改建共用）
+  facilitySpotReason(key, i) {
+    const f = FACILITIES[key], m = this.map;
+    if (f.needs === 'river' && !this.near(i, 1, (j) => m.terrain[j] === TERRAIN.RIVER)) return `${f.name}要蓋在河邊`;
+    if (f.needs === 'coast' && !this.near(i, 1, (j) => m.terrain[j] === TERRAIN.SEA)) return `${f.name}要蓋在海邊`;
+    if (f.needs === 'road' && !this.neighbors4(i).some((j) => this.connected[j] && !this.s.grid.elev[j])) return `${f.name}要緊鄰接到港口的路`;
+    if (f.needs === 'rail' && !this.neighbors4(i).some((j) => this.s.grid.rail[j])) return `${f.name}要緊鄰鐵路`;
+    return null;
+  }
+
+  // 高架柱子：每一段連續高架從端點（編號最小的端點；環狀就用編號最小的格）起算，第 1、1+N、1+2N…格有柱子
+  pillarsFor(startCells, isElev) {
+    const n = this.map.n, every = ELEVATED.pillarEvery;
+    const seen = new Set();
+    const out = [];
+    for (const st of startCells) {
+      if (seen.has(st) || !isElev(st)) continue;
+      const comp = [st]; seen.add(st);
+      for (let h = 0; h < comp.length; h++) for (const j of this.neighbors4(comp[h])) if (!seen.has(j) && isElev(j)) { seen.add(j); comp.push(j); }
+      const deg = (i) => this.neighbors4(i).filter(isElev).length;
+      const ends = comp.filter((i) => deg(i) <= 1);
+      const anchor = Math.min(...(ends.length ? ends : comp));
+      const dist = new Map([[anchor, 0]]);
+      const q = [anchor];
+      for (let h = 0; h < q.length; h++) for (const j of this.neighbors4(q[h])) if (!dist.has(j) && isElev(j)) { dist.set(j, dist.get(q[h]) + 1); q.push(j); }
+      for (const [i, d] of dist) if (d % every === 0) out.push(i);
+    }
+    void n;
+    return out;
+  }
+  // 地面上有沒有東西（分區、建築、鐵路）
+  groundBusy(i) { const g = this.s.grid; return !!(g.zone[i] || g.bld[i] || g.rail[i]); }
+  // 地面道路（高架不算）擋住
+  groundRoad(i) { const g = this.s.grid; return !!(g.road[i] && !g.elev[i]); }
+  roadCost(i) {
+    const t = this.map.terrain[i];
+    return t === TERRAIN.MOUNTAIN ? ROAD.cost.mountain : t === TERRAIN.HILL ? ROAD.cost.hill : ROAD.cost.plain;
+  }
+  canElevate() { return this.s.era >= ELEVATED.era; }
 
   // 回傳 { cells: [{i, cost, set}], cost, reason }
-  plan(tool, x0, y0, x1 = x0, y1 = y0) {
+  // opts.elev：道路類工具（路、公路、高速公路）蓋成高架
+  plan(tool, x0, y0, x1 = x0, y1 = y0, opts = {}) {
     const s = this.s, g = s.grid, m = this.map, era = s.era;
     const cells = [];
     let cost = 0;
     const reasons = new Set();
+    const add = (i, c, set) => { c = Math.round(c * this.buildMult(i)); cells.push({ i, cost: c, set }); cost += c; };
+    const elev = !!opts.elev && ELEVATABLE.has(tool);
+    if (elev && !this.canElevate()) return { cells: [], cost: 0, reason: `要到${eraInfo(ELEVATED.era).name}才能蓋高架`, skipped: [] };
     for (const i of this.cellsFor(tool, x0, y0, x1, y1)) {
       const t = m.terrain[i];
-      const empty = !g.road[i] && !g.zone[i] && !g.bld[i];
+      const underOK = g.road[i] && g.elev[i] && !this.pillar[i]; // 高架底下（不是柱子）可以蓋
+      const empty = (!g.road[i] || underOK) && !this.groundBusy(i);
       if (t === TERRAIN.SEA) { reasons.add('不能蓋在海上'); continue; }
       if (!this.owns(i)) { reasons.add('這裡還沒買下（到「區域」購買）'); continue; }
       if (tool === 'road') {
-        if (g.road[i] || g.bld[i] === BLD.PORT) continue;
-        if (g.zone[i] || g.bld[i]) { reasons.add('有東西擋住，先拆除'); continue; }
-        let c, set;
-        if (t === TERRAIN.RIVER) { c = ROAD.bridgeCost[Math.min(era, 2)]; set = { road: 2 }; } else {
-          c = t === TERRAIN.MOUNTAIN ? ROAD.cost.mountain : t === TERRAIN.HILL ? ROAD.cost.hill : ROAD.cost.plain;
-          set = { road: 1 };
+        if (g.bld[i] === BLD.PORT) continue;
+        if (elev) {
+          if (g.road[i] && g.elev[i]) continue;
+          if (g.road[i]) add(i, ELEVATED.cost, { elev: 1 });                 // 地面路改成高架
+          else add(i, (t === TERRAIN.RIVER ? ROAD.cost.plain : this.roadCost(i)) + ELEVATED.cost, { road: 1, elev: 1 });
+        } else {
+          if (g.road[i]) continue;
+          if (g.zone[i] || g.bld[i]) { reasons.add('有東西擋住，先拆除（或打開「高架」從上面跨過）'); continue; }
+          if (t === TERRAIN.RIVER) add(i, ROAD.bridgeCost[era], { road: 2 });
+          else add(i, this.roadCost(i), { road: 1 });
         }
-        cells.push({ i, cost: c, set });
-        cost += c;
+      } else if (tool === 'rail') {
+        if (era < RAIL.era) { reasons.add(`要到${eraInfo(RAIL.era).name}才能鋪鐵路`); continue; }
+        if (g.rail[i]) continue;
+        if (g.zone[i] || g.bld[i]) { reasons.add('有東西擋住，先拆除'); continue; }
+        if (this.pillar[i]) { reasons.add('高架柱子擋住'); continue; }
+        if (t === TERRAIN.RIVER) add(i, RAIL.bridgeCost, { rail: 2 });
+        else add(i, t === TERRAIN.MOUNTAIN ? RAIL.cost.mountain : t === TERRAIN.HILL ? RAIL.cost.hill : RAIL.cost.plain, { rail: 1 });
       } else if (ZONES[tool]) {
         const z = ZONE[tool];
         if (g.zone[i] === z) continue;
         if (t === TERRAIN.MOUNTAIN) { reasons.add('高山只能鋪路'); continue; }
         if (t === TERRAIN.RIVER) { reasons.add('河流上不能劃區'); continue; }
-        if (g.road[i] || g.bld[i]) { reasons.add('有東西擋住，先拆除'); continue; }
-        const c = ZONES[tool].cost;
-        cells.push({ i, cost: c, set: { zone: z, level: 0, pop: 0 } });
-        cost += c;
+        if (g.road[i] && this.pillar[i]) { reasons.add('高架柱子的格子不能蓋'); continue; }
+        if ((g.road[i] && !underOK) || g.bld[i] || g.rail[i]) { reasons.add('有東西擋住，先拆除'); continue; }
+        add(i, ZONES[tool].cost, { zone: z, level: 0, pop: 0, bera: era });
       } else if (FACILITIES[tool]) {
         const f = FACILITIES[tool];
         if (era < f.era) { reasons.add(`要到${eraInfo(f.era).name}才能蓋`); continue; }
         if (f.specialOf) {
-          if (this.hasSpecial(tool)) { reasons.add(`${f.name}已經蓋好了`); continue; }
+          if (this.hasSpecial(tool) || cells.length) { reasons.add(`${f.name}已經蓋好了`); continue; }
           if (f.specialOf < era) { reasons.add('已經過了這個時代'); continue; }
         }
         if (t !== TERRAIN.PLAIN && t !== TERRAIN.HILL) { reasons.add('要蓋在平原或丘陵'); continue; }
+        if (g.road[i] && this.pillar[i]) { reasons.add('高架柱子的格子不能蓋'); continue; }
         if (!empty) { reasons.add('有東西擋住，先拆除'); continue; }
-        if (f.needs === 'river' && !this.near(i, 1, (j) => m.terrain[j] === TERRAIN.RIVER)) { reasons.add(`${f.name}要蓋在河邊`); continue; }
-        if (f.needs === 'coast' && !this.near(i, 1, (j) => m.terrain[j] === TERRAIN.SEA)) { reasons.add(`${f.name}要蓋在海邊`); continue; }
-        if (f.needs === 'road' && !this.neighbors4(i).some((j) => this.connected[j])) { reasons.add(`${f.name}要緊鄰接到港口的路`); continue; }
-        cells.push({ i, cost: f.cost, set: { bld: KEY_BLD[tool] } });
-        cost += f.cost;
+        const why = this.facilitySpotReason(tool, i);
+        if (why) { reasons.add(why); continue; }
+        add(i, f.cost, { bld: KEY_BLD[tool], bera: era });
       } else if (LINES[tool]) {
         const l = LINES[tool];
         if (era < l.era) { reasons.add(`要到${eraInfo(l.era).name}才能用${l.name}`); continue; }
         if (g[tool][i]) continue;
-        cells.push({ i, cost: l.cost, set: { [tool]: 1 } });
-        cost += l.cost;
+        add(i, l.cost, { [tool]: 1 });
+      } else if (TRANSPORT[tool]) {
+        const tr = TRANSPORT[tool];
+        if (era < tr.era) { reasons.add(`要到${eraInfo(tr.era).name}才能蓋${tr.name}`); continue; }
+        const c = tr.cost * this.eff('transportCost');
+        if (tr.on === 'road') {
+          if (elev) {
+            // 高架模式：沒有路的地方直接蓋一段高架的公路/高速公路；已有的路改成高架並升級
+            if (g.bld[i] === BLD.PORT) continue;
+            if (g.road[i] && g.elev[i] && g.trans[i] >= tr.level) continue;
+            const set = { trans: Math.max(tr.level, g.trans[i]), elev: 1 };
+            let cc = c * (g.trans[i] >= tr.level ? 0 : 1);
+            if (!g.road[i]) { set.road = 1; cc += (t === TERRAIN.RIVER ? ROAD.cost.plain : this.roadCost(i)) + ELEVATED.cost; } else if (!g.elev[i]) cc += ELEVATED.cost;
+            add(i, cc, set);
+          } else {
+            if (!g.road[i]) { reasons.add(`${tr.name}要蓋在已有的道路上（把路升級；打開「高架」可以直接蓋新的高架${tr.name}）`); continue; }
+            if (g.trans[i] >= tr.level) continue;
+            add(i, c, { trans: tr.level });
+          }
+        } else {
+          if (g.metro[i]) continue;
+          add(i, c, { metro: 1 });
+        }
       } else if (tool === 'bulldoze') {
         if (g.bld[i] === BLD.PORT) { reasons.add('港口不能拆'); continue; }
-        if (!g.road[i] && !g.zone[i] && !g.bld[i] && !g.pipe[i] && !g.wire[i]) continue;
-        cells.push({ i, cost: 0, set: { road: 0, zone: 0, level: 0, pop: 0, bld: 0, pipe: 0, wire: 0 } });
+        if (!g.road[i] && !g.zone[i] && !g.bld[i] && !g.pipe[i] && !g.wire[i] && !g.metro[i] && !g.rail[i]) continue;
+        cells.push({ i, cost: 0, set: Object.fromEntries([...U8_LAYERS.map((k) => [k, 0]), ['pop', 0]]) });
       }
+    }
+    // 高架：算出蓋好後的柱子位置，柱子不能壓在分區、建築或鐵路上
+    if (cells.some((c) => c.set.elev)) {
+      const newElev = new Set(cells.filter((c) => c.set.elev).map((c) => c.i));
+      const isElev = (j) => newElev.has(j) || !!(g.road[j] && g.elev[j]);
+      const pil = this.pillarsFor([...newElev], isElev);
+      const bad = pil.find((j) => this.groundBusy(j));
+      if (bad != null) {
+        const W = m.w;
+        return { cells, cost, reason: `高架的柱子（每 ${ELEVATED.pillarEvery} 格一根）會壓到 (${bad % W}, ${(bad / W) | 0}) 的東西，先拆除或換個位置`, skipped: [...reasons], pillars: pil };
+      }
+      return { cells, cost, reason: cost > s.money ? '錢不夠' : null, skipped: [...reasons], pillars: pil };
     }
     let reason = cells.length ? null : ([...reasons][0] || '這裡沒有可以蓋的地方');
     if (cells.length && cost > s.money) reason = '錢不夠';
     return { cells, cost, reason, skipped: [...reasons] };
   }
 
-  build(tool, x0, y0, x1 = x0, y1 = y0) {
+  snapshotCell(i) {
+    const g = this.s.grid;
+    return [i, ...U8_LAYERS.map((k) => g[k][i]), g.pop[i]];
+  }
+  restoreCell(snap) {
+    const g = this.s.grid, i = snap[0];
+    U8_LAYERS.forEach((k, j) => { g[k][i] = snap[j + 1]; });
+    g.pop[i] = snap[U8_LAYERS.length + 1];
+    this.markDirty(i);
+  }
+
+  build(tool, x0, y0, x1 = x0, y1 = y0, opts = {}) {
     if (this.s.gameOver) return { ok: false, reason: '遊戲已結束' };
-    const p = this.plan(tool, x0, y0, x1, y1);
+    const p = this.plan(tool, x0, y0, x1, y1, opts);
     if (p.reason) return { ok: false, reason: p.reason };
     const g = this.s.grid;
     const undo = { tool, cost: p.cost, cells: [] };
     for (const c of p.cells) {
       const i = c.i;
-      undo.cells.push([i, g.road[i], g.zone[i], g.level[i], g.bld[i], g.pipe[i], g.wire[i], g.pop[i]]);
+      undo.cells.push(this.snapshotCell(i));
       for (const [k, v] of Object.entries(c.set)) g[k][i] = v;
       this.markDirty(i);
     }
@@ -230,20 +425,15 @@ export class Sim {
     this.undoStack.push(undo);
     if (this.undoStack.length > UNDO_LIMIT) this.undoStack.shift();
     this.infraDirty = true;
-    this.updateInfra();
-    this.checkMilestones();
+    // deferInfra：一次蓋很多次時（經濟模擬機器人）先不重算，最後再呼叫 updateInfra()
+    if (!this.deferInfra) { this.updateInfra(); this.checkMilestones(); }
     return { ok: true, cost: p.cost, count: p.cells.length };
   }
 
   undo() {
     const u = this.undoStack.pop();
     if (!u) return { ok: false, reason: '沒有可以復原的步驟' };
-    const g = this.s.grid;
-    for (let k = u.cells.length - 1; k >= 0; k--) {
-      const [i, road, zone, level, bld, pipe, wire, pop] = u.cells[k];
-      g.road[i] = road; g.zone[i] = zone; g.level[i] = level; g.bld[i] = bld; g.pipe[i] = pipe; g.wire[i] = wire; g.pop[i] = pop;
-      this.markDirty(i);
-    }
+    for (let k = u.cells.length - 1; k >= 0; k--) this.restoreCell(u.cells[k]);
     this.s.money += u.cost;
     this.infraDirty = true;
     this.updateInfra();
@@ -260,7 +450,8 @@ export class Sim {
     for (const p of this.map.ports) if (p.county === c.id) {
       const i = p.y * this.map.w + p.x;
       const g = this.s.grid;
-      g.road[i] = 0; g.zone[i] = 0; g.level[i] = 0; g.pop[i] = 0; g.bld[i] = BLD.PORT;
+      for (const k of U8_LAYERS) g[k][i] = 0;
+      g.pop[i] = 0; g.bld[i] = BLD.PORT;
       this.markDirty(i);
     }
     this.undoStack.length = 0; // 買地不能復原，之前的步驟也不再復原（避免退錢後錢變負的）
@@ -272,9 +463,79 @@ export class Sim {
     return { ok: true, price: r.price };
   }
 
+  // ---------- 建築隨時代演進：改建 ----------
+  // 舊樣式（樣式時代 < 目前時代）且已經蓋起來的區塊
+  oldStyleCells() {
+    const g = this.s.grid, era = this.s.era;
+    return this.zoneList.filter((i) => g.level[i] && this.beraAt(i) < era);
+  }
+  zoneRebuildCost(i) {
+    const R = ERA_UPGRADES.rebuildCost;
+    return Math.round((R.base + R.perLevel * this.s.grid.level[i]) * eraInfo(this.s.era).taxMult * this.buildMult(i));
+  }
+  // cells 省略 = 全部舊樣式
+  rebuildPlan(cells = null) {
+    const list = (cells || this.oldStyleCells()).filter((i) => this.s.grid.zone[i] && this.s.grid.level[i] && this.beraAt(i) < this.s.era);
+    return { cells: list, cost: list.reduce((a, i) => a + this.zoneRebuildCost(i), 0) };
+  }
+  rebuildZones(cells = null) {
+    if (this.s.gameOver) return { ok: false, reason: '遊戲已結束' };
+    const p = this.rebuildPlan(cells);
+    if (!p.cells.length) return { ok: false, reason: '沒有需要改建的舊建築' };
+    if (p.cost > this.s.money) return { ok: false, reason: '錢不夠', cost: p.cost };
+    for (const i of p.cells) { this.s.grid.bera[i] = this.s.era; this.markDirty(i); }
+    this.s.money -= p.cost;
+    this.undoStack.length = 0;
+    this.infraDirty = true;
+    this.updateInfra();
+    this.computeTotals();
+    this.events.push({ type: 'rebuild', count: p.cells.length, cost: p.cost });
+    return { ok: true, cost: p.cost, count: p.cells.length };
+  }
+  // 過時設施可以改建成什麼
+  facilityUpgrade(i) {
+    const key = BLD_KEY[this.s.grid.bld[i]];
+    const o = OBSOLETE[key];
+    if (!o) return null;
+    const to = o.upgradeTo.find((k) => FACILITIES[k].era <= this.s.era);
+    if (!to) return { key, to: null, reason: `要到${eraInfo(Math.min(...o.upgradeTo.map((k) => FACILITIES[k].era))).name}才能改建` };
+    const cost = Math.round(FACILITIES[to].cost * FACILITY_REBUILD.costRatio * this.buildMult(i));
+    const why = this.facilitySpotReason(to, i);
+    return { key, to, cost, reason: why || (cost > this.s.money ? '錢不夠' : null) };
+  }
+  upgradeFacility(i) {
+    if (this.s.gameOver) return { ok: false, reason: '遊戲已結束' };
+    const u = this.facilityUpgrade(i);
+    if (!u) return { ok: false, reason: '這個建築不用改建' };
+    if (!u.to || u.reason) return { ok: false, reason: u.reason };
+    this.s.grid.bld[i] = KEY_BLD[u.to];
+    this.s.grid.bera[i] = this.s.era;
+    this.s.money -= u.cost;
+    this.markDirty(i);
+    this.undoStack.length = 0;
+    this.infraDirty = true;
+    this.updateInfra();
+    this.events.push({ type: 'upgrade', from: FACILITIES[u.key].name, to: FACILITIES[u.to].name, cost: u.cost });
+    return { ok: true, cost: u.cost, to: u.to };
+  }
+  // 過時設施變差了多少（給介面清楚標示）：例如「容量 300 → 150」
+  obsoleteEffects(key) {
+    if (!this.isObsolete(key)) return [];
+    const o = OBSOLETE[key], f = FACILITIES[key], out = [];
+    if (o.capacityMult != null && o.capacityMult !== 1) out.push(`供應量 ${f.capacity.toLocaleString()} → ${Math.round(f.capacity * o.capacityMult).toLocaleString()}`);
+    if (o.maintenanceMult != null && o.maintenanceMult !== 1) out.push(`維護費 ×${o.maintenanceMult}`);
+    if (o.nearPenaltyMult != null && o.nearPenaltyMult !== 1 && f.nearPenalty) out.push(`附近住宅幸福度 ${f.nearPenalty} → ${Math.round(f.nearPenalty * o.nearPenaltyMult)}`);
+    return out;
+  }
+  obsoleteFacilities() {
+    const out = [];
+    for (const key of Object.keys(OBSOLETE)) for (const i of this.bldList[key] || []) if (this.isObsolete(key)) out.push(i);
+    return out;
+  }
+
   markDirty(i) { this.dirtyCells.add(i); }
 
-  // ---------- 基礎設施（道路連通、水、電、幸福度）----------
+  // ---------- 基礎設施（道路連通、水、電、交通、幸福度）----------
   updateInfra() {
     const m = this.map, g = this.s.grid, n = m.n, w = m.w;
     this.connected.fill(0);
@@ -283,18 +544,28 @@ export class Sim {
     this.access.fill(0);
     // 掃一次：分區、設施清單
     const zoneList = [];
-    const bldList = { port: [], well: [], waterworks: [], coal: [], lighthouse: [], station: [] };
-    let roads = 0, bridges = 0, pipes = 0, wires = 0;
+    const bldList = {};
+    for (const k of BLD_KEY) if (k) bldList[k] = [];
+    const transCells = [];
+    let roads = 0, bridges = 0, pipes = 0, wires = 0, metros = 0, rails = 0, railBridges = 0, elevs = 0;
+    const railCells = [], elevCells = [];
+    const trans = {};
     for (let i = 0; i < n; i++) {
       if (g.zone[i]) zoneList.push(i);
-      if (g.bld[i]) bldList[BLD_KEY[g.bld[i]]].push(i);
+      if (g.bld[i] && BLD_KEY[g.bld[i]]) bldList[BLD_KEY[g.bld[i]]].push(i);
       if (g.road[i] === 1) roads++; else if (g.road[i] === 2) bridges++;
       if (g.pipe[i]) pipes++;
       if (g.wire[i]) wires++;
+      if (g.trans[i]) { trans[g.trans[i]] = (trans[g.trans[i]] || 0) + 1; transCells.push(i); }
+      if (g.metro[i]) { metros++; transCells.push(i); }
+      if (g.rail[i]) { if (g.rail[i] === 2) railBridges++; else rails++; railCells.push(i); }
+      if (g.elev[i] && g.road[i]) { elevs++; elevCells.push(i); }
     }
     this.zoneList = zoneList;
     this.bldList = bldList;
-    this.lineCount = { road: roads, bridge: bridges, pipe: pipes, wire: wires };
+    this.lineCount = { road: roads, bridge: bridges, pipe: pipes, wire: wires, trans, metro: metros, rail: rails, railBridge: railBridges, elev: elevs };
+    this.pillar.fill(0);
+    for (const i of this.pillarsFor(elevCells, (j) => g.road[j] && g.elev[j])) this.pillar[i] = 1;
     // 道路 BFS（從自己擁有的港口出發）
     const q = new Int32Array(n);
     let comp = 0;
@@ -317,11 +588,60 @@ export class Sim {
     }
     for (const i of zoneList) {
       let best = -1;
-      for (const j of this.neighbors4(i)) if (this.connected[j] && (best < 0 || this.dist[j] < this.dist[best])) best = j;
+      // 只能從地面道路進出（高架不能）
+      for (const j of this.neighbors4(i)) if (this.connected[j] && !g.elev[j] && (best < 0 || this.dist[j] < this.dist[best])) best = j;
       if (best >= 0) { this.access[i] = 1; this.comp[i] = this.comp[best]; this.dist[i] = this.dist[best] + 1; }
     }
-    this.updateUtility('water', ['well', 'waterworks'], 'pipe', this.waterCov, this.waterOK);
-    this.updateUtility('power', ['coal'], 'wire', this.powerCov, this.powerOK);
+    // 交通加成：範圍內取最大
+    this.transit.fill(0);
+    const levelKey = {};
+    for (const [k, tr] of Object.entries(TRANSPORT)) if (tr.level) levelKey[tr.level] = k;
+    const stampMax = (arr, ci, r, v) => {
+      const x0 = ci % w, y0 = (ci / w) | 0;
+      for (let y = Math.max(0, y0 - r); y <= Math.min(m.h - 1, y0 + r); y++) for (let x = Math.max(0, x0 - r); x <= Math.min(w - 1, x0 + r); x++) {
+        const j = y * w + x;
+        if (arr[j] < v) arr[j] = v;
+      }
+    };
+    // 鐵路：連到車站（或火車站）的整條鐵路才有加成
+    this.railActive.fill(0);
+    const railSeen = new Uint8Array(railCells.length ? n : 0);
+    for (const st of railCells) {
+      if (railSeen[st]) continue;
+      const comp = [st]; railSeen[st] = 1;
+      let hasStop = false;
+      for (let h = 0; h < comp.length; h++) {
+        for (const j of this.neighbors4(comp[h])) {
+          if (g.bld[j] === BLD.RAILSTOP || g.bld[j] === BLD.STATION) hasStop = true;
+          if (g.rail[j] && !railSeen[j]) { railSeen[j] = 1; comp.push(j); }
+        }
+      }
+      if (hasStop) for (const i of comp) { this.railActive[i] = 1; stampMax(this.transit, i, RAIL.radius, Math.round(RAIL.bonus * 100)); }
+    }
+    for (const i of transCells) {
+      if (g.trans[i] && this.connected[i]) { const tr = TRANSPORT[levelKey[g.trans[i]]]; if (tr) stampMax(this.transit, i, tr.radius, Math.round(tr.bonus * 100)); }
+      if (g.metro[i]) stampMax(this.transit, i, TRANSPORT.metro.radius, Math.round(TRANSPORT.metro.bonus * 100));
+    }
+    // 電廠扣分、地標加分
+    this.plantPen.fill(0);
+    this.landmark.fill(0);
+    for (const key of POWER_KEYS) {
+      const p = this.facNearPenalty(key);
+      if (!p) continue;
+      for (const c of bldList[key]) {
+        const x0 = c % w, y0 = (c / w) | 0, r = HAPPINESS.radius;
+        for (let y = Math.max(0, y0 - r); y <= Math.min(m.h - 1, y0 + r); y++) for (let x = Math.max(0, x0 - r); x <= Math.min(w - 1, x0 + r); x++) {
+          const j = y * w + x;
+          if (this.plantPen[j] > p) this.plantPen[j] = Math.max(-128, p);
+        }
+      }
+    }
+    for (const key of SPECIAL_KEYS) {
+      if (FACILITIES[key].specialOf >= this.s.era) continue;
+      for (const c of bldList[key]) stampMax(this.landmark, c, LANDMARK.radius, LANDMARK.happiness);
+    }
+    this.updateUtility('water', WATER_KEYS, 'pipe', this.waterCov, this.waterOK);
+    this.updateUtility('power', POWER_KEYS, 'wire', this.powerCov, this.powerOK);
     this.updateHappiness();
     this.infraDirty = false;
   }
@@ -337,20 +657,19 @@ export class Sim {
     cov.fill(0);
     ok.fill(0);
     const groups = [];
-    // 單獨覆蓋的設施（水井、或沒接管線的廠）與管線網路
-    const seen = new Uint8Array(0);
-    void seen;
+    // 單獨覆蓋的設施（水井）與管線網路
     const netOf = new Map(); // 設施 cell → 網路
     const visited = this._visited || (this._visited = new Uint8Array(n));
     visited.fill(0);
     const q = this._q || (this._q = new Int32Array(n));
+    const isNode = (b) => b && b !== 'well' && facKeys.includes(b);
     for (const key of facKeys) {
       const f = FACILITIES[key];
       for (const c of this.bldList[key]) {
         if (netOf.has(c)) continue;
-        const group = { cap: 0, use: 0, cells: [] , plants: [], lines: [] };
+        const group = { cap: 0, use: 0, cells: [], plants: [], lines: [] };
         if (key === 'well') {
-          group.cap = f.capacity; group.plants.push([c, f.coverRadius]);
+          group.cap = this.facCapacity('well'); group.plants.push([c, f.coverRadius]);
           groups.push(group);
           continue;
         }
@@ -360,21 +679,20 @@ export class Sim {
         while (h < t) {
           const i = q[h++];
           const b = BLD_KEY[g.bld[i]];
-          if (facKeys.includes(b) && b !== 'well') {
-            group.cap += FACILITIES[b].capacity; group.plants.push([i, FACILITIES[b].coverRadius]); netOf.set(i, group);
+          if (isNode(b)) {
+            group.cap += this.facCapacity(b); group.plants.push([i, FACILITIES[b].coverRadius]); netOf.set(i, group);
           } else if (g[lineKey][i]) group.lines.push(i);
           const x = i % w;
           for (const j of [x > 0 ? i - 1 : -1, x < w - 1 ? i + 1 : -1, i - w, i + w]) {
             if (j < 0 || j >= n || visited[j]) continue;
-            const bj = BLD_KEY[g.bld[j]];
-            if (g[lineKey][j] || (facKeys.includes(bj) && bj !== 'well')) { visited[j] = 1; q[t++] = j; }
+            if (g[lineKey][j] || isNode(BLD_KEY[g.bld[j]])) { visited[j] = 1; q[t++] = j; }
           }
         }
         groups.push(group);
       }
     }
     // 覆蓋範圍 → 群組內的分區格
-    let total = { cap: 0, use: 0 };
+    const total = { cap: 0, use: 0 };
     for (const grp of groups) {
       const sid = ++this.stampId;
       const add = (ci, r) => {
@@ -391,7 +709,7 @@ export class Sim {
       };
       for (const [c, r] of grp.plants) add(c, r);
       for (const c of grp.lines) add(c, LINES[lineKey].radius);
-      grp.ok = grp.use <= grp.cap;
+      grp.ok = grp.use <= grp.cap && grp.cap > 0;
       total.cap += grp.cap; total.use += grp.use;
     }
     for (const grp of groups) if (grp.ok) for (const j of grp.cells) ok[j] = 1;
@@ -405,17 +723,16 @@ export class Sim {
       let v = H.base;
       if (this.waterOK[i]) v += H.water;
       if (this.powerOK[i]) v += H.power;
-      let ind = 0, shop = false, plant = false;
+      let ind = 0, shop = false;
       const x0 = i % w, y0 = (i / w) | 0;
       for (let y = Math.max(0, y0 - r); y <= Math.min(m.h - 1, y0 + r); y++) for (let x = Math.max(0, x0 - r); x <= Math.min(w - 1, x0 + r); x++) {
         const j = y * w + x;
         if (g.zone[j] === ZONE.I && g.level[j] > 0) ind++;
         else if (g.zone[j] === ZONE.C && g.level[j] > 0) shop = true;
-        if (g.bld[j] === BLD.COAL) plant = true;
       }
       v += Math.max(H.industryNearMax, ind * H.industryNear);
       if (shop) v += H.commerceNear;
-      if (plant) v += H.plantNear;
+      v += this.plantPen[i] + this.landmark[i] + this.transit[i] * 0.3;
       this.happy[i] = clamp(Math.round(v), 0, 100);
     }
   }
@@ -429,20 +746,24 @@ export class Sim {
   }
 
   // ---------- 人口、工作、需求 ----------
+  // 每格的稅收權重：縣市 taxMult × 交通加成
+  taxWeight(i) { return this.regionType(this.map.county[i]).taxMult * (1 + this.transit[i] / 100); }
   computeTotals() {
     const g = this.s.grid;
-    let pop = 0, capC = 0, capI = 0;
+    let pop = 0, capC = 0, capI = 0, wR = 0, wC = 0, wI = 0;
     for (const i of this.zoneList) {
       const z = g.zone[i];
-      if (z === ZONE.R) pop += g.pop[i];
-      else if (this.access[i]) { if (z === ZONE.C) capC += this.capAt(i); else capI += this.capAt(i); }
+      if (z === ZONE.R) { pop += g.pop[i]; wR += g.pop[i] * this.taxWeight(i); } else if (this.access[i]) {
+        const c = this.capAt(i);
+        if (z === ZONE.C) { capC += c; wC += c * this.taxWeight(i); } else { capI += c; wI += c * this.taxWeight(i); }
+      }
     }
     const workers = pop * ECON.labor;
     const needJobs = Math.max(0, workers - pop * ECON.selfEmployed);
     const jobs = capC + capI;
     const f = jobs > 0 ? Math.min(1, needJobs / jobs) : 0;
     const openJobs = jobs + ECON.baseJobs - needJobs;
-    this.totals = { pop, capC, capI, jobs, workers, needJobs, filledC: capC * f, filledI: capI * f, openJobs };
+    this.totals = { pop, capC, capI, jobs, workers, needJobs, filledC: capC * f, filledI: capI * f, openJobs, wR, wC: wC * f, wI: wI * f };
     this.demand = {
       R: clamp(openJobs / Math.max(50, needJobs * 0.25 + 50), -1, 1),
       C: clamp((pop * ECON.shopNeed - capC + 10) / Math.max(20, pop * ECON.shopNeed * 0.5), -1, 1),
@@ -468,79 +789,109 @@ export class Sim {
     }
   }
 
+  refreshUtilities() {
+    this.updateUtility('water', WATER_KEYS, 'pipe', this.waterCov, this.waterOK);
+    this.updateUtility('power', POWER_KEYS, 'wire', this.powerCov, this.powerOK);
+  }
+
   monthTick() {
     const s = this.s, g = s.grid;
     if (this.infraDirty) this.updateInfra();
-    else { this.updateUtility('water', ['well', 'waterworks'], 'pipe', this.waterCov, this.waterOK); this.updateUtility('power', ['coal'], 'wire', this.powerCov, this.powerOK); this.updateHappiness(); }
+    else { this.refreshUtilities(); this.updateHappiness(); }
     this.computeTotals();
-    const era = eraInfo(s.era);
+    const era = s.era;
     let needC = this.totals.pop * ECON.shopNeed - this.totals.capC + 10;
     let needI = this.totals.capC * ECON.goodsNeed + ECON.industryBase + this.totals.pop * 0.05 - this.totals.capI;
     const rng = this.rng;
     // 打亂順序，避免總是從北邊先長
     const list = this.zoneList.slice();
     for (let k = list.length - 1; k > 0; k--) { const j = (rng() * (k + 1)) | 0; [list[k], list[j]] = [list[j], list[k]]; }
-    let births = 0;
+    let rebuilt = 0;
     for (const i of list) {
       if (!this.growthOK(i)) continue;
       const z = g.zone[i], lv = g.level[i];
+      const boost = 1 + 2 * this.transit[i] / 100;
+      const maxLv = this.maxLevelAt(i);
+      // （預設關閉）舊樣式自動改建成新時代樣式；Sonny 決定舊建築要付錢才升級
+      if (ERA_UPGRADES.autoRebuild && lv && this.beraAt(i) < era && rng() < ERA_UPGRADES.rebuildChance * boost) {
+        const before = this.capAt(i);
+        g.bera[i] = era; this.markDirty(i); rebuilt++;
+        if (z === ZONE.C) { needC -= this.capAt(i) - before; } else if (z === ZONE.I) needI -= this.capAt(i) - before;
+        continue;
+      }
       if (z === ZONE.R) {
         const cap = this.capAt(i);
         if (lv === 0) {
-          if (this.demand.R > -0.5 && rng() < GROWTH.firstBuildChance) { g.level[i] = 1; this.markDirty(i); }
+          if (this.demand.R > -0.5 && rng() < GROWTH.firstBuildChance) { g.level[i] = 1; g.bera[i] = era; this.markDirty(i); }
         } else {
-          if (lv < era.maxLevel && g.pop[i] >= cap * GROWTH.fullRatio && this.demand.R > 0 && rng() < GROWTH.levelUpChance) { g.level[i] = lv + 1; this.markDirty(i); }
+          if (lv < maxLv && g.pop[i] >= cap * GROWTH.fullRatio && this.demand.R > 0 && rng() < GROWTH.levelUpChance * boost) { g.level[i] = lv + 1; this.markDirty(i); }
           if (g.pop[i] > 0 && g.pop[i] < cap) {
             const add = g.pop[i] * GROWTH.naturalGrowth;
             const whole = Math.floor(add) + (rng() < add % 1 ? 1 : 0);
-            const real = Math.min(whole, cap - g.pop[i]);
-            g.pop[i] += real; births += real;
+            g.pop[i] += Math.min(whole, cap - g.pop[i]);
           }
         }
       } else {
         const isC = z === ZONE.C;
         const need = isC ? needC : needI;
         const grow = (to) => {
-          const inc = this.capAt(i, to) - this.capAt(i, lv);
-          g.level[i] = to; this.markDirty(i);
+          // 空地第一次蓋 → 目前時代樣式；已經蓋好的長高 → 維持原本樣式
+          const bera = lv === 0 ? era : this.beraAt(i);
+          const inc = this.capAt(i, to, bera) - this.capAt(i, lv);
+          g.level[i] = to; if (lv === 0) g.bera[i] = era; this.markDirty(i);
           if (isC) { needC -= inc; needI += inc * ECON.goodsNeed; } else needI -= inc;
         };
-        if (lv === 0) { if (need > -10 && rng() < GROWTH.firstBuildChance) grow(1); } else if (lv < era.maxLevel && need > 0 && rng() < GROWTH.levelUpChance) grow(lv + 1);
+        if (lv === 0) { if (need > -10 && rng() < GROWTH.firstBuildChance) grow(1); } else if (lv < maxLv && need > 0 && rng() < GROWTH.levelUpChance * boost) grow(lv + 1);
       }
     }
+    if (rebuilt) this.events.push({ type: 'autoRebuild', count: rebuilt });
     // 重算一次（成長後），再算錢
-    this.updateUtility('water', ['well', 'waterworks'], 'pipe', this.waterCov, this.waterOK);
-    this.updateUtility('power', ['coal'], 'wire', this.powerCov, this.powerOK);
-    const t = this.computeTotals();
+    this.refreshUtilities();
+    this.computeTotals();
     this.economy();
     s.portUnloaded = {};
     s.month++;
+    this.updateEraEvents();
     this.checkEra();
     this.checkMilestones();
-    void births;
+    this.checkVictory();
   }
 
   maintenance() {
-    const lc = this.lineCount, era = Math.min(this.s.era, 2);
+    const lc = this.lineCount, era = this.s.era;
     let fac = 0;
-    for (const [k, list] of Object.entries(this.bldList)) if (FACILITIES[k]) fac += FACILITIES[k].maintenance * list.length;
+    for (const [k, list] of Object.entries(this.bldList)) if (FACILITIES[k]) fac += this.facMaintenance(k) * list.length;
+    let transport = lc.metro * TRANSPORT.metro.maintenance + lc.rail * RAIL.maintenance + lc.railBridge * RAIL.bridgeMaintenance + lc.elev * ELEVATED.maintenance;
+    for (const tr of Object.values(TRANSPORT)) if (tr.level) transport += (lc.trans[tr.level] || 0) * tr.maintenance;
     return {
       roads: lc.road * ROAD.maintenance + lc.bridge * ROAD.bridgeMaintenance[era],
       facilities: fac,
       lines: lc.pipe * LINES.pipe.maintenance + lc.wire * LINES.wire.maintenance,
+      transport,
       loan: this.s.loan.taken && this.s.loan.monthsLeft > 0 ? FINANCE.loan.monthlyPayment : 0,
     };
   }
 
-  economy() {
-    const s = this.s, t = this.totals, tax = ECON.tax;
-    const inc = {
-      R: t.pop * tax.R, C: t.filledC * tax.C, I: t.filledI * tax.I,
-      trade: this.bldList.port.length ? t.filledI * ECON.tradePerIndustryJob : 0,
+  // 收入明細（不改狀態）
+  incomeBreakdown() {
+    const t = this.totals, tax = ECON.tax, em = eraInfo(this.s.era).taxMult;
+    let land = 0;
+    for (const id of this.s.owned) land += this.landIncomeOf(id);
+    return {
+      R: (t.wR ?? t.pop) * tax.R * em * this.eff('taxR'),
+      C: (t.wC ?? t.filledC) * tax.C * em * this.eff('taxC') * this.specialEff('taxC'),
+      I: (t.wI ?? t.filledI) * tax.I * em * this.eff('taxI'),
+      trade: this.bldList.port.length ? t.filledI * ECON.tradePerIndustryJob * em * this.eff('trade') * this.specialEff('trade') : 0,
+      land,
     };
+  }
+
+  economy() {
+    const s = this.s;
+    const inc = this.incomeBreakdown();
     const exp = this.maintenance();
-    const income = Math.round(inc.R + inc.C + inc.I + inc.trade);
-    const expense = Math.round(exp.roads + exp.facilities + exp.lines + exp.loan);
+    const income = Math.round(Object.values(inc).reduce((a, b) => a + b, 0));
+    const expense = Math.round(Object.values(exp).reduce((a, b) => a + b, 0));
     const net = income - expense;
     s.money += net;
     if (s.loan.taken && s.loan.monthsLeft > 0) s.loan.monthsLeft--;
@@ -562,10 +913,8 @@ export class Sim {
 
   // 收支預估（不改狀態）
   forecast() {
-    const t = this.totals, tax = ECON.tax;
-    const income = Math.round(t.pop * tax.R + t.filledC * tax.C + t.filledI * tax.I + (this.bldList.port.length ? t.filledI * ECON.tradePerIndustryJob : 0));
-    const e = this.maintenance();
-    const expense = Math.round(e.roads + e.facilities + e.lines + e.loan);
+    const income = Math.round(Object.values(this.incomeBreakdown()).reduce((a, b) => a + b, 0));
+    const expense = Math.round(Object.values(this.maintenance()).reduce((a, b) => a + b, 0));
     return { income, expense, net: income - expense };
   }
 
@@ -583,24 +932,31 @@ export class Sim {
     this.s.pendingLoan = false;
     this.endGame('破產：沒有借緊急貸款');
   }
-  endGame(reason) {
+  summary() {
     const s = this.s;
-    s.gameOver = {
-      reason, month: s.month, pop: this.totals.pop, era: s.era,
+    return {
+      month: s.month, pop: this.totals.pop, era: s.era,
       regions: s.owned.map((id) => this.map.counties.get(id).name),
-      milestones: Object.keys(s.milestones).length,
+      milestones: Object.keys(s.milestones).length, money: Math.round(s.money),
     };
+  }
+  endGame(reason) {
+    this.s.gameOver = { reason, ...this.summary() };
     this.events.push({ type: 'gameOver' });
   }
 
+  // ---------- 時代 ----------
   checkEra() {
     const s = this.s;
     const e = eraInfo(s.era);
     if (s.era >= MAX_PLAYABLE_ERA || !e.popToNext) return;
     if (this.totals.pop >= e.popToNext && this.hasSpecial(e.special)) {
       s.era++;
+      s.eraStart = s.month;
       this.dirtyAll = true;
-      this.events.push({ type: 'era', era: s.era, name: eraInfo(s.era).name });
+      this.infraDirty = true;
+      const obsolete = Object.entries(OBSOLETE).filter(([k, o]) => o.fromEra === s.era && (this.bldList[k] || []).length).map(([, o]) => o.text);
+      this.events.push({ type: 'era', era: s.era, name: eraInfo(s.era).name, old: this.oldStyleCells().length, obsolete });
     }
   }
   eraProgress() {
@@ -608,8 +964,41 @@ export class Sim {
     return {
       era: this.s.era, name: e.name, nextName: ERAS[this.s.era]?.name || null,
       popNeed: e.popToNext, pop: this.totals.pop, special: e.special, specialName: FACILITIES[e.special]?.name || e.special,
-      specialBuilt: this.hasSpecial(e.special), locked: this.s.era >= MAX_PLAYABLE_ERA,
+      specialBuilt: this.hasSpecial(e.special), locked: this.s.era >= MAX_PLAYABLE_ERA, last: !e.popToNext,
     };
+  }
+  updateEraEvents() {
+    const s = this.s;
+    s.effects = s.effects.filter((e) => e.until > s.month);
+    for (const ev of ERA_EVENTS) {
+      if (ev.era !== s.era || s.eventsDone[ev.id] !== undefined || s.month - s.eraStart < ev.atMonth) continue;
+      s.eventsDone[ev.id] = s.month;
+      if (ev.effect) s.effects.push({ id: ev.id, until: s.month + ev.months, ...ev.effect });
+      if (ev.grant) s.money += ev.grant;
+      this.events.push({ type: 'eraEvent', id: ev.id, name: ev.name, text: ev.text });
+    }
+  }
+  activeEvents() {
+    return this.s.effects.map((e) => ({ ...ERA_EVENTS.find((x) => x.id === e.id), monthsLeft: e.until - this.s.month }));
+  }
+
+  // ---------- 完成條件 ----------
+  victoryProgress() {
+    const V = VICTORY;
+    const items = [
+      { id: 'era', text: `進入${eraInfo(V.era).name}`, done: this.s.era >= V.era },
+      { id: 'pop', text: `人口 ${V.pop.toLocaleString()}`, done: this.totals.pop >= V.pop, now: this.totals.pop },
+      { id: 'special', text: `蓋好${FACILITIES[V.special].name}`, done: this.hasSpecial(V.special) },
+      { id: 'milestone', text: MILESTONES.find((x) => x.id === V.milestone).name, done: this.s.milestones[V.milestone] !== undefined },
+    ];
+    return { items, done: items.every((x) => x.done), victory: this.s.victory };
+  }
+  checkVictory() {
+    if (this.s.victory) return;
+    if (this.victoryProgress().done) {
+      this.s.victory = { ...this.summary() };
+      this.events.push({ type: 'victory' });
+    }
   }
 
   checkMilestones() {
@@ -631,7 +1020,7 @@ export class Sim {
     }
     if (ms.firstBridge === undefined && this.lineCount.bridge > 0) hit('firstBridge');
     if (s.purchases > 0) hit('firstRegion');
-    if (this.bldList.lighthouse?.length || this.bldList.station?.length) hit('firstSpecial');
+    if (SPECIAL_KEYS.some((k) => this.hasSpecial(k))) hit('firstSpecial');
     if (s.era >= 2) hit('era2');
     if (s.era >= ERAS.length) hit('modern');
   }
@@ -662,6 +1051,7 @@ export class Sim {
     const t = this.totals;
     return Math.max(0, t.openJobs) / (ECON.labor - ECON.selfEmployed) + 20;
   }
+  portCapacity() { return Math.round(eraInfo(this.s.era).portUnload * this.eff('portCap')); }
 
   updateShips(dt) {
     const s = this.s;
@@ -673,9 +1063,10 @@ export class Sim {
       s.shipTimer += sh.intervalMonths;
       const port = ports[s.portRR % ports.length];
       s.portRR++;
-      const attract = Math.min(1, Math.min(this.vacancy(), this.jobRoom()) / sh.capacity);
-      const passengers = Math.max(1, Math.round(sh.capacity * (0.3 + 0.7 * attract)));
-      s.ships.push({ id: (s.shipSeq = (s.shipSeq || 0) + 1), port: port.name, era: s.era, t: 0, phase: 'in', passengers, capacity: sh.capacity, travel: sh.travelMonths });
+      const capacity = Math.round(sh.capacity * this.eff('immigration'));
+      const attract = Math.min(1, Math.min(this.vacancy(), this.jobRoom()) / capacity);
+      const passengers = Math.max(1, Math.round(capacity * (0.3 + 0.7 * attract)));
+      s.ships.push({ id: (s.shipSeq = (s.shipSeq || 0) + 1), port: port.name, era: s.era, t: 0, phase: 'in', passengers, capacity, travel: sh.travelMonths });
     }
     for (const ship of s.ships) {
       ship.t += dt / ship.travel;
@@ -690,7 +1081,7 @@ export class Sim {
     if (!port) return;
     const pi = port.y * m.w + port.x;
     const used = s.portUnloaded[ship.port] || 0;
-    const portRoom = Math.max(0, PORT.unloadPerMonth - used);
+    const portRoom = Math.max(0, this.portCapacity() - used);
     const targets = this.eligibleTargets(this.comp[pi]);
     const vacancy = targets.reduce((a, b) => a + b[1], 0);
     let n = Math.floor(Math.min(ship.passengers, portRoom, vacancy, this.jobRoom()));

@@ -105,3 +105,7 @@ button { font: inherit; color: inherit; cursor: pointer; }
   .dbar i { width: 34px; }
   #stat-date small { display: none; }
 }
+.scroll-x { overflow-x: auto; }
+.scroll-x table { min-width: 520px; }
+#toolbar button.hot { box-shadow: inset 0 -3px 0 var(--accent); }
+.subtools button.hot { border-color: var(--accent); }
