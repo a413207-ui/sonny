@@ -1,0 +1,57 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<!-- 只允許同源資源；執行時不連任何外部網址 -->
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; connect-src 'self'; base-uri 'none'; form-action 'none'">
+<meta name="theme-color" content="#1f5d8c">
+<title>台灣模擬</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<canvas id="view"></canvas>
+
+<header id="hud">
+  <div class="row">
+    <div class="stat" id="stat-money" title="金錢／每月淨收支"><span class="ico">💰</span><b id="money">—</b><small id="net"></small></div>
+    <div class="stat" id="stat-pop" title="人口"><span class="ico">👥</span><b id="pop">—</b></div>
+    <div class="stat" id="stat-date"><span id="date">—</span><small id="era-name"></small></div>
+    <div class="speed" role="group" aria-label="遊戲速度">
+      <button data-speed="0" title="暫停（空白鍵）">⏸</button>
+      <button data-speed="1" title="×1">×1</button>
+      <button data-speed="2" title="×2">×2</button>
+      <button data-speed="3" title="×4">×4</button>
+    </div>
+    <button id="menu-btn" class="icon-btn" title="選單" aria-label="選單">☰</button>
+  </div>
+  <div class="row demand" id="demand" title="需求：往上 = 缺這種區">
+    <div class="dbar" data-k="R"><span>住</span><i><em></em></i></div>
+    <div class="dbar" data-k="C"><span>商</span><i><em></em></i></div>
+    <div class="dbar" data-k="I"><span>工</span><i><em></em></i></div>
+    <div id="util" class="util"></div>
+  </div>
+  <div id="banner" class="banner" hidden></div>
+</header>
+
+<aside id="side">
+  <button id="undo-btn" class="icon-btn" title="復原上一步（Ctrl+Z）">↶</button>
+  <button id="ov-water" class="icon-btn" title="水的覆蓋">💧</button>
+  <button id="ov-power" class="icon-btn" title="電的覆蓋">⚡</button>
+  <button id="regions-btn" class="icon-btn" title="區域（買地）">🗺</button>
+  <button id="era-btn" class="icon-btn" title="時代">🏛</button>
+  <button id="ms-btn" class="icon-btn" title="里程碑">🏆</button>
+</aside>
+
+<div id="tool-tip" class="tool-tip"></div>
+<div id="subtools" class="subtools" hidden></div>
+<nav id="toolbar"></nav>
+
+<div id="toasts" aria-live="polite"></div>
+<div id="sheet" class="sheet" hidden></div>
+<div id="modal-wrap" hidden><div id="modal" role="dialog" aria-modal="true"></div></div>
+<div id="loading">台灣模擬 載入中…</div>
+<noscript>需要開啟 JavaScript。</noscript>
+<script type="module" src="main.js"></script>
+</body>
+</html>
