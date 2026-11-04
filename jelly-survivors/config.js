@@ -98,6 +98,33 @@ export const CONFIG = {
     warning: '精英怪「大綠毛蟲」出現了！',
   },
 
+  // ---------- 包圍突襲（G-WAVE-01）----------
+  // 定期以玩家為中心、在剛好畫面外的圓上排一整圈怪，全部一起往玩家衝，圓圈慢慢縮小。
+  // 時程：2:00、3:30、5:00、6:30、8:00、9:30（共 6 次）。
+  encircle: {
+    name: '包圍突襲',
+    warning: '⚠ 怪物包圍了！',
+    start: 120, // 第一次 2:00（一定晚於新手保護 stage.warmup.until）
+    interval: 90, // 之後每 90 秒一次
+    warnTime: 2.5, // 生成前幾秒顯示預警（上方提示 + 畫面邊緣紅光）
+    baseCount: 24, // 第一次的隻數
+    countGrowth: 8, // 之後每次多幾隻（24、32、40、48…）
+    maxCount: isTouch ? 40 : 64, // 單次上限；手機較低，避免一圈太多拖慢
+    // 怪物池（stage.maxEnemies）空位不夠時：先把畫面外最遠的一般怪收掉讓位，最多收到 recycleMax 隻，
+    // 剩下的就直接減量；另外保留 reserve 個空位給精英／王分裂
+    recycleMax: 30,
+    reserve: 10,
+    lowFps: 40, // 手機 FPS 低於這個值時，再把數量 ×lowFpsMult
+    lowFpsMult: 0.6,
+    radiusPad: 1.5, // 圓的半徑 = 鏡頭可視半徑 + radiusPad（剛好在畫面外）
+    layerSplit: 28, // 超過這個數量就排成兩層（外層錯開半格）
+    layerGap: 2.2, // 兩層之間的距離
+    hopFrom: 300, // 5:00 起混入跳跳史萊姆
+    hopFrac: 0.15, // 混入比例
+    xpMult: 0.5, // 突襲怪掉經驗寶石的機率 ×0.5（經驗打折，避免升級變快太多）
+    bossMult: 0.5, // 王在場時數量減半
+  },
+
   // ---------- 王（G-CORE-02）----------
   boss: {
     type: 'slimeKing',

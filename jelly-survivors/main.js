@@ -63,6 +63,7 @@ class Game {
     this.boss = new BossAI(this);
     this.pickOut = { gold: 0, potions: 0 };
     this.buildSkillbar();
+    $('encircle-warn').textContent = CONFIG.encircle.warning;
 
     this.state = 'title';
     this.input.handlers.pause = () => this.togglePause();
@@ -179,6 +180,11 @@ class Game {
     this.potions = 0;
     this.runGold = 0;
     this.nextElite = CONFIG.elite.firstAt;
+    // 包圍突襲：新手保護期間絕對不會發生
+    this.nextWave = Math.max(CONFIG.encircle.start, CONFIG.stage.warmup.until);
+    this.waveAt = 0; // 預警中：這個時間點生成（0 = 沒有預警中）
+    this.waveIndex = 0;
+    this.waveLog = []; // 每次突襲的紀錄（測試 / bot 用）
     this.pendingJob = false;
     this.jobOffered = false;
     this.bossKilled = false;
@@ -272,6 +278,7 @@ class Game {
     }
 
     this.spawnSpecial();
+    this.updateEncircle();
     this.spawn(dt);
     this.boss.update(dt);
     this.enemies.update(dt, p.x, p.z, this.elapsed, this.world, (i) => {
@@ -338,7 +345,8 @@ class Game {
     }
     if (def.drops) {
       for (const kind of def.drops.gems) this.gems.add(kind, x + (Math.random() - 0.5) * 2, z + (Math.random() - 0.5) * 2);
-    } else {
+    } else if (!en.wave[i] || Math.random() < CONFIG.encircle.xpMult) {
+      // 包圍突襲的怪：掉寶石機率打折（經驗打折）
       this.gems.dropFrom(def.gem, x, z);
     }
     if (def.gold && Math.random() < def.gold.chance) this.pickups.addGold(x + 0.4, z, def.gold.amount);
@@ -359,6 +367,89 @@ class Game {
     if (!this.boss.spawned && this.elapsed >= CONFIG.boss.spawnAt) {
       if (this.boss.spawn()) this.showBanner(CONFIG.boss.warning, 3);
     }
+  }
+
+  // ---------- 包圍突襲（G-WAVE-01）----------
+  updateEncircle() {
+    const ec = CONFIG.encircle;
+    const t = this.elapsed;
+    if (!this.waveAt && t >= this.nextWave - ec.warnTime && this.nextWave < CONFIG.stage.duration) {
+      // 進入預警；時間被跳過去（例如測試）時，一樣先預警滿 warnTime 秒才生成
+      this.waveAt = Math.max(this.nextWave, t + (t > this.nextWave - ec.warnTime + 0.5 ? ec.warnTime : 0));
+      this.waveWarnFrom = t;
+    }
+    if (this.waveAt && t >= this.waveAt) {
+      const k = this.waveIndex;
+      this.spawnEncircle(ec.baseCount + ec.countGrowth * k);
+      this.waveIndex++;
+      this.waveAt = 0;
+      while (this.nextWave <= t + ec.warnTime) this.nextWave += ec.interval;
+    }
+  }
+
+  // 以玩家為中心，在剛好畫面外的圓上均勻排一圈（數量多時排兩層），全部朝玩家衝過來
+  spawnEncircle(want) {
+    const ec = CONFIG.encircle;
+    const st = CONFIG.stage;
+    const en = this.enemies;
+    const p = this.player;
+    let n = Math.min(want, ec.maxCount);
+    if (this.boss.alive) n = Math.round(n * ec.bossMult);
+    if (CONFIG.isMobile && this.fps && this.fps < ec.lowFps) n = Math.round(n * ec.lowFpsMult);
+    const r0 = this.world.viewRadius + ec.radiusPad;
+    // 怪物池空位不夠：先把畫面外最遠的一般怪收掉讓位，還不夠就減量
+    let free = en.max - en.count - ec.reserve;
+    if (free < n) free += en.recycleFar(Math.min(ec.recycleMax, n - free), p.x, p.z, r0);
+    const before = en.count;
+    n = Math.max(0, Math.min(n, free));
+
+    const tier = this.tier;
+    const hpMult = Math.pow(st.hpGrowth, tier);
+    const dmgMult = Math.pow(st.damageGrowth, tier);
+    const spdMult = Math.pow(st.speedGrowth, tier);
+    // 種類：當下時段會出現的一般怪（跳跳史萊姆另外照比例混入）
+    const entries = st.spawnTable.filter((e) => tier >= e.from && e.type !== 'hopSlime');
+    const total = entries.reduce((a, e) => a + e.weight, 0);
+    const pickType = () => {
+      let r = Math.random() * total;
+      return (entries.find((e) => (r -= e.weight) < 0) || entries[0]).type;
+    };
+    const hopOk = this.elapsed >= ec.hopFrom;
+
+    const inner = n > ec.layerSplit ? Math.ceil(n * 0.55) : n;
+    const lim = CONFIG.map.size / 2 - 1;
+    const angles = [];
+    let spawned = 0;
+    let minD = Infinity;
+    let maxD = 0;
+    const a0 = Math.random() * Math.PI * 2;
+    for (let s = 0; s < n; s++) {
+      const outer = s >= inner;
+      const m = outer ? n - inner : inner;
+      const j = outer ? s - inner : s;
+      const a = a0 + ((j + (outer ? 0.5 : 0)) / m) * Math.PI * 2;
+      const cx = Math.cos(a);
+      const cz = Math.sin(a);
+      // 貼著地圖邊緣時沿著這個方向縮到地圖內；太近（等於牆就擋住了）就略過
+      let r = r0 + (outer ? ec.layerGap : 0);
+      if (cx) r = Math.min(r, ((cx > 0 ? lim : -lim) - p.x) / cx);
+      if (cz) r = Math.min(r, ((cz > 0 ? lim : -lim) - p.z) / cz);
+      if (r < 6) continue;
+      const x = p.x + cx * r;
+      const z = p.z + cz * r;
+      const type = hopOk && Math.random() < ec.hopFrac ? 'hopSlime' : pickType();
+      const i = en.spawn(type, x, z, hpMult, dmgMult, spdMult, -cx, -cz);
+      if (i < 0) break;
+      en.wave[i] = 1;
+      spawned++;
+      angles.push(Math.atan2(z - p.z, x - p.x));
+      minD = Math.min(minD, r);
+      maxD = Math.max(maxD, r);
+    }
+    this.waveLog.push({
+      at: this.elapsed, index: this.waveIndex, want, spawned, before, after: en.count,
+      angles, minDist: minD, maxDist: maxD, viewRadius: this.world.viewRadius, boss: this.boss.alive,
+    });
   }
 
   showBanner(text, seconds = 2.2) {
@@ -749,6 +840,15 @@ class Game {
     for (const s of Object.values(this.skills)) s.syncMesh?.(this.time);
     this.skillFx.sync(this.simDt, this.time); // 要在 syncMesh 之後：有特效的子彈會把原本的幾何藏起來
     this.boss.syncMesh(this.time);
+    // 包圍突襲預警：上方提示 + 畫面邊緣紅光（生成後再多留 0.6 秒）
+    const warnOn = this.state !== 'title' && this.state !== 'shop' && this.state !== 'over' &&
+      (this.waveAt > 0 || (this.waveLog.length > 0 && this.elapsed - this.waveLog.at(-1).at < 0.6));
+    if (this.hudCache.warnOn !== warnOn) {
+      this.hudCache.warnOn = warnOn;
+      $('encircle-warn').classList.toggle('hidden', !warnOn);
+      $('edge-flash').classList.toggle('hidden', !warnOn);
+      document.body.classList.toggle('encircling', warnOn);
+    }
     if (this.bannerUntil && this.time > this.bannerUntil) {
       this.bannerUntil = 0;
       $('banner').classList.add('hidden');

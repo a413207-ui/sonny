@@ -204,6 +204,43 @@ html, body {
 }
 @keyframes pop { from { transform: translateX(-50%) scale(0.7); opacity: 0; } }
 
+/* ---------- 包圍突襲預警（G-WAVE-01）---------- */
+#edge-flash {
+  position: fixed;
+  inset: 0;
+  z-index: 3;
+  pointer-events: none;
+  background: radial-gradient(ellipse at center, transparent 45%, rgba(230, 0, 0, 0.85) 100%);
+  box-shadow: inset 0 0 60px rgba(220, 0, 0, 1);
+  border: 4px solid rgba(255, 60, 60, 0.8);
+  animation: edgePulse 0.5s ease-in-out infinite alternate;
+}
+@keyframes edgePulse { from { opacity: 0.35; } to { opacity: 1; } }
+#encircle-warn {
+  position: fixed;
+  left: 50%;
+  /* 在 HUD（經驗條 + 血條 + 王血條）下方；橫式手機高度小，所以用 max 而不是百分比 */
+  top: calc(env(safe-area-inset-top) + min(100px, 20vh));
+  transform: translateX(-50%);
+  z-index: 6;
+  pointer-events: none;
+  padding: 6px 16px;
+  border-radius: 10px;
+  background: rgba(150, 0, 0, 0.82);
+  border: 2px solid #ffd0d0;
+  color: #fff;
+  font-size: clamp(18px, min(5.2vw, 6vh), 28px);
+  line-height: 1.25;
+  font-weight: 900;
+  white-space: nowrap;
+  max-width: 94vw;
+  text-shadow: 0 2px 3px rgba(0, 0, 0, 0.7);
+  animation: warnBlink 0.5s ease-in-out infinite alternate;
+}
+/* 預警中，原本的提示橫幅（精英、王）往下讓位，避免橫式手機上重疊 */
+body.encircling #banner { top: calc(env(safe-area-inset-top) + 160px); }
+@keyframes warnBlink { from { transform: translateX(-50%) scale(0.94); } to { transform: translateX(-50%) scale(1.04); } }
+
 /* ---------- 疊加畫面 ---------- */
 .overlay {
   position: fixed;
