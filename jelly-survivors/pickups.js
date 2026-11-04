@@ -1,5 +1,5 @@
 // 地上的金幣與遺忘藥水：物件池 + 兩個 InstancedMesh。吸取範圍和經驗寶石相同。
-import * as THREE from './vendor/three.module.min.js';
+import * as THREE from 'three';
 import { CONFIG } from './config.js';
 
 const COIN = 0;

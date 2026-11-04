@@ -6,6 +6,8 @@
   <meta name="theme-color" content="#6fae55" />
   <title>果凍大陸：轉職倖存者</title>
   <link rel="stylesheet" href="./style.css" />
+  <!-- 全站只有一份 Three.js：遊戲和 00GameDevs 特效都用 import 'three'，指到本地 vendor 檔 -->
+  <script type="importmap">{ "imports": { "three": "./vendor/three.module.min.js" } }</script>
 </head>
 <body>
   <div id="game"></div>
@@ -55,6 +57,12 @@
     <div class="panel">
       <h2>暫停</h2>
       <button class="btn" id="resume-btn">繼續</button>
+      <div class="vfxq" id="vfx-quality" role="group" aria-label="特效品質">
+        <span>特效品質</span>
+        <button data-q="high" aria-pressed="false">高</button>
+        <button data-q="mid" aria-pressed="false">中</button>
+        <button data-q="low" aria-pressed="false">低</button>
+      </div>
       <button class="btn ghost potion-btn" id="pause-forget-btn">🧪 使用遺忘藥水</button>
       <button class="btn ghost" id="restart-btn">重新開始</button>
     </div>
@@ -73,6 +81,7 @@
       <h2>轉職！選擇你的職業</h2>
       <p class="sub">職業招式會加入升級卡池，並獲得 1 瓶遺忘藥水</p>
       <div id="jobs"></div>
+      <p class="sub hidden" id="job-loading">準備職業特效…</p>
     </div>
   </div>
 
@@ -112,7 +121,6 @@
   </div>
 
   <script type="module" src="./main.js"></script>
-  <script data-goatcounter="https://sonnystudio.goatcounter.com/count"
-          async src="//gc.zgo.at/count.js"></script>
+  <script data-goatcounter="https://sonnystudio.goatcounter.com/count" async src="//gc.zgo.at/count.js"></script>
 </body>
 </html>

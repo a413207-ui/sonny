@@ -2,7 +2,7 @@
 // 招式：
 //   衝撞 —— 停下蓄力（地上出現紅色警示帶）→ 朝玩家方向高速衝刺
 //   分裂 —— 定時在身邊分裂出小史萊姆；血量低於一半時立刻大分裂一次，之後衝撞變頻繁
-import * as THREE from './vendor/three.module.min.js';
+import * as THREE from 'three';
 import { CONFIG } from './config.js';
 
 export class BossAI {

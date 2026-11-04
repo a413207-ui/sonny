@@ -1,5 +1,5 @@
 // 經驗寶石：小藍 / 中綠 / 大紫，物件池 + 單一 InstancedMesh（用 instanceColor 分色）。
-import * as THREE from './vendor/three.module.min.js';
+import * as THREE from 'three';
 import { CONFIG } from './config.js';
 
 const KINDS = ['small', 'medium', 'large'];

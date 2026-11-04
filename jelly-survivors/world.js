@@ -1,5 +1,5 @@
 // 場景、鏡頭、地圖（有邊界的平原）。
-import * as THREE from './vendor/three.module.min.js';
+import * as THREE from 'three';
 import { CONFIG } from './config.js';
 
 export class World {
@@ -116,6 +116,8 @@ export class World {
   }
 
   render() {
+    // 高品質且有火球時，由特效系統用發光後製畫整個畫面
+    if (this.vfx?.render()) return;
     this.renderer.render(this.scene, this.camera);
   }
 }
