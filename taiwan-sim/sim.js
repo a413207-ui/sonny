@@ -7,6 +7,9 @@ import {
   TAX, BUDGET, CRIME, HEALTH, TRAFFIC, LAND_VALUE, POLLUTION,
 } from './config.js';
 import { allocServices, updateServices, eduLevelCap } from './services.js';
+import { allocCommute, computeCommute } from './commute.js';
+import { buildingName, makeResident, hash3, yearOf, seeded } from './names.js';
+import { COMMUTE, RESIDENTS, SERVICE_BUILDINGS } from './config.js';
 
 // 建築編號（存檔用，只能往後加，不能改舊的）
 export const BLD = {
@@ -101,6 +104,7 @@ export class Sim {
     this.railActive = new Uint8Array(n);  // 連到車站的鐵路
     this.accessRoad = new Int32Array(n).fill(-1); // 區塊進出用的地面道路格
     allocServices(this);                  // 教育、警力、醫療、污染、健康、犯罪、地價、車流（services.js）
+    allocCommute(this);                   // 通勤配對與路線（commute.js）
     this.stamp = new Int32Array(n);
     this.stampId = 0;
     this.zoneList = [];
@@ -116,6 +120,10 @@ export class Sim {
     this.undoStack = [];
     this.updateInfra();
     this.computeTotals();
+    computeCommute(this);
+    updateServices(this);
+    this.updateHappiness();
+    this.ensureInfo();
   }
 
   static newState(map) {
@@ -146,6 +154,9 @@ export class Sim {
     for (const z of ['R', 'C', 'I']) if (!Number.isFinite(s.taxRates[z])) s.taxRates[z] = TAX.default;
     if (!s.budget || typeof s.budget !== 'object') s.budget = {};
     for (const k of Object.keys(BUDGET.keys)) if (!Number.isFinite(s.budget[k])) s.budget[k] = BUDGET.default;
+    // 第四版：每棟建築的名字、住戶、公司（key = 格子編號）
+    if (!s.info || typeof s.info !== 'object' || Array.isArray(s.info)) s.info = {};
+    if (!Number.isInteger(s.infoSeq)) s.infoSeq = 0;
     return s;
   }
 
@@ -335,10 +346,9 @@ export class Sim {
   // 這格有地面道路（港口也算）／有高架道路橋面
   hasGroundRoad(i) { const g = this.s.grid; return !!((g.road[i] && g.elev[i] !== 1) || g.bld[i] === BLD.PORT); }
   hasDeck(i) { const g = this.s.grid; return !!(g.road[i] && g.elev[i]); }
-  // 地面上有沒有東西（分區、建築、地面鐵路、地面道路）：高架道路的柱子不能壓在這些上面
-  groundBusy(i) { const g = this.s.grid; return !!(g.zone[i] || g.bld[i] || (g.rail[i] && !g.relev[i]) || (g.road[i] && g.elev[i] === 2)); }
-  // 高架鐵路的柱子不能壓在分區、建築、地面道路上
-  railGroundBusy(i) { const g = this.s.grid; return !!(g.zone[i] || g.bld[i] || (g.road[i] && g.elev[i] !== 1)); }
+  // 地面上有沒有東西（分區、建築、地面鐵路）：高架的柱子不能壓在這些上面（可以立在地面道路的中央分隔島）
+  groundBusy(i) { const g = this.s.grid; return !!(g.zone[i] || g.bld[i] || (g.rail[i] && !g.relev[i])); }
+  railGroundBusy(i) { const g = this.s.grid; return !!(g.zone[i] || g.bld[i]); }
   anyPillar(i) { return !!(this.pillar[i] || this.railPillar[i]); }
   // 地面空著（上面只有高架、而且不是柱子格）
   groundFree(i) {
@@ -467,8 +477,7 @@ export class Sim {
       const newElev = new Set(cells.filter((c) => c.set[key]).map((c) => c.i));
       const isElev = (j) => newElev.has(j) || !!(g[base][j] && g[key][j]);
       const pil = this.pillarsFor([...newElev], isElev);
-      const twoLevel = (j) => cells.some((c) => c.i === j && c.set.elev === 2);
-      const bad = pil.find((j) => (key === 'relev' ? this.railGroundBusy(j) : this.groundBusy(j) || twoLevel(j)));
+      const bad = pil.find((j) => (key === 'relev' ? this.railGroundBusy(j) : this.groundBusy(j)));
       if (bad != null) {
         const W = m.w;
         return { cells, cost, reason: `高架的柱子（每 ${ELEVATED.pillarEvery} 格一根）會壓到 (${bad % W}, ${(bad / W) | 0}) 的東西，先拆除或換個位置`, skipped: [...reasons], pillars: pil };
@@ -507,6 +516,7 @@ export class Sim {
     this.undoStack.push(undo);
     if (this.undoStack.length > UNDO_LIMIT) this.undoStack.shift();
     this.infraDirty = true;
+    this.commuteDirty = true; // 下個月重新配對通勤
     // deferInfra：一次蓋很多次時（經濟模擬機器人）先不重算，最後再呼叫 updateInfra()
     if (!this.deferInfra) { this.updateInfra(); this.checkMilestones(); }
     return { ok: true, cost: p.cost, count: p.cells.length };
@@ -543,6 +553,149 @@ export class Sim {
     this.checkMilestones();
     this.dirtyAll = true;
     return { ok: true, price: r.price };
+  }
+
+  // ---------- 每棟建築的名字、住戶、公司（第四版）----------
+  // 這格現在是哪種建築：'R' 'C' 'I'（已經蓋起來的區塊）、'B:設施名'（港口以外的建築）、null
+  infoKind(i) {
+    const g = this.s.grid;
+    if (g.bld[i] && g.bld[i] !== BLD.PORT) return `B:${BLD_KEY[g.bld[i]]}`;
+    if (g.zone[i] && g.level[i]) return ZONE_KEY[g.zone[i]];
+    return null;
+  }
+  // 補上新建築的名字、拿掉已經拆掉的（名字一旦產生就存進存檔，不會再變）
+  ensureInfo() {
+    const s = this.s, info = s.info;
+    for (const key of Object.keys(info)) {
+      const i = Number(key);
+      if (this.infoKind(i) !== info[key].k) delete info[key];
+    }
+    const add = (i) => {
+      const k = this.infoKind(i);
+      if (!k || info[i]) return;
+      const seed = hash3(s.rngSeed, i, ++s.infoSeq);
+      const era = k.startsWith('B:') ? s.era : this.beraAt(i);
+      const rec = { k, s: seed, t: s.month };
+      if (k === 'R') rec.n = buildingName(seed, 'R', era);
+      else if (k === 'C' || k === 'I') { const r = buildingName(seed, k, era); rec.n = r.name; rec.ind = r.industry; } else rec.n = buildingName(seed, 'B', era, FACILITIES[k.slice(2)]?.name || '');
+      info[i] = rec;
+    };
+    for (const i of this.zoneList) if (this.s.grid.level[i]) add(i);
+    for (const [key, list] of Object.entries(this.bldList)) if (key !== 'port') for (const i of list) add(i);
+  }
+  infoOf(i) { return this.s.info[i] || null; }
+  // 立刻重新配對通勤（測試、改了人口之後用）
+  recomputeCommute() { computeCommute(this); updateServices(this); this.updateHappiness(); }
+  // 住宅的代表住戶（第一次看的時候產生並存進存檔；工作地點跟著通勤配對，換工作時才更新）
+  residentsOf(i) {
+    const rec = this.s.info[i];
+    if (!rec || rec.k !== 'R') return [];
+    const g = this.s.grid;
+    const want = Math.min(RESIDENTS.residentsShown, g.pop[i]);
+    if (!rec.r) rec.r = [];
+    const year = yearOf(this.s.month);
+    while (rec.r.length < want) rec.r.push([...makeResident(rec.s, rec.r.length, this.beraAt(i), year, this.edu[i]), -1]);
+    const groups = this.commute.byHome.get(i) || [];
+    const total = groups.reduce((a, b) => a + b.count, 0);
+    const workers = this.workers[i] || 0;
+    const out = [];
+    rec.r.slice(0, Math.max(want, 0)).forEach((p, k) => {
+      const [name, birth, edu, female] = p;
+      const age = year - birth;
+      // 工作：照通勤配對的比例分給代表住戶；原本的工作還在就不換
+      let gr = groups.find((x) => x.job === p[4]);
+      // 原本的公司還在、這棟也還有人通勤：保留原本的工作（通勤方式與時間用這棟的路線估）
+      if (!gr && p[4] >= 0 && groups.length && (this.s.info[p[4]]?.k === 'C' || this.s.info[p[4]]?.k === 'I')) gr = { ...groups[0], job: p[4] };
+      const share = workers ? total / workers : 0;
+      const rnd = seeded(hash3(rec.s, k, 99));
+      if (!gr && total && rnd() < share) {
+        let r = rnd() * total;
+        for (const x of groups) { r -= x.count; if (r <= 0) { gr = x; break; } }
+        gr = gr || groups[0];
+      }
+      p[4] = gr ? gr.job : -1;
+      out.push({ name, age, female: !!female, edu: RESIDENTS.eduLevels[edu], job: gr ? gr.job : -1, jobName: gr ? this.s.info[gr.job]?.n : null, mode: gr ? this.modeName(gr.mode, rnd) : null, minutes: gr ? gr.minutes : null });
+    });
+    return out;
+  }
+  modeName(mode, rnd = Math.random) {
+    if (mode === 'walk') return '走路';
+    if (mode === 'rail') return this.lineCount.metro && rnd() < 0.5 ? '捷運' : '火車';
+    const opts = { 1: ['走路', '牛車'], 2: ['腳踏車', '人力車'], 3: ['腳踏車', '機車', '公車'], 4: ['機車', '汽車', '公車'], 5: ['機車', '汽車', '公車'] }[this.s.era];
+    return opts[Math.floor(rnd() * opts.length) % opts.length];
+  }
+  // 公司：員工、職缺、員工從哪些住宅來、要的教育、稅收貢獻
+  companyOf(i) {
+    const rec = this.s.info[i];
+    if (!rec || (rec.k !== 'C' && rec.k !== 'I')) return null;
+    const g = this.s.grid;
+    const jobs = this.capAt(i);
+    const groups = this.commute.byJob.get(i) || [];
+    const employees = groups.reduce((a, b) => a + b.count, 0);
+    const from = new Map();
+    for (const gr of groups) from.set(gr.home, (from.get(gr.home) || 0) + gr.count);
+    const lv = g.level[i];
+    const eduReq = lv >= 6 ? '大學以上' : lv >= 5 ? '高中職以上' : lv >= 4 ? '國中以上' : lv >= 3 ? '小學以上' : '不限';
+    const inc = this.incomeBreakdown();
+    const t = this.totals;
+    const isC = g.zone[i] === ZONE.C;
+    const totalCap = isC ? t.capC : t.capI;
+    const tax = totalCap ? (isC ? inc.C : inc.I + inc.trade) * jobs / totalCap : 0;
+    return {
+      name: rec.n, industry: rec.ind, kind: isC ? '商業' : '工業', jobs, employees, openings: Math.max(0, jobs - employees),
+      from: [...from].sort((a, b) => b[1] - a[1]).map(([h, c]) => ({ home: h, name: this.s.info[h]?.n || '住宅', count: c })),
+      eduReq, tax: Math.round(tax),
+    };
+  }
+  // 公共建築與其他設施
+  publicInfoOf(i) {
+    const rec = this.s.info[i];
+    const key = BLD_KEY[this.s.grid.bld[i]];
+    const f = FACILITIES[key];
+    if (!f) return null;
+    const out = { name: rec?.n || f.name, type: f.name, maintenance: Math.round(this.facMaintenance(key)), rows: [] };
+    const covered = (r) => {
+      let pop = 0;
+      const { w, h } = this.map;
+      const x0 = i % w, y0 = (i / w) | 0;
+      for (let y = Math.max(0, y0 - r); y <= Math.min(h - 1, y0 + r); y++) for (let x = Math.max(0, x0 - r); x <= Math.min(w - 1, x0 + r); x++) {
+        const j = y * w + x;
+        if (this.s.grid.zone[j] === ZONE.R) pop += this.s.grid.pop[j];
+      }
+      return pop;
+    };
+    if (f.kind === 'service') {
+      const b = SERVICE_BUILDINGS[key];
+      const budget = this.s.budget[b.svc];
+      const eff = Math.round(b.strength * Math.sqrt(Math.max(0, budget) / 100));
+      const pop = covered(b.radius);
+      out.rows.push(['服務範圍', `${b.radius} 格`], ['預算', `${budget}%（強度 ${b.strength} → ${eff}）`], ['範圍內居民', `${pop.toLocaleString()} 人`]);
+      if (b.svc === 'edu') out.rows.push(['在學人數', `約 ${Math.round(pop * 0.18).toLocaleString()} 人（範圍內居民的 18%）`]);
+      if (b.svc === 'health') out.rows.push(['每月看診', `約 ${Math.round(pop * 0.08).toLocaleString()} 人次`]);
+      if (b.svc === 'police') out.rows.push(['範圍內平均犯罪', `${this.avgAround(i, b.radius, this.crime)}`]);
+    } else if (f.kind === 'water' || f.kind === 'power') {
+      out.rows.push(['供應量', `${Math.round(this.facCapacity(key)).toLocaleString()}`], ['範圍', `${f.coverRadius} 格`]);
+    } else if (key === 'railstop' || key === 'station') {
+      let riders = 0;
+      for (const gr of this.commute.groups) if (gr.mode === 'rail' && this.isNearRail(gr.home, i)) riders += gr.count;
+      out.rows.push(['搭火車通勤', `附近約 ${riders.toLocaleString()} 人`]);
+    }
+    if (f.specialOf) out.rows.push(['時代特殊建築', `${eraInfo(f.specialOf).name}`]);
+    return out;
+  }
+  avgAround(i, r, arr) {
+    const { w, h } = this.map;
+    const x0 = i % w, y0 = (i / w) | 0;
+    let s = 0, c = 0;
+    for (let y = Math.max(0, y0 - r); y <= Math.min(h - 1, y0 + r); y++) for (let x = Math.max(0, x0 - r); x <= Math.min(w - 1, x0 + r); x++) {
+      const j = y * w + x;
+      if (this.s.grid.zone[j]) { s += arr[j]; c++; }
+    }
+    return c ? Math.round(s / c) : 0;
+  }
+  isNearRail(home, stop) {
+    const w = this.map.w;
+    return Math.abs((home % w) - (stop % w)) <= RAIL.radius * 2 && Math.abs(((home / w) | 0) - ((stop / w) | 0)) <= RAIL.radius * 2;
   }
 
   // ---------- 建築隨時代演進：改建 ----------
@@ -731,6 +884,7 @@ export class Sim {
     this.updateUtility('power', POWER_KEYS, 'wire', this.powerCov, this.powerOK);
     updateServices(this);
     this.updateHappiness();
+    this.ensureInfo();
     this.infraDirty = false;
   }
 
@@ -822,6 +976,7 @@ export class Sim {
       if (shop) v += H.commerceNear;
       v += this.plantPen[i] + this.landmark[i] + this.transit[i] * 0.3;
       v -= this.crime[i] * CRIME.happiness + this.pollution[i] * POLLUTION.happiness + (this.jammed(i) ? TRAFFIC.jamHappiness : 0);
+      if (this.commuteMin && this.commuteMin[i] > COMMUTE.longMinutes) v -= COMMUTE.longHappiness; // 通勤太久
       this.happy[i] = clamp(Math.round(v), 0, 100);
     }
   }
@@ -891,6 +1046,8 @@ export class Sim {
     const s = this.s, g = s.grid;
     if (this.infraDirty) this.updateInfra();
     else { this.refreshUtilities(); updateServices(this); this.updateHappiness(); }
+    // 通勤：每幾個月（或蓋了東西之後）重新配對
+    if (this.commuteDirty || ++this.commuteAge >= COMMUTE.recomputeMonths) { computeCommute(this); updateServices(this); this.updateHappiness(); }
     this.computeTotals();
     const era = s.era;
     let needC = this.totals.pop * ECON.shopNeed - this.totals.capC + 10;
@@ -904,7 +1061,8 @@ export class Sim {
       if (!this.growthOK(i)) continue;
       const z = g.zone[i], lv = g.level[i];
       // 交通加成、稅率、塞車都會影響成長機率
-      const boost = (1 + 2 * this.transit[i] / 100) * this.taxGrowthMult(z0(g, i)) * (this.jammed(i) ? TRAFFIC.jamGrowth : 1);
+      const boost = (1 + 2 * this.transit[i] / 100) * this.taxGrowthMult(z0(g, i)) * (this.jammed(i) ? TRAFFIC.jamGrowth : 1)
+        * (this.commuteMin[i] > COMMUTE.longMinutes ? COMMUTE.longGrowth : 1);
       const maxLv = this.growthLevelCap(i);
       // （預設關閉）舊樣式自動改建成新時代樣式；Sonny 決定舊建築要付錢才升級
       if (ERA_UPGRADES.autoRebuild && lv && this.beraAt(i) < era && rng() < ERA_UPGRADES.rebuildChance * boost) {
@@ -939,6 +1097,7 @@ export class Sim {
       }
     }
     if (rebuilt) this.events.push({ type: 'autoRebuild', count: rebuilt });
+    this.ensureInfo();
     // 重算一次（成長後），再算錢
     this.refreshUtilities();
     this.computeTotals();

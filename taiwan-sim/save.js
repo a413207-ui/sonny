@@ -1,5 +1,5 @@
 // 存檔：只用瀏覽器 localStorage（不收集任何個資）。格式含版本號；讀檔失敗時不覆蓋原檔。
-// 版本：v1 = 第一版（T-TW-01）；v2 = 第二版（T-TW-02）；v3 = 第三版（T-TW-03）。舊版本讀進來會先 migrate 再還原。
+// 版本：v1 = 第一版（T-TW-01）；v2 = 第二版（T-TW-02）；v3 = 第三版（T-TW-03）；v4 = 第四版（T-TW-04）。舊版本讀進來會先 migrate 再還原。
 import { SAVE_KEY, SAVE_VERSION, TAX, BUDGET } from './config.js';
 import { Sim, U8_LAYERS } from './sim.js';
 
@@ -72,6 +72,14 @@ export const MIGRATIONS = {
     if (!st || typeof st !== 'object' || !st.grid || typeof st.money !== 'number') throw new Error('v2 存檔缺少 state');
     const state = { ...st, version: 3, taxRates: { R: TAX.default, C: TAX.default, I: TAX.default }, budget: Object.fromEntries(Object.keys(BUDGET.keys).map((k) => [k, BUDGET.default])) };
     return { ...obj, saveVersion: 3, state, migratedFrom: obj.migratedFrom || 2 };
+  },
+  // v3 → v4：新增每棟建築的名字／住戶／公司（info）。舊存檔沒有這些資料：讀進來時依格子自動產生（Sim.ensureInfo），
+  // 之後就存進存檔、不再改變。格子、金錢、稅率、預算都不變。
+  3(obj) {
+    const st = obj.state;
+    if (!st || typeof st !== 'object' || !st.grid || typeof st.money !== 'number') throw new Error('v3 存檔缺少 state');
+    const state = { ...st, version: 4, info: {}, infoSeq: 0 };
+    return { ...obj, saveVersion: 4, state, migratedFrom: obj.migratedFrom || 3 };
   },
 };
 export function migrate(obj, map) {

@@ -3,6 +3,7 @@
 import {
   SERVICE_BUILDINGS, EDUCATION, CRIME, POLLUTION, HEALTH, TRAFFIC, LAND_VALUE, RAIL, TRANSPORT, BUDGET, TERRAIN,
 } from './config.js';
+import { computeFlow } from './commute.js';
 
 const clamp = (v, a, b) => (v < a ? a : v > b ? b : v);
 
@@ -94,48 +95,22 @@ export function updateServices(sim) {
     if (m.terrain[i] === TERRAIN.SEA) { sim.health[i] = 0; continue; }
     sim.health[i] = clamp(Math.round(HEALTH.base + sim.care[i] * HEALTH.care + (sim.waterOK[i] ? HEALTH.water : 0) - sim.pollution[i] * HEALTH.pollution), 0, 100);
   }
-  // ---- 失業率 ----
+  // ---- 失業率：第四版起用通勤配對的結果（住宅看自己這棟，商工看全市）----
   const t = sim.totals;
-  const unemp = t.needJobs > 0 ? clamp((t.needJobs - t.jobs) / t.needJobs, 0, 1) : 0;
-  // ---- 交通車流 ----
-  const flow = sim.flow, cong = sim.cong;
-  flow.fill(0); cong.fill(0);
-  const share = TRAFFIC.carShare[era] ?? 1;
-  let maxDist = 0;
-  const roads = [];
-  for (let i = 0; i < n; i++) if (g.road[i] && sim.connected[i]) { roads.push(i); if (sim.dist[i] > maxDist) maxDist = sim.dist[i]; }
-  for (const i of sim.zoneList) {
-    const a = sim.accessRoad[i];
-    if (a < 0 || !g.level[i]) continue;
-    let trips = g.zone[i] === 1 ? g.pop[i] * TRAFFIC.perPop : sim.capAt(i) * TRAFFIC.perJob;
-    trips *= share * (sim.transitCov[i] ? 1 - TRAFFIC.transitShare : 1);
-    flow[a] += trips;
-  }
-  // 依離港口的距離分桶，從遠到近往港口方向累積
-  const buckets = Array.from({ length: maxDist + 1 }, () => []);
-  for (const i of roads) buckets[sim.dist[i]].push(i);
-  const cap = sim._cap || (sim._cap = new Float32Array(n));
-  for (const i of roads) cap[i] = roadCapacity(sim, i);
-  for (let d = maxDist; d > 0; d--) {
-    for (const i of buckets[d]) {
-      if (!flow[i]) continue;
-      let best = -1;
-      for (const j of sim.neighbors4(i)) if (sim.connected[j] && sim.dist[j] === d - 1 && (best < 0 || cap[j] > cap[best])) best = j;
-      if (best >= 0) flow[best] += flow[i] * TRAFFIC.decay;
-    }
-  }
-  let jammed = 0, busiest = 0;
-  for (const i of roads) {
-    cong[i] = cap[i] > 0 ? flow[i] / cap[i] : 0;
-    if (cong[i] >= TRAFFIC.yellow) jammed++;
-    if (cong[i] > busiest) busiest = cong[i];
-  }
+  const cs = sim.commute?.stats;
+  const unemp = cs && cs.workers ? clamp(cs.unemployment, 0, 1) : t.needJobs > 0 ? clamp((t.needJobs - t.jobs) / t.needJobs, 0, 1) : 0;
+  const localUnemp = (i) => (g.zone[i] === 1 && sim.workers && sim.workers[i] ? clamp(1 - sim.employed[i] / sim.workers[i], 0, 1) : unemp);
+  // ---- 交通車流：用通勤路線（commute.js）----
+  computeFlow(sim);
+  const jammed = sim.commute.stats.jammedRoads || 0, busiest = sim.commute.stats.busiest || 0;
+  const roads = { length: sim.commute.stats.roads || 0 };
+  const cong = sim.cong;
   // ---- 犯罪、土地價值（分區格）----
   let crimeSum = 0, eduSum = 0, healthSum = 0, lvSum = 0, zn = 0;
   sim.crime.fill(0); sim.landValue.fill(0);
   for (const i of sim.zoneList) {
     const density = g.level[i] / 6;
-    const cr = clamp(Math.round(CRIME.base + density * CRIME.density + unemp * CRIME.unemployment - sim.edu[i] * CRIME.education - sim.police[i] * CRIME.police), 0, 100);
+    const cr = clamp(Math.round(CRIME.base + density * CRIME.density + localUnemp(i) * CRIME.unemployment - sim.edu[i] * CRIME.education - sim.police[i] * CRIME.police), 0, 100);
     sim.crime[i] = cr;
     const a = sim.accessRoad[i];
     const jam = a >= 0 && cong[a] >= TRAFFIC.yellow ? 1 : 0;

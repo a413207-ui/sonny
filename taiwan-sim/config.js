@@ -4,7 +4,8 @@
 export const SAVE_KEY = 'taiwanSim.save';
 // v2：第二版（時代 3–5、建築隨時代演進、縣市平衡）。v1 存檔讀進來會自動遷移（save.js migrate），
 // 遷移前的原檔另存一份在 `${SAVE_KEY}.v1-backup`，不會被覆蓋。
-export const SAVE_VERSION = 3;   // v3：第三版（城市服務、稅率、預算）；v2 存檔自動遷移，原檔另存在 `${SAVE_KEY}.v2-backup`
+export const SAVE_VERSION = 4;   // v4：第四版（通勤、居民與公司名稱）；舊存檔自動遷移，原檔另存在 `${SAVE_KEY}.v{舊版本}-backup`
+// （v3：第三版，城市服務、稅率、預算）   // v3：第三版（城市服務、稅率、預算）；v2 存檔自動遷移，原檔另存在 `${SAVE_KEY}.v2-backup`
 
 // ---- 時間 ----
 export const TIME = {
@@ -127,7 +128,7 @@ export const RAIL = {
 // ---- 高架（任何道路種類和鐵路都可以蓋成高架）----
 // 工具列「高架」切換打開時，鋪路、公路、高速公路、鐵路都蓋成高架。高架一路接過去不用先降回地面：
 // 碰到地面道路就從上面跨過（地面道路保留，兩層交叉）；高架鐵路比高架道路高一層，兩者可以交叉。高架底下的格子可以蓋其他東西（劃區、蓋設施），
-// 但柱子所在的格子不行。柱子規則：每一段連續的高架（上下左右相連），從端點（編號最小的端點）起算，
+// 但柱子所在的格子不行（柱子可以立在地面道路的中央分隔島，所以可以沿著既有的路蓋高架）。柱子規則：每一段連續的高架（上下左右相連），從端點（編號最小的端點）起算，
 // 第 1、8、15…格（每 pillarEvery 格）有一根柱子。高架只能從兩端或旁邊的地面道路上下，旁邊的區塊不能從高架進出。
 // 高架鐵路一樣要整條連到車站才有效果，和地面鐵路相接的地方是引道。
 // 費用 = 該格原本的道路／鐵路造價（過河不用另外架橋）+ cost（每格）；維護費 = 原本的 + maintenance（每格每月）。
@@ -367,6 +368,7 @@ export const POLLUTION = {
 export const HEALTH = { base: 45, care: 0.5, water: 10, pollution: 0.6, growthBlock: 20 };
 
 // ---- 交通：每格道路的車流量與壅塞 ----
+// （第四版起車流改用通勤計算，見 COMMUTE；perPop/perJob/decay 只在沒有通勤資料時備用）
 // 每個區塊每月產生的車流：住宅 人口×perPop、商工 工作×perJob，再乘時代的汽車普及率 carShare；
 // 有鐵路（連到車站）或捷運的範圍，車流 ×(1 − transitShare)。
 // 車流進入旁邊的道路，沿著往港口的方向累積（每格衰減 decay；優先走容量大的路）。
@@ -397,6 +399,47 @@ export const AGENTS = {
   trainSpeed: 4, trainStopSeconds: 2.5, trainCars: 4,
   pedSpeed: 0.35,
 };
+
+// =====================================================================
+// ---- 第四版（T-TW-04）：通勤交通、居民與公司 ----
+// =====================================================================
+
+// ---- 通勤：住家 ↔ 工作地 ----
+// 每棟住宅的上班人口 = 人口 × workerShare，配對到商業/工業的工作（找最快到的、還有職缺的那棟），
+// 沿著道路網（道路、公路、高速公路、高架）找最快的路線；住家和公司都在鐵路（連到車站）或捷運範圍內的人，
+// 有 railShare 改搭火車/捷運（不佔道路）。路線很短（≤ walkCells 格）就走路。
+// 交通車流 = 每條路上開車/騎車通勤的人數 × 時代的汽車普及率（TRAFFIC.carShare），壅塞 = 車流 / 道路容量（TRAFFIC.capacity）。
+// 每格行車時間（分鐘）：minutesPerCell × 道路倍率（公路、高速公路、高架較快），塞車時 × (1 + congWeight × (壅塞 − 0.6))。
+// 通勤超過 longMinutes 分鐘：住宅幸福度 −longHappiness、成長 ×longGrowth；超過 maxMinutes 分鐘就不去（算失業）。
+// 每 recomputeMonths 個月重新配對一次（蓋了東西也會在下個月重算）。rounds：配對回合數；nearestJobs：每輪每棟住宅可以依序試幾家最近的公司（越多越接近最佳，越慢）。
+export const COMMUTE = {
+  workerShare: 0.4,
+  railShare: 0.5,
+  walkCells: 2,
+  minutesPerCell: { walk: 12, road: 2, rail: 1 },
+  roadSpeed: { road: 1, bridge: 1.2, highway: 0.7, freeway: 0.45, elevated: 0.6 },
+  railWaitMinutes: 8,
+  congWeight: 1.5,
+  longMinutes: 50, longHappiness: 10, longGrowth: 0.7,
+  maxMinutes: 120,
+  recomputeMonths: 3,
+  rounds: 16,
+  nearestJobs: 8,   // 每個道路節點記住最近的幾家公司（一輪裡額滿就換下一家）
+};
+
+// ---- 居民與公司資料（全部虛構，程式產生，存進存檔）----
+// residentsShown：每棟住宅保存幾位代表住戶（實際人口可能很多，面板會寫「共 N 人，以下是代表住戶」）
+// 教育程度（依時代可能出現的程度，越後面越高）
+export const RESIDENTS = {
+  residentsShown: 8,
+  eduLevels: ['沒上過學', '私塾', '公學校', '國民學校', '國中', '高中職', '大學', '研究所'],
+  eduByEra: { 1: [0, 1], 2: [0, 1, 2], 3: [0, 2, 3, 4, 5], 4: [3, 4, 5, 6], 5: [4, 5, 6, 7] },
+};
+
+// ---- 路上的交通工具對應通勤（AGENTS 之外的設定）----
+// 一天在畫面上是 daySeconds 真實秒；早上 7–9 點往公司、傍晚 17–19 點回家是尖峰（peakMult 倍的車），晚上很少車。
+// 每台車／每個行人代表 peoplePerAgent 個通勤的人（只影響「某條通勤路線出現車的機會」，總數仍受 AGENTS 上限）。
+export const COMMUTE_VIEW = { daySeconds: 36, peakMult: 3, nightMult: 0.25, peoplePerAgent: 20 };
 
 // ---- 破產、預警、緊急貸款 ----
 export const FINANCE = {

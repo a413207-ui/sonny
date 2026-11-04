@@ -1,6 +1,7 @@
-// 路上的交通工具、火車、行人：只是畫面效果（不影響模擬），用模擬的車流量決定多寡。
+// 路上的交通工具、火車、行人：只是畫面效果（不影響模擬）。第四版起沿著真實的通勤路線（住家 ↔ 公司）走，
+// 早上往公司、傍晚回家，尖峰車多。
 // 只在放大到看得到細節時、畫面範圍內出現；數量上限在 config.js AGENTS。全部程式原創繪製。
-import { AGENTS, TRAFFIC } from './config.js';
+import { AGENTS, TRAFFIC, COMMUTE_VIEW } from './config.js';
 import { TW, TH } from './render.js';
 
 const DIRS = [[1, 0], [-1, 0], [0, 1], [0, -1]];
@@ -29,6 +30,7 @@ export class Agents {
     this.cars = []; this.trains = []; this.peds = [];
     this.spawnAcc = 0;
     this.seq = 0;
+    this.clock = 7; // 畫面上的時間（小時），開局是早上 7 點
   }
   get sim() { return this.r.sim; }
   limits() {
@@ -87,7 +89,23 @@ export class Agents {
     const s = this.r.worldToScreen(p.x, p.y);
     return s.x > -margin && s.y > -margin && s.x < this.r.vw + margin && s.y < this.r.vh + margin;
   }
-  // 每秒掃一次畫面內的道路、鐵路格（取樣），產生時從這裡挑
+  // ---------- 一天的時間（畫面上的時鐘）----------
+  // 早上往公司、傍晚回家；尖峰車多、晚上車少
+  hour() { return this.clock % 24; }
+  intensity() {
+    const h = this.hour();
+    if ((h >= 7 && h < 9) || (h >= 17 && h < 19)) return COMMUTE_VIEW.peakMult;
+    if (h >= 22 || h < 5) return COMMUTE_VIEW.nightMult;
+    return 1;
+  }
+  toWork() { const h = this.hour(); return h >= 4 && h < 13; }
+  clockText() {
+    const h = this.hour(), hh = Math.floor(h), mm = Math.floor((h - hh) * 60);
+    const tag = (h >= 7 && h < 9) ? '上班尖峰' : (h >= 17 && h < 19) ? '下班尖峰' : (h >= 22 || h < 5) ? '深夜' : '';
+    return `${String(hh).padStart(2, '0')}:${String(mm).padStart(2, '0')}${tag ? ` ${tag}` : ''}`;
+  }
+
+  // 每秒掃一次畫面內的道路、鐵路格（取樣），並挑出經過畫面的通勤路線
   scanView(now) {
     if (this._scanT && now - this._scanT < 1000 && this._roads) return;
     this._scanT = now;
@@ -101,52 +119,155 @@ export class Agents {
     }
     this._roads = [...roads];
     this._rails = [...rails];
+    this._roadSet = roads;
+    // 經過畫面的通勤路線（依人數加權）
+    const vis = { road: [], walk: [], rail: [] }, wsum = { road: 0, walk: 0, rail: 0 };
+    for (const gr of sim.commute?.groups || []) {
+      const path = gr.path;
+      let seen = false;
+      if (gr.mode === 'rail') seen = (rails.size && (this.nearAny(gr.home, rails) || this.nearAny(gr.job, rails)));
+      else for (let k = 0; k < path.length; k += 2) if (roads.has(path[k])) { seen = true; break; }
+      if (!seen) continue;
+      wsum[gr.mode] += gr.count;
+      vis[gr.mode].push([wsum[gr.mode], gr]);
+    }
+    this._vis = vis; this._wsum = wsum;
   }
+  nearAny(cell, set) {
+    const w = this.r.map.w, x0 = cell % w, y0 = (cell / w) | 0;
+    for (let dy = -4; dy <= 4; dy++) for (let dx = -4; dx <= 4; dx++) if (set.has((y0 + dy) * w + x0 + dx)) return true;
+    return false;
+  }
+  pickGroup(mode) {
+    const list = this._vis?.[mode];
+    if (!list || !list.length) return null;
+    const r = Math.random() * this._wsum[mode];
+    let lo = 0, hi = list.length - 1;
+    while (lo < hi) { const mid = (lo + hi) >> 1; if (list[mid][0] < r) lo = mid + 1; else hi = mid; }
+    return list[lo][1];
+  }
+  // 路線上某一格在哪一層（高架或地面）
+  levelOn(path, k) {
+    const g = this.sim.s.grid, i = path[k];
+    if (g.elev[i] === 1) return 'd';
+    if (g.elev[i] === 2) {
+      const a = path[k - 1], b = path[k + 1];
+      if ((a != null && g.elev[a]) || (b != null && g.elev[b])) return 'd';
+    }
+    return 'g';
+  }
+  // 鐵路通勤：住家附近的鐵路格 → 公司附近的鐵路格（BFS，結果快取）
+  railRoute(gr) {
+    this._railCache = this._railCache || new Map();
+    const key = `${gr.home}-${gr.job}`;
+    if (this._railCache.has(key)) return this._railCache.get(key);
+    const g = this.sim.s.grid, w = this.r.map.w;
+    const nearRail = (c) => { const x0 = c % w, y0 = (c / w) | 0; for (let r = 0; r <= 4; r++) for (let dy = -r; dy <= r; dy++) for (let dx = -r; dx <= r; dx++) { const j = (y0 + dy) * w + x0 + dx; if (g.rail[j] && this.sim.railActive[j]) return j; } return -1; };
+    const a = nearRail(gr.home), b = nearRail(gr.job);
+    let route = null;
+    if (a >= 0 && b >= 0 && a !== b) {
+      const prev = new Map([[a, -1]]);
+      const q = [a];
+      for (let h = 0; h < q.length && !prev.has(b); h++) for (const [j] of this.railNext(q[h])) if (!prev.has(j)) { prev.set(j, q[h]); q.push(j); }
+      if (prev.has(b)) { route = []; for (let c = b; c !== -1; c = prev.get(c)) route.push(c); route.reverse(); }
+    }
+    if (this._railCache.size > 500) this._railCache.clear();
+    this._railCache.set(key, route);
+    return route;
+  }
+
   trySpawn(lim) {
     const sim = this.sim, g = sim.s.grid;
     if (!this._roads) this.scanView(performance.now());
     const era = sim.s.era;
-    const rails = this._rails, roads = this._roads;
-    const wantTrain = rails.length && this.trains.length < lim.trains && Math.random() < 0.15;
-    const i = wantTrain ? rails[Math.floor(Math.random() * rails.length)] : roads.length ? roads[Math.floor(Math.random() * roads.length)] : -1;
-    if (i < 0) return;
-    if (wantTrain) {
-      const opts = this.railNext(i);
-      if (opts.length && !this.trains.some((t) => t.path.includes(i))) {
-        const o = opts[Math.floor(Math.random() * opts.length)];
-        this.trains.push({ id: ++this.seq, path: [i, o[0]], t: 0, dx: o[1], dy: o[2], stop: 0, stopped: -1, era });
+    const work = this.toWork();
+    const roll = Math.random();
+    // 火車：搭火車通勤的路線（沒有就在鐵路上隨便跑）
+    if (roll < 0.12 && this._rails.length && this.trains.length < lim.trains) {
+      const gr = this.pickGroup('rail');
+      let route = gr ? this.railRoute(gr) : null;
+      if (route && !work) route = route.slice().reverse();
+      if (route && route.length >= 2 && !this.trains.some((t) => t.route === route)) {
+        const w = this.r.map.w, a = route[0], b = route[1];
+        this.trains.push({ id: ++this.seq, path: [a, b], route, ri: 2, t: 0, dx: (b % w) - (a % w), dy: ((b / w) | 0) - ((a / w) | 0), stop: 0, stopped: -1, era, commute: true });
+        return;
       }
-      return;
-    }
-    if (!g.road[i] || !sim.connected[i]) return;
-    const cong = sim.cong[i] || 0;
-    const share = TRAFFIC.carShare[era] ?? 1;
-    // 行人：住宅、商業區旁的路
-    if (this.peds.length < lim.peds && Math.random() < 0.5) {
-      const nearZone = sim.neighbors4(i).some((j) => (g.zone[j] === 1 || g.zone[j] === 2) && g.level[j]);
-      if (nearZone && g.elev[i] !== 1) {
-        const opts = this.roadNext(i, 'g');
-        if (opts.length) {
+      if (!this._vis?.rail.length) {
+        const i = this._rails[Math.floor(Math.random() * this._rails.length)];
+        const opts = this.railNext(i);
+        if (opts.length && !this.trains.some((t) => t.path.includes(i))) {
           const o = opts[Math.floor(Math.random() * opts.length)];
-          this.peds.push({ id: ++this.seq, a: i, b: o[0], t: Math.random(), dx: o[2], dy: o[3], side: Math.random() < 0.5 ? 1 : -1, life: 8 + Math.random() * 10, col: CAR_COLORS[Math.floor(Math.random() * CAR_COLORS.length)] });
+          this.trains.push({ id: ++this.seq, path: [i, o[0]], t: 0, dx: o[1], dy: o[2], stop: 0, stopped: -1, era });
         }
       }
       return;
     }
+    // 尖峰時段車多、深夜車少
+    if (Math.random() > this.intensity() / COMMUTE_VIEW.peakMult) return;
+    // 行人：走路上班的人（沒有就在住宅、商業區旁散步）
+    if (roll < 0.45) {
+      if (this.peds.length >= lim.peds) return;
+      const gr = this.pickGroup('walk');
+      if (gr && gr.path.length >= 2) { this.spawnOnPath('ped', gr, work); return; }
+      const roads = this._roads;
+      const i = roads.length ? roads[Math.floor(Math.random() * roads.length)] : -1;
+      if (i < 0 || g.elev[i] === 1) return;
+      if (!sim.neighbors4(i).some((j) => (g.zone[j] === 1 || g.zone[j] === 2) && g.level[j])) return;
+      const opts = this.roadNext(i, 'g');
+      if (!opts.length) return;
+      const o = opts[Math.floor(Math.random() * opts.length)];
+      this.peds.push({ id: ++this.seq, a: i, b: o[0], t: Math.random(), dx: o[2], dy: o[3], side: Math.random() < 0.5 ? 1 : -1, life: 8 + Math.random() * 10, col: CAR_COLORS[Math.floor(Math.random() * CAR_COLORS.length)] });
+      return;
+    }
     if (this.cars.length >= lim.cars) return;
-    // 車流越多越常出現車（壅塞的路車多）
-    if (Math.random() > Math.min(1, (g.elev[i] ? 0.6 : 0.15) + cong * 0.9) * (0.4 + 0.6 * share)) return; // 高架、高速公路上也常有車
-    const level = g.elev[i] === 1 ? 'd' : g.elev[i] === 2 && Math.random() < 0.5 ? 'd' : 'g';
+    // 車：開車/騎車上班的路線（每台代表 peoplePerAgent 人，人多的路線比較常出現）
+    const gr = this.pickGroup('road');
+    if (gr && gr.path.length >= 2) {
+      const share = TRAFFIC.carShare[era] ?? 1;
+      if (Math.random() < Math.min(1, (gr.count * share) / COMMUTE_VIEW.peoplePerAgent + 0.2)) this.spawnOnPath('car', gr, work);
+      return;
+    }
+    // 畫面上沒有開車通勤的路線（例如大家都走路上班）：在路上隨便跑，車很少（高架、高速公路上多一點）
+    const roads = this._roads;
+    const i = roads.length ? roads[Math.floor(Math.random() * roads.length)] : -1;
+    if (i < 0) return;
+    if (Math.random() > (g.elev[i] || g.trans[i] ? 0.6 : 0.15)) return;
+    const level = g.elev[i] === 1 || (g.elev[i] === 2 && Math.random() < 0.5) ? 'd' : 'g';
     const opts = this.roadNext(i, level);
     if (!opts.length) return;
     const o = opts[Math.floor(Math.random() * opts.length)];
     const [kind, , speed] = pick(VEHICLES[Math.min(5, Math.max(1, era))], Math.random());
     this.cars.push({ id: ++this.seq, a: i, b: o[0], la: level, lb: o[1], t: 0, dx: o[2], dy: o[3], kind, speed, col: CAR_COLORS[Math.floor(Math.random() * CAR_COLORS.length)], life: 20 + Math.random() * 20 });
   }
+  // 沿通勤路線產生：早上從住家往公司，傍晚反過來；從路線上看得到的地方開始
+  spawnOnPath(type, gr, work) {
+    const w = this.r.map.w;
+    const path = work ? gr.path : gr.path.slice().reverse();
+    const visible = [];
+    for (let k = 0; k < path.length - 1; k++) if (this._roadSet.has(path[k])) visible.push(k);
+    const k = visible.length ? visible[Math.floor(Math.random() * Math.min(visible.length, 4))] : 0;
+    const a = path[k], b = path[k + 1];
+    const dx = (b % w) - (a % w), dy = ((b / w) | 0) - ((a / w) | 0);
+    const base = { id: ++this.seq, path, k, a, b, t: 0, dx, dy, home: gr.home, job: gr.job, toWork: work, col: CAR_COLORS[Math.floor(Math.random() * CAR_COLORS.length)] };
+    if (type === 'ped') { this.peds.push({ ...base, side: Math.random() < 0.5 ? 1 : -1, life: 60 }); return; }
+    const [kind, , speed] = pick(VEHICLES[Math.min(5, Math.max(1, this.sim.s.era))], Math.random());
+    this.cars.push({ ...base, la: this.levelOn(path, k), lb: this.levelOn(path, k + 1), kind, speed, life: 60 });
+  }
+  // 沿路線走一格（路線走完 = 到了，消失）
+  stepPath(o) {
+    const w = this.r.map.w;
+    o.k++;
+    if (o.k + 1 >= o.path.length) { o.life = 0; return false; }
+    o.a = o.path[o.k]; o.b = o.path[o.k + 1];
+    o.dx = (o.b % w) - (o.a % w); o.dy = ((o.b / w) | 0) - ((o.a / w) | 0);
+    if (o.la !== undefined) { o.la = this.levelOn(o.path, o.k); o.lb = this.levelOn(o.path, o.k + 1); }
+    return true;
+  }
 
   // ---------- 每一幀 ----------
-  update(dt, now = performance.now()) {
+  update(dt, now = performance.now(), running = true) {
     const r = this.r;
+    if (running) this.clock = (this.clock + Math.min(dt, 0.1) * 24 / COMMUTE_VIEW.daySeconds) % 24;
     if (!this.enabled || r.cam.z < AGENTS.minZoom || !this.sim) { this.clear(); this._roads = null; return; }
     this.scanView(now);
     dt = Math.min(dt, 0.1);
@@ -156,13 +277,14 @@ export class Agents {
     while (this.spawnAcc >= 1 && tries++ < 8) { this.spawnAcc--; this.trySpawn(lim); }
     if (this.spawnAcc > 8) this.spawnAcc = 0;
     const sim = this.sim, g = sim.s.grid;
-    // 車：壅塞時變慢
+    // 車：壅塞時變慢；通勤的車沿路線走，其他隨便跑
     for (const c of this.cars) {
       c.life -= dt;
       const v = AGENTS.carSpeed * c.speed / (1 + (sim.cong[c.b] || 0));
       c.t += dt * v;
-      while (c.t >= 1) {
+      while (c.t >= 1 && c.life > 0) {
         c.t -= 1;
+        if (c.path) { if (!this.stepPath(c)) break; continue; }
         const opts = g.road[c.b] ? this.roadNext(c.b, c.lb) : [];
         if (!opts.length) { c.life = 0; break; }
         const o = this.choose(opts, c.dx, c.dy, Math.random());
@@ -173,9 +295,10 @@ export class Agents {
     // 行人
     for (const p of this.peds) {
       p.life -= dt;
-      p.t += dt * AGENTS.pedSpeed;
-      while (p.t >= 1) {
+      p.t += dt * AGENTS.pedSpeed * (p.path ? 2 : 1);
+      while (p.t >= 1 && p.life > 0) {
         p.t -= 1;
+        if (p.path) { if (!this.stepPath(p)) break; continue; }
         const opts = this.roadNext(p.b, 'g');
         if (!opts.length) { p.life = 0; break; }
         const o = this.choose(opts, p.dx, p.dy, Math.random());
@@ -183,7 +306,7 @@ export class Agents {
       }
     }
     this.peds = this.peds.filter((p) => p.life > 0 && g.road[p.b] && this.inView(p.a, 60));
-    // 火車：在車站停
+    // 火車：通勤路線上跑，在車站停，到終點就消失
     for (const tr of this.trains) {
       if (tr.stop > 0) { tr.stop -= dt; continue; }
       tr.t += dt * AGENTS.trainSpeed;
@@ -191,10 +314,20 @@ export class Agents {
         tr.t -= 1;
         const head = tr.path[tr.path.length - 1];
         if (this.isStop(head) && tr.stopped !== head) { tr.stop = AGENTS.trainStopSeconds; tr.stopped = head; tr.t = 0; break; }
-        const opts = this.railNext(head);
-        if (!opts.length) { tr.dead = true; break; }
-        const o = this.choose(opts, tr.dx, tr.dy, Math.random());
-        tr.path.push(o[0]); tr.dx = o[1]; tr.dy = o[2];
+        let next;
+        if (tr.route) {
+          if (tr.ri >= tr.route.length) { tr.dead = true; break; }
+          next = tr.route[tr.ri++];
+          if (!g.rail[next]) { tr.dead = true; break; }
+          const w = this.r.map.w;
+          tr.dx = (next % w) - (head % w); tr.dy = ((next / w) | 0) - ((head / w) | 0);
+        } else {
+          const opts = this.railNext(head);
+          if (!opts.length) { tr.dead = true; break; }
+          const o = this.choose(opts, tr.dx, tr.dy, Math.random());
+          next = o[0]; tr.dx = o[1]; tr.dy = o[2];
+        }
+        tr.path.push(next);
         if (tr.path.length > AGENTS.trainCars + 3) tr.path.shift();
       }
     }

@@ -117,3 +117,10 @@ button { font: inherit; color: inherit; cursor: pointer; }
 .slider-row input { width: 100%; }
 #side { max-height: calc(100vh - 170px); overflow-y: auto; }
 @media (max-height: 760px) { #side .icon-btn { height: 34px; min-width: 34px; font-size: 16px; } #side { gap: 4px; } }
+
+.bpanel h3 { margin: 0 0 2px; font-size: 16px; }
+.bpanel { border-bottom: 1px solid #456; padding-bottom: 8px; margin-bottom: 8px; }
+.sheet h3.sub { font-size: 13px; color: var(--muted); }
+.people { list-style: none; padding: 0; margin: 4px 0; max-height: 34vh; overflow-y: auto; }
+.people li { padding: 4px 0; border-bottom: 1px solid #2c3a48; line-height: 1.4; }
+.linkbtn { background: none; border: 0; padding: 0; color: #8cc4ff; text-decoration: underline; font-size: inherit; }
