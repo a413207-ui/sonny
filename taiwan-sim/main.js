@@ -5,6 +5,8 @@ import {
 } from './config.js';
 import { loadMapBrowser } from './map.js';
 import { Sim, ZONE_KEY, BLD_KEY, landPrice, eraInfo, styleName, ELEVATABLE } from './sim.js';
+import { TAX, BUDGET, SERVICE_BUILDINGS, TRAFFIC, CRIME, HEALTH, EDUCATION, LAND_VALUE } from './config.js';
+import { LAYERS } from './services.js';
 import { Renderer } from './render.js';
 import { Input } from './input.js';
 import { saveToStorage, loadFromStorage, backupBrokenSave, serialize, deserialize } from './save.js';
@@ -31,6 +33,7 @@ const TOOLBAR = [
   { group: 'water', icon: '💧', label: '水', key: '6', items: ['well', 'waterpoint', 'waterworks', 'purifier', 'pipe'] },
   { group: 'power', icon: '⚡', label: '電', key: '7', items: ['coal', 'hydro', 'nuclear', 'modernplant', 'wire'] },
   { group: 'special', icon: '🏛️', label: '特殊', key: '8', items: ['lighthouse', 'station', 'dam', 'epz', 'skyscraper'] },
+  { group: 'service', icon: '🏫', label: '服務', key: 's', items: Object.keys(SERVICE_BUILDINGS) },
   { id: 'bulldoze', icon: '🧹', label: '拆除', key: '9' },
 ];
 
@@ -60,11 +63,15 @@ function toolDesc(id) {
   if (id === 'inspect') return '拖動地圖、點格子看資訊；雙指縮放';
   const elevTxt = elevOn(id) ? `【高架】每格另加 ${fmt(ELEVATED.cost)}、每 ${ELEVATED.pillarEvery} 格一根柱子，底下可以蓋東西 — ` : '';
   if (id === 'road') return `${elevTxt}${ROAD.names[era]} ${ROAD.cost.plain}元/格（丘陵 ${ROAD.cost.hill}、高山 ${ROAD.cost.mountain}、${ROAD.bridgeNames[era]} ${ROAD.bridgeCost[era]}）— 拖曳畫線`;
-  if (id === 'rail') return `${featured('rail') ? '★本時代主打 ' : ''}鐵路 ${RAIL.cost.plain}元/格（丘陵 ${RAIL.cost.hill}、隧道 ${RAIL.cost.mountain}、鐵橋 ${RAIL.bridgeCost}）・要連到車站，沿線 ${RAIL.radius} 格稅收 +${Math.round(RAIL.bonus * 100)}% — 拖曳畫線（可穿過道路）`;
+  if (id === 'rail') return `${elevTxt}${featured('rail') ? '★本時代主打 ' : ''}鐵路 ${RAIL.cost.plain}元/格（丘陵 ${RAIL.cost.hill}、隧道 ${RAIL.cost.mountain}、鐵橋 ${RAIL.bridgeCost}）・要連到車站，沿線 ${RAIL.radius} 格稅收 +${Math.round(RAIL.bonus * 100)}% — 拖曳畫線（可穿過道路）`;
   if (ZONES[id]) return `${ZONES[id].name}區 ${ZONES[id].cost}元/格 — 拖曳畫範圍；要接路、有水${game.sim.powerNeeded() ? '、有電' : ''}才會長`;
   if (FACILITIES[id]) {
     const f = FACILITIES[id];
     const need = { river: '・要蓋在河邊', coast: '・要蓋在海邊', road: '・要緊鄰接到港口的路' }[f.needs] || '';
+    if (f.kind === 'service') {
+      const svcName = { edu: '教育', police: '警力', health: '醫療' }[f.svc];
+      return `${f.name} ${fmt(f.cost)}元・維護 ${fmt(game.sim.facMaintenance(id))}/月・${svcName}範圍 ${f.radius} 格、強度 ${f.strength}・要緊鄰接到港口的路`;
+    }
     const capN = game.sim.facCapacity(id);
     const cap = capN ? `・供應 ${capN.toLocaleString()}・範圍 ${f.coverRadius} 格` : id === 'waterpoint' ? `・水管網路的接點（範圍 ${f.coverRadius} 格）` : '';
     const old = game.sim.isObsolete(id) ? `・⚠ 過時（${game.sim.obsoleteEffects(id).join('、')}）` : '';
@@ -132,7 +139,9 @@ function setTool(id) {
   for (const b of document.querySelectorAll('#toolbar button')) b.classList.toggle('on', b.dataset.id === (grp ? grp.group : id));
   $('#tool-tip').textContent = id === 'inspect' ? '' : toolDesc(id);
   // 管線/電線工具自動打開覆蓋圖
-  if (id === 'pipe' || FACILITIES[id]?.kind === 'water' || id === 'dam') setOverlay('water', true);
+  const svc = FACILITIES[id]?.kind === 'service' ? FACILITIES[id].svc : null;
+  if (svc) setOverlay({ edu: 'edu', police: 'police', health: 'health' }[svc], true);
+  else if (id === 'pipe' || FACILITIES[id]?.kind === 'water' || id === 'dam') setOverlay('water', true);
   else if (id === 'wire' || FACILITIES[id]?.kind === 'power') setOverlay('power', true);
   closeSheet();
 }
@@ -141,8 +150,8 @@ function setElevated(on) {
   if (on && !game.sim.canElevate()) { toast(`要到${eraInfo(ELEVATED.era).name}才能蓋高架`, 'bad'); on = false; }
   game.elevated = on;
   $('#elev-btn').classList.toggle('on', on);
-  $('#tool-tip').textContent = game.tool === 'inspect' ? (on ? '高架：選「路」或交通裡的公路、高速公路，拖曳就蓋成高架' : '') : toolDesc(game.tool);
-  toast(on ? `🌉 高架開啟：路、公路、高速公路都蓋成高架（每 ${ELEVATED.pillarEvery} 格一根柱子，底下可以蓋東西）` : '高架關閉', '', 3000, 'elevToast');
+  $('#tool-tip').textContent = game.tool === 'inspect' ? (on ? '高架：選「路」或交通裡的鐵路、公路、高速公路，拖曳就蓋成高架' : '') : toolDesc(game.tool);
+  toast(on ? `🌉 高架開啟：路、鐵路、公路、高速公路都蓋成高架（每 ${ELEVATED.pillarEvery} 格一根柱子，底下可以蓋東西）` : '高架關閉', '', 3000, 'elevToast');
 }
 function updateElevButton() {
   const b = $('#elev-btn');
@@ -158,6 +167,32 @@ function setOverlay(kind, force) {
   r.invalidateAll();
   $('#ov-water').classList.toggle('on', next === 'water');
   $('#ov-power').classList.toggle('on', next === 'power');
+  $('#layers-btn').classList.toggle('on', !!LAYERS[next]);
+  $('#layers-btn').textContent = LAYERS[next]?.icon || '📊';
+  game.ovT = performance.now();
+  const legend = $('#legend');
+  if (LAYERS[next]) {
+    legend.hidden = false;
+    legend.textContent = next === 'traffic' ? '🚦 交通：綠 = 順暢、黃 = 車多、紅 = 塞車（只畫道路）'
+      : next === 'crime' || next === 'pollution' ? `${LAYERS[next].icon} ${LAYERS[next].name}：越紅越嚴重` : `${LAYERS[next].icon} ${LAYERS[next].name}：越綠越好`;
+  } else legend.hidden = true;
+}
+// 圖層選單（手機也點得到）
+function openLayers() {
+  const sheet = $('#sheet');
+  const cur = game.renderer.overlay;
+  const btn = (k, icon, name) => `<button class="btn ${cur === k ? '' : 'alt'}" data-layer="${k}">${icon} ${esc(name)}</button>`;
+  sheet.innerHTML = `<button class="x" aria-label="關閉">✕</button><h3>📊 資訊圖層</h3>
+    <div class="layer-grid">${Object.entries(LAYERS).map(([k, l]) => btn(k, l.icon, l.name)).join('')}${btn('water', '💧', '水')}${btn('power', '⚡', '電')}${btn('', '✖', '關閉圖層')}</div>`;
+  sheet.hidden = false;
+  sheet.querySelector('.x').addEventListener('click', closeSheet);
+  sheet.querySelectorAll('[data-layer]').forEach((b) => b.addEventListener('click', () => { setOverlay(b.dataset.layer || null, true); closeSheet(); }));
+}
+function setAgents(on) {
+  game.renderer.agents.enabled = on;
+  if (!on) game.renderer.agents.clear();
+  $('#agents-btn').classList.toggle('on', on);
+  try { localStorage.setItem('taiwanSim.showAgents', on ? '1' : '0'); } catch { /* 忽略 */ }
 }
 
 // ---------- 提示 ----------
@@ -346,7 +381,7 @@ function eraModal(e) {
       <li>船：${esc(era.ship.name)}（載 ${era.ship.capacity} 人）；港口每月可卸 ${era.portUnload} 人</li>
       <li>區塊最高可長到第 ${era.maxLevel} 級；稅收 ×${era.taxMult}</li>
       ${era.featured ? `<li>★ <b>本時代主打：${esc(era.featuredText)}</b>（工具列「交通」）</li>` : ''}
-      ${e.era === ELEVATED.era ? `<li>🌉 從現在起任何道路都可以蓋成高架（右側「高架」切換）</li>` : ''}
+      ${e.era === ELEVATED.era ? `<li>🌉 從現在起任何道路和鐵路都可以蓋成高架（右側「高架」切換）</li>` : ''}
       ${newTools.length ? `<li>新建築：${newTools.map(esc).join('、')}</li>` : ''}
       <li>舊建築 ${e.old} 格會保留原本的樣式；想換成「${esc(era.zoneNames.R)}／${esc(era.zoneNames.C)}／${esc(era.zoneNames.I)}」的樣式要付錢改建（點格子或在「時代」全部改建）。</li>
       ${(e.obsolete || []).map((t) => `<li>⚠ ${esc(t)}（舊設施照常運作，不會被換掉；付錢改建才會變成新版本）</li>`).join('')}
@@ -388,20 +423,52 @@ function openMoney() {
   const sim = game.sim, st = sim.s.stats, b = st.breakdown || {};
   const inc = b.income || {}, exp = b.expense || {};
   const f = sim.forecast();
+  const fc = { inc: sim.incomeBreakdown(), exp: sim.maintenance() };
+  const v = sim.svcStats || {};
   const loan = sim.s.loan.taken ? `已借（還剩 ${sim.s.loan.monthsLeft} 個月，每月 ${FINANCE.loan.monthlyPayment} 元）` : `還沒借（可借一次 ${fmt(FINANCE.loan.amount)}）`;
-  openModal(`<h2>💰 收支</h2>
-    <p>目前 <b>${fmt(sim.s.money)}</b> 元。上個月淨收支 <b>${st.net >= 0 ? '+' : ''}${fmt(st.net)}</b>；照現在預估每月 ${f.net >= 0 ? '+' : ''}${fmt(f.net)}。</p>
+  const taxRow = (z, name) => `<div class="slider-row"><span>${name}稅</span><input type="range" min="${TAX.min}" max="${TAX.max}" step="${TAX.step}" value="${sim.taxRate(z)}" data-tax="${z}" aria-label="${name}稅率"><b data-taxv="${z}">${sim.taxRate(z)}%</b></div>`;
+  const budRow = (k, name) => `<div class="slider-row"><span>${name}</span><input type="range" min="${BUDGET.min}" max="${BUDGET.max}" step="${BUDGET.step}" value="${sim.s.budget[k]}" data-budget="${k}" aria-label="${name}預算"><b data-budv="${k}">${sim.s.budget[k]}%</b></div>`;
+  const m = openModal(`<h2>💰 收支・稅率・預算</h2>
+    <p>目前 <b>${fmt(sim.s.money)}</b> 元。上個月淨收支 <b>${st.net >= 0 ? '+' : ''}${fmt(st.net)}</b>；照現在預估每月 <b data-fnet>${f.net >= 0 ? '+' : ''}${fmt(f.net)}</b>。</p>
+    <h3>稅率（預設 ${TAX.default}%）</h3>
+    ${taxRow('R', '住宅')}${taxRow('C', '商業')}${taxRow('I', '工業')}
+    <p class="small">稅率每高於預設 1%，該類需求 −${Math.round(TAX.demandPerPoint * 100)}%、成長機率 −${Math.round(TAX.growthPerPoint * 100)}%，住宅稅還會讓移民少 ${Math.round(TAX.immigrationPerPoint * 100)}%；低於預設則反過來（最多 +${Math.round(TAX.maxBonus * 100)}%）。</p>
+    <h3>預算（預設 ${BUDGET.default}%）</h3>
+    ${budRow('edu', '教育')}${budRow('police', '治安')}${budRow('health', '醫療')}${budRow('roads', '道路維護')}
+    <p class="small">服務效果 × √(預算/100)，維護費 × 預算/100；道路維護預算影響道路容量（塞車）。</p>
+    <h3>明細（上月 → 照現在預估）</h3>
     <table>
-      <tr><th>收入（上月）</th><th></th><th>支出（上月）</th><th></th></tr>
-      <tr><td>住宅稅</td><td>${fmt(inc.R || 0)}</td><td>道路與橋維護</td><td>${fmt(exp.roads || 0)}</td></tr>
-      <tr><td>商業稅</td><td>${fmt(inc.C || 0)}</td><td>設施維護</td><td>${fmt(exp.facilities || 0)}</td></tr>
-      <tr><td>工業稅</td><td>${fmt(inc.I || 0)}</td><td>水管電線維護</td><td>${fmt(exp.lines || 0)}</td></tr>
-      <tr><td>港口貿易</td><td>${fmt(inc.trade || 0)}</td><td>交通維護</td><td>${fmt(exp.transport || 0)}</td></tr>
-      <tr><td>田賦（買下的縣市）</td><td>${fmt(inc.land || 0)}</td><td>貸款還款</td><td>${fmt(exp.loan || 0)}</td></tr>
+      <tr><th>收入</th><th></th><th>支出</th><th></th></tr>
+      <tr><td>住宅稅</td><td>${fmt(inc.R || 0)} → <span data-fi="R">${fmt(fc.inc.R)}</span></td><td>道路與橋維護</td><td>${fmt(exp.roads || 0)} → <span data-fe="roads">${fmt(fc.exp.roads)}</span></td></tr>
+      <tr><td>商業稅</td><td>${fmt(inc.C || 0)} → <span data-fi="C">${fmt(fc.inc.C)}</span></td><td>水電與其他設施</td><td>${fmt(exp.facilities || 0)} → ${fmt(fc.exp.facilities)}</td></tr>
+      <tr><td>工業稅</td><td>${fmt(inc.I || 0)} → <span data-fi="I">${fmt(fc.inc.I)}</span></td><td>教育預算</td><td>${fmt(exp.edu || 0)} → <span data-fe="edu">${fmt(fc.exp.edu)}</span></td></tr>
+      <tr><td>港口貿易</td><td>${fmt(inc.trade || 0)}</td><td>治安預算</td><td>${fmt(exp.police || 0)} → <span data-fe="police">${fmt(fc.exp.police)}</span></td></tr>
+      <tr><td>田賦</td><td>${fmt(inc.land || 0)}</td><td>醫療預算</td><td>${fmt(exp.health || 0)} → <span data-fe="health">${fmt(fc.exp.health)}</span></td></tr>
+      <tr><td></td><td></td><td>水管電線</td><td>${fmt(exp.lines || 0)}</td></tr>
+      <tr><td></td><td></td><td>交通（鐵路、高架、公路…）</td><td>${fmt(exp.transport || 0)}</td></tr>
+      <tr><td></td><td></td><td>貸款還款</td><td>${fmt(exp.loan || 0)}</td></tr>
     </table>
-    <p class="small">稅收 = 基本稅率 × 時代倍率（${eraInfo(sim.s.era).taxMult}）× 縣市倍率 × 交通加成${sim.activeEvents().length ? `；時代事件：${sim.activeEvents().map((e) => esc(e.name)).join('、')}` : ''}。</p>
-    <p class="small">建造費一次付清，不算在每月支出。緊急貸款：${loan}。<br>
+    <h3>城市狀況（已蓋好的區塊平均）</h3>
+    <p class="small">教育 ${Math.round(v.edu || 0)}・犯罪 ${Math.round(v.crime || 0)}・健康 ${Math.round(v.health || 0)}・地價 ${Math.round(v.landValue || 0)}・失業率 ${Math.round((v.unemployment || 0) * 100)}%・塞車路段 ${v.jammedRoads || 0} / ${v.roads || 0}</p>
+    <p class="small">稅收 = 基本稅率 × 稅率/${TAX.default}% × 時代倍率（${eraInfo(sim.s.era).taxMult}）× 縣市倍率 × 交通加成 × 地價${sim.activeEvents().length ? `；時代事件：${sim.activeEvents().map((e) => esc(e.name)).join('、')}` : ''}。建造費一次付清，不算在每月支出。緊急貸款：${loan}。<br>
     預警：赤字時錢撐不到 ${FINANCE.warnRunwayMonths} 個月會黃色預警、撐不到 ${FINANCE.dangerRunwayMonths} 個月紅色危急；連續 ${FINANCE.deficitStreakWarn} 個月赤字會提醒。</p>`);
+  const refresh = () => {
+    const nf = sim.forecast(), ni = sim.incomeBreakdown(), ne = sim.maintenance();
+    m.querySelector('[data-fnet]').textContent = `${nf.net >= 0 ? '+' : ''}${fmt(nf.net)}`;
+    m.querySelectorAll('[data-fi]').forEach((e) => { e.textContent = fmt(ni[e.dataset.fi]); });
+    m.querySelectorAll('[data-fe]').forEach((e) => { e.textContent = fmt(ne[e.dataset.fe]); });
+  };
+  m.querySelectorAll('[data-tax]').forEach((el) => el.addEventListener('input', () => {
+    sim.setTax(el.dataset.tax, el.value);
+    m.querySelector(`[data-taxv="${el.dataset.tax}"]`).textContent = `${sim.taxRate(el.dataset.tax)}%`;
+    refresh();
+  }));
+  m.querySelectorAll('[data-budget]').forEach((el) => el.addEventListener('input', () => {
+    sim.setBudget(el.dataset.budget, el.value);
+    m.querySelector(`[data-budv="${el.dataset.budget}"]`).textContent = `${sim.s.budget[el.dataset.budget]}%`;
+    sim.dirtyAll = true;
+    refresh();
+  }));
 }
 
 function openHelp() {
@@ -417,7 +484,11 @@ function openHelp() {
     <li><b>改建</b>：換時代後，舊建築會保留原本的樣式，不會自動改建。點格子或在「時代」付錢改建，才會換成新時代樣式（住得更多、可以再長高）。過時的水井、燃煤電廠照常運作但效果變差（地圖上有 ⚠），付錢改建才會變成新設施。</li>
     <li><b>鐵路</b>：日據時代的主打建築。在「交通」鋪鐵路、在旁邊蓋車站，沿線 ${RAIL.radius} 格稅收 +${Math.round(RAIL.bonus * 100)}%、長得更快（沒連到車站就沒效果）。</li>
     <li><b>交通</b>：民國光復以後可以把路升級成公路；經濟起飛時代的主打是高速公路；現代可以蓋捷運：範圍內稅收變高、長得更快。</li>
-    <li><b>高架</b>：經濟起飛以後按右側 🌉 打開，路、公路、高速公路都蓋成高架；每 ${ELEVATED.pillarEvery} 格一根柱子，柱子以外的格子底下可以劃區、蓋設施。</li>
+    <li><b>高架</b>：經濟起飛以後按右側 🌉 打開，路、鐵路、公路、高速公路都蓋成高架；每 ${ELEVATED.pillarEvery} 格一根柱子，柱子以外的格子底下可以劃區、蓋設施。</li>
+    <li><b>城市服務</b>（工具列「服務」）：學校提高教育（商業、工業要有教育才能升到高等級）；警察降低犯罪（犯罪太高的區塊不長）；醫院提高健康（工業污染會降低健康，健康影響人口自然增加）。服務的效果和維護費看「收支」裡的預算。</li>
+    <li><b>稅率與預算</b>：在「💰 收支」調整住宅、商業、工業稅率（太高需求和成長變差、太低沒錢）以及教育、治安、醫療、道路的預算。</li>
+    <li><b>交通</b>：每條路有車流量，塞車的地方成長變慢；公路、高速公路、高架、鐵路、捷運可以分散車流。</li>
+    <li><b>資訊圖層</b>：右側 📊 可以看交通、教育、警力、犯罪、健康、污染、地價；🚗 開關路上的車、火車、行人。</li>
     <li><b>買地</b>：在「區域」花錢買下新縣市，例如臺南市。</li>
     <li><b>完成</b>：在現代達成人口 ${VICTORY.pop.toLocaleString()}、蓋好摩天大樓、蓋到台北，就完成這局（可以繼續玩）。</li>
     <li><b>破產</b>：錢低於 0 時可以借一次緊急貸款；借過之後錢又用完就輸了。</li>
@@ -474,9 +545,13 @@ function inspect(cell) {
   const rows = [['地形', `${TERRAIN_NAMES[t]}${t ? `・約 ${Math.round(m.heightM[i])} 公尺` : ''}${m.coast[i] ? '・海岸' : ''}`]];
   if (cty) rows.push(['縣市', `${cty.name}${own ? '' : '（未購買）'}`]);
   if (g.road[i]) rows.push(['道路', `${g.road[i] === 2 ? '橋' : '道路'}${sim.connected[i] ? '・已接上港口' : '・沒接上港口'}`]);
+  if (g.road[i] && sim.connected[i]) {
+    const c = sim.cong[i];
+    rows.push(['車流', `${Math.round(sim.flow[i]).toLocaleString()} 輛/月・${c >= TRAFFIC.yellow ? '🔴 塞車' : c >= TRAFFIC.green ? '🟡 車多' : '🟢 順暢'}（${Math.round(c * 100)}%）`]);
+  }
   if (g.trans[i]) rows.push(['交通', Object.values(TRANSPORT).find((t) => t.level === g.trans[i])?.name || '']);
-  if (g.road[i] && g.elev[i]) rows.push(['高架', sim.pillar[i] ? '有柱子（這格底下不能蓋）' : '底下可以蓋東西']);
-  if (g.rail[i]) rows.push(['鐵路', `${g.rail[i] === 2 ? '鐵橋' : '鐵軌'}・${sim.railActive[i] ? '已連到車站' : '還沒連到車站（沒有效果）'}`]);
+  if (g.road[i] && g.elev[i]) rows.push(['高架', g.elev[i] === 2 ? '從地面道路上面跨過（兩層交叉）' : sim.pillar[i] ? '有柱子（這格底下不能蓋）' : '底下可以蓋東西']);
+  if (g.rail[i]) rows.push(['鐵路', `${g.relev[i] ? `高架鐵路（${sim.railPillar[i] ? '有柱子，這格底下不能蓋' : '底下可以蓋東西'}）` : g.rail[i] === 2 ? '鐵橋' : '鐵軌'}・${sim.railActive[i] ? '已連到車站' : '還沒連到車站（沒有效果）'}`]);
   if (g.metro[i]) rows.push(['捷運', '捷運線']);
   const key = BLD_KEY[g.bld[i]];
   const actions = [];
@@ -506,6 +581,7 @@ function inspect(cell) {
     }
     if (z === 'R') rows.push(['人口', `${g.pop[i]} / ${sim.capAt(i)}`], ['幸福度', `${st.happy}`]);
     else rows.push(['工作', `${sim.capAt(i)} 個`]);
+    rows.push(['城市', `教育 ${sim.edu[i]}・警力 ${sim.police[i]}・犯罪 ${sim.crime[i]}・健康 ${sim.health[i]}・污染 ${sim.pollution[i]}・地價 ${sim.landValue[i]}`]);
     rows.push(['水／電', `${st.water ? '有水' : st.waterCov ? '水量不足' : '沒水'}・${st.power ? '有電' : st.powerCov ? '電力不足' : '沒電'}${sim.powerNeeded() ? '' : '（這個時代還不需要電）'}`]);
     why = st.why;
   }
@@ -651,6 +727,7 @@ function startSim(sim) {
   } else {
     game.renderer.sim = sim;
     game.renderer.walkers = [];
+    game.renderer.agents.clear();
     game.renderer.computeColors();
     game.renderer.invalidateAll();
   }
@@ -686,6 +763,8 @@ function loop(now) {
   }
   game.renderer.frame(now, game.input.settling);
   if (now - hudT > 200) { updateHud(); hudT = now; }
+  // 資訊圖層每個月會變：最多每 2 秒重畫一次
+  if (LAYERS[game.renderer.overlay] && sim.s.month !== game.ovMonth && now - (game.ovT || 0) > 2000) { game.ovMonth = sim.s.month; game.ovT = now; game.renderer.invalidateAll(); }
   if (now - saveT > TIME.autosaveSeconds * 1000) { saveT = now; doSave(); }
   requestAnimationFrame(loop);
 }
@@ -714,6 +793,11 @@ async function boot() {
   $('#undo-btn').addEventListener('click', undo);
   $('#ov-water').addEventListener('click', () => setOverlay('water'));
   $('#ov-power').addEventListener('click', () => setOverlay('power'));
+  $('#layers-btn').addEventListener('click', openLayers);
+  $('#agents-btn').addEventListener('click', () => setAgents(!game.renderer.agents.enabled));
+  let showAgents = true;
+  try { showAgents = localStorage.getItem('taiwanSim.showAgents') !== '0'; } catch { /* 忽略 */ }
+  setAgents(showAgents);
   $('#regions-btn').addEventListener('click', openRegions);
   $('#era-btn').addEventListener('click', openEra);
   $('#ms-btn').addEventListener('click', openMilestones);
@@ -743,7 +827,7 @@ async function boot() {
       get sim() { return game.sim; }, get renderer() { return game.renderer; }, map: game.map, game,
       advance: (months) => { game.sim.advance(months); handleEvents(); },
       build: (...a) => game.sim.build(...a),
-      buyRegion, setTool, undo, doSave, restart, openEra, inspect,
+      buyRegion, setTool, undo, doSave, restart, openEra, inspect, openMoney, openLayers, setOverlay, setAgents,
       get loaded() { return loaded; },
       screenOf: (x, y) => game.renderer.cellToScreen(x, y),
       serialize: () => serialize(game.sim),

@@ -109,3 +109,11 @@ button { font: inherit; color: inherit; cursor: pointer; }
 .scroll-x table { min-width: 520px; }
 #toolbar button.hot { box-shadow: inset 0 -3px 0 var(--accent); }
 .subtools button.hot { border-color: var(--accent); }
+
+.layer-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; }
+.layer-grid .btn { padding: 8px 4px; font-size: 13px; }
+.legend { position: fixed; left: 6px; bottom: 90px; font-size: 12px; background: var(--bg); padding: 4px 10px; border-radius: 10px; z-index: 4; max-width: calc(100vw - 60px); pointer-events: none; }
+.slider-row { display: grid; grid-template-columns: 5.5em 1fr 3.2em; gap: 6px; align-items: center; margin: 4px 0; }
+.slider-row input { width: 100%; }
+#side { max-height: calc(100vh - 170px); overflow-y: auto; }
+@media (max-height: 760px) { #side .icon-btn { height: 34px; min-width: 34px; font-size: 16px; } #side { gap: 4px; } }

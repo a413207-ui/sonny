@@ -1,8 +1,10 @@
 // 斜角 2.5D（等角）繪圖。全部用程式畫，沒有外部圖檔。
 // 效能：靜態畫面（地形＋建築）畫進快取畫布，只有拖曳/縮放超出範圍或地圖變動時才重畫；
 // 縮很小時改畫整張地圖的總覽快取（變動時只重畫變動的區域）。每一幀只另外畫船、移民、預覽。
-import { TERRAIN, ERAS, FACILITIES } from './config.js';
+import { TERRAIN, ERAS, FACILITIES, TRAFFIC } from './config.js';
 import { BLD, BLD_KEY, ZONE } from './sim.js';
+import { LAYERS, layerValue } from './services.js';
+import { Agents } from './agents.js';
 
 export const TW = 64;
 export const TH = 32;
@@ -26,9 +28,12 @@ const SIMPLE_STYLE = {
   2: { 1: ['#d84a3a', '#c9b48a', '#a8946c'], 2: ['#e8e4dc', '#d6d0c4', '#b4ad9f'], 3: ['#d8d2c4', '#cfc6b4', '#aea592'], 4: ['#e46a4a', '#e8e2d6', '#c4bcae'], 5: ['#9fc3e2', '#6f9ccc', '#4f78a6'] },
   3: { 1: ['#5e5550', '#a0784f', '#82603d'], 2: ['#6a6f78', '#9a9890', '#7b7972'], 3: ['#c8c6be', '#b4b1a8', '#96938a'], 4: ['#4a7ab8', '#d8d8d4', '#b2b2ac'], 5: ['#2f4a6a', '#f2f2ee', '#d2d2cc'] },
 };
-const ELEV_LIFT = 24; // 高架離地高度（zoom = 1 時 px）
+const ELEV_LIFT = 24; // 高架道路離地高度（zoom = 1 時 px）
+const ELEV_LIFT_RAIL = 38; // 高架鐵路比高架道路高一層，交叉時從上面過
 const SIMPLE_BLD = {
   railstop: ['#c86a3a', 8],
+  shufang: ['#e6d6b4', 8], gongxue: ['#e8e0cc', 10], middle: ['#ece6d8', 20], university: ['#c0704a', 22],
+  baojia: ['#d8b98a', 7], paichu: ['#2f5fb0', 12], policehq: ['#2f5fb0', 24], herbal: ['#2f8a4a', 8], hospital: ['#f6f6f2', 16], medcenter: ['#f4f6f8', 40],
   port: ['#7a5a3a', 10], well: ['#5a8ad8', 10], waterworks: ['#3a6ad8', 10], waterpoint: ['#6a9ae0', 6], purifier: ['#3f9ad8', 10],
   coal: ['#444', 14], hydro: ['#8aa0b8', 12], nuclear: ['#d8d8d4', 26], modernplant: ['#eef0f2', 14],
   lighthouse: ['#fff', 30], station: ['#c84', 14], dam: ['#c8c4b8', 14], epz: ['#e8e2d2', 24], skyscraper: ['#8fc0e0', 110],
@@ -48,6 +53,7 @@ export class Renderer {
     this.preview = null;
     this.hover = -1;
     this.walkers = [];
+    this.agents = new Agents(this);   // 路上的車、火車、行人（畫面效果）
     this.effects = [];
     this.isMobile = Math.min(globalThis.innerWidth || 1000, globalThis.innerHeight || 1000) < 700;
     this.overviewZ = this.isMobile ? 0.125 : 0.25;
@@ -234,7 +240,20 @@ export class Renderer {
       ctx.fill();
     }
     // 疊加圖層（水/電覆蓋）
-    if (this.overlay) {
+    if (this.overlay && LAYERS[this.overlay]) {
+      // 城市資訊圖層：交通（綠黃紅）、教育/警力/健康/地價（越高越綠）、犯罪/污染（越高越紅）
+      const v = layerValue(sim, this.overlay, i);
+      let col = null;
+      if (this.overlay === 'traffic') {
+        if (v != null) col = v >= TRAFFIC.yellow ? 'rgba(230,40,40,0.75)' : v >= TRAFFIC.green ? 'rgba(250,200,30,0.75)' : 'rgba(40,190,80,0.7)';
+      } else if (v != null) {
+        const bad = this.overlay === 'crime' || this.overlay === 'pollution';
+        const k = Math.max(0, Math.min(1, v / 100));
+        col = bad ? `rgba(${200 + 55 * k | 0},${150 - 130 * k | 0},40,${0.25 + 0.5 * k})` : `rgba(${200 - 170 * k | 0},${120 + 90 * k | 0},${200 - 120 * k | 0},${0.25 + 0.45 * k})`;
+      }
+      ctx.fillStyle = 'rgba(20,20,30,0.25)'; ctx.fill(); // 打開圖層時其他地方變暗
+      if (col) { ctx.fillStyle = col; ctx.fill(); }
+    } else if (this.overlay) {
       const cov = this.overlay === 'water' ? sim.waterCov[i] : sim.powerCov[i];
       const ok = this.overlay === 'water' ? sim.waterOK[i] : sim.powerOK[i];
       let col = null;
@@ -253,8 +272,8 @@ export class Renderer {
     }
     // 道路
     const elevRoad = g.road[i] && g.elev[i];
-    if ((g.road[i] && !elevRoad) || g.bld[i] === BLD.PORT) this.drawRoad(ctx, i, sx, sy, z);
-    if (g.rail[i]) this.drawRail(ctx, i, sx, sy, z);
+    if ((g.road[i] && g.elev[i] !== 1) || g.bld[i] === BLD.PORT) this.drawRoad(ctx, i, sx, sy, z, false);
+    if (g.rail[i] && !g.relev[i]) this.drawRail(ctx, i, sx, sy, z);
     // 管線、電線
     if (this.overlay === 'water' && g.pipe[i]) this.drawLine(ctx, i, sx, sy, z, 'pipe', '#1f6fe0', 0.16);
     if (g.wire[i] && (this.overlay === 'power' || z >= 0.35)) this.drawLine(ctx, i, sx, sy, z, 'wire', this.overlay === 'power' ? '#e0a000' : 'rgba(40,40,40,0.7)', this.overlay === 'power' ? 0.14 : 0.04, true);
@@ -263,17 +282,21 @@ export class Renderer {
     if (g.bld[i]) this.drawBuilding(ctx, i, sx, sy, z, detail);
     else if (zt && g.level[i]) this.drawZoneBuildings(ctx, i, sx, sy, z, detail);
     // 高架在建築上面（底下的格子可以蓋東西）
-    if (elevRoad) this.drawRoad(ctx, i, sx, sy, z);
+    if (elevRoad) this.drawRoad(ctx, i, sx, sy, z, true);
+    if (g.rail[i] && g.relev[i]) this.drawRail(ctx, i, sx, sy, z);
   }
 
-  drawRoad(ctx, i, sx, sy, z) {
+  // deck = true：畫高架橋面；false：畫地面道路（高架底下的地面道路也是）
+  drawRoad(ctx, i, sx, sy, z, deck = false) {
     const g = this.sim.s.grid, m = this.map, w = m.w, x = i % w, y = (i / w) | 0;
     const era = this.sim.s.era;
     const bridge = g.road[i] === 2;
     const tr = g.trans[i];
     // 顏色：土路 → 石板路 → 柏油路；公路/高速公路/高架道路更寬
     const col = bridge ? (era >= 3 ? '#b4b2aa' : era >= 2 ? '#a8a49c' : '#8b5a2b') : tr ? '#4a4d52' : era >= 3 ? '#5c5f64' : era >= 2 ? '#a39e95' : '#b8956a';
-    const isNode = (j) => g.road[j] || g.bld[j] === BLD.PORT;
+    // 地面道路只連到有地面道路的鄰格（或接引道的高架）；橋面連到所有道路鄰格（地面的那端是引道）
+    const isNode = deck ? (j) => (g.road[j] && g.elev[j]) || (g.elev[i] === 1 && (g.road[j] || g.bld[j] === BLD.PORT))
+      : (j) => g.bld[j] === BLD.PORT || (g.road[j] && (g.elev[j] !== 1 || !g.elev[i]));
     const dirs = [];
     if (x < w - 1 && isNode(i + 1)) dirs.push([TW / 4, TH / 4, i + 1]);
     if (x > 0 && isNode(i - 1)) dirs.push([-TW / 4, -TH / 4, i - 1]);
@@ -281,7 +304,7 @@ export class Renderer {
     if (y > 0 && isNode(i - w)) dirs.push([TW / 4, -TH / 4, i - w]);
     ctx.lineCap = 'round';
     const lw = Math.max(1.2, (bridge ? 12 : tr === 1 ? 12 : tr >= 2 ? 15 : 10) * z);
-    const el = !!g.elev[i];
+    const el = deck;
     const lift = el ? ELEV_LIFT * z : 0; // 高架抬高
     const stroke = (color, width, dash = null, up = lift) => {
       ctx.strokeStyle = color; ctx.lineWidth = width;
@@ -324,48 +347,151 @@ export class Renderer {
   }
 
   // 鐵路：枕木＋兩條鐵軌（原創畫法）；鐵橋多畫一層鋼樑
+  // 城市服務建築（第三版）：教育、治安、醫療，依時代開放；全部原創畫法
+  drawService(ctx, key, sx, sy, z, at) {
+    const flag = (u, v, col, h = 30) => {
+      const [fx, fy] = at(u, v);
+      ctx.strokeStyle = '#ddd'; ctx.lineWidth = Math.max(1, 1.2 * z);
+      ctx.beginPath(); ctx.moveTo(fx, fy); ctx.lineTo(fx, fy - h * z); ctx.stroke();
+      ctx.fillStyle = col; ctx.fillRect(fx, fy - h * z, 9 * z, 5 * z);
+    };
+    const sign = (u, v, h, col, w = 8) => {
+      const [px, py] = at(u, v);
+      ctx.fillStyle = col; ctx.fillRect(px - w / 2 * z, py - h * z, w * z, 4 * z);
+    };
+    const cross = (cx, cy, s) => {
+      ctx.fillStyle = '#fff'; ctx.fillRect(cx - s * 1.4 * z, cy - s * 1.4 * z, s * 2.8 * z, s * 2.8 * z);
+      ctx.fillStyle = '#d83a3a';
+      ctx.fillRect(cx - s * 0.4 * z, cy - s * 1.2 * z, s * 0.8 * z, s * 2.4 * z);
+      ctx.fillRect(cx - s * 1.2 * z, cy - s * 0.4 * z, s * 2.4 * z, s * 0.8 * z);
+    };
+    if (key === 'shufang') {
+      // 書房：小三合院式平房、紅瓦、門口匾額
+      this.box(ctx, sx, sy, z, 0.26, 0.16, 8, null, '#e6d6b4', '#c8b48e');
+      this.gable(ctx, sx, sy, z, 0.26, 0.16, 8, 6, '#b5523b', '#8e3c2a');
+      sign(0, 0.17, 6, '#2a2a2a', 10);
+    } else if (key === 'gongxue') {
+      // 公學校：長條木造校舍、黑瓦、操場＋旗桿
+      const [px, py] = at(0.15, 0.2);
+      ctx.fillStyle = '#c8a878'; ctx.beginPath(); ctx.ellipse(px, py, 12 * z, 6 * z, 0, 0, Math.PI * 2); ctx.fill();
+      this.box(ctx, ...at(-0.12, -0.08), z, 0.3, 0.12, 10, null, '#e8e0cc', '#c8bea6');
+      this.gable(ctx, ...at(-0.12, -0.08), z, 0.3, 0.12, 10, 6, '#4a4a52', '#3a3a42');
+      this.floorLines(ctx, ...at(-0.12, -0.08), z, 0.3, 0.12, 10, 1, 'rgba(0,0,0,0)', 6);
+      flag(0.35, 0.3, '#f4f4f4');
+    } else if (key === 'middle') {
+      // 中學：三層水泥校舍＋大鐘
+      this.box(ctx, sx, sy, z, 0.32, 0.16, 20, '#e2ddd0', '#ece6d8', '#c8c0ae');
+      this.floorLines(ctx, sx, sy, z, 0.32, 0.16, 20, 3, 'rgba(70,90,120,0.5)', 6);
+      const [cx, cy] = at(0, 0.17);
+      ctx.fillStyle = '#fff'; ctx.beginPath(); ctx.arc(cx, cy - 23 * z, 3.5 * z, 0, Math.PI * 2); ctx.fill();
+      ctx.strokeStyle = '#333'; ctx.lineWidth = Math.max(0.6, 0.8 * z);
+      ctx.beginPath(); ctx.moveTo(cx, cy - 23 * z); ctx.lineTo(cx, cy - 25.5 * z); ctx.moveTo(cx, cy - 23 * z); ctx.lineTo(cx + 2 * z, cy - 23 * z); ctx.stroke();
+      flag(0.38, 0.32, '#d33', 26);
+    } else if (key === 'university') {
+      // 大學：紅磚主樓＋圓頂＋草坪
+      const [gx, gy] = at(0.2, 0.22);
+      ctx.fillStyle = '#6ab04c'; ctx.beginPath(); ctx.ellipse(gx, gy, 14 * z, 7 * z, 0, 0, Math.PI * 2); ctx.fill();
+      this.box(ctx, ...at(-0.1, -0.1), z, 0.3, 0.18, 22, '#b06040', '#c0704a', '#9a5236');
+      this.floorLines(ctx, ...at(-0.1, -0.1), z, 0.3, 0.18, 22, 3, 'rgba(255,240,220,0.5)', 7);
+      const [dx, dy] = at(-0.1, -0.1);
+      ctx.fillStyle = '#3f8a7a';
+      ctx.beginPath(); ctx.arc(dx, dy - 22 * z - 4 * z, 8 * z, Math.PI, 0); ctx.fill();
+      this.box(ctx, dx, dy - 22 * z, z, 0.08, 0.08, 4, '#e8e0cc', '#d8ceb6', '#b8ae96');
+    } else if (key === 'baojia') {
+      // 保甲局：小土角屋＋燈籠
+      this.box(ctx, sx, sy, z, 0.18, 0.14, 7, null, '#d8b98a', '#b8956a');
+      this.gable(ctx, sx, sy, z, 0.18, 0.14, 7, 5, '#8a5a3a', '#6e462e');
+      const [lx, ly] = at(0.2, 0.15);
+      ctx.fillStyle = '#e83a2a'; ctx.beginPath(); ctx.ellipse(lx, ly - 9 * z, 2.5 * z, 3.2 * z, 0, 0, Math.PI * 2); ctx.fill();
+    } else if (key === 'paichu') {
+      // 派出所：白色小樓＋藍色招牌＋紅燈
+      this.box(ctx, sx, sy, z, 0.2, 0.16, 12, '#e8e8e4', '#f2f2ee', '#cfcfca');
+      sign(0, 0.17, 10, '#2f5fb0', 12);
+      const [lx, ly] = at(0, 0);
+      ctx.fillStyle = '#ff3030'; ctx.beginPath(); ctx.arc(lx, ly - 14 * z, 1.8 * z, 0, Math.PI * 2); ctx.fill();
+    } else if (key === 'policehq') {
+      // 警察局：大樓＋藍色腰帶＋警車
+      this.box(ctx, ...at(-0.08, -0.06), z, 0.28, 0.18, 24, '#e2e4e8', '#eceef2', '#c4c8ce');
+      this.floorLines(ctx, ...at(-0.08, -0.06), z, 0.28, 0.18, 24, 4, 'rgba(60,70,90,0.35)', 6);
+      const [bx, by] = at(-0.08, 0.13);
+      ctx.fillStyle = '#2f5fb0'; ctx.fillRect(bx - 14 * z, by - 12 * z, 28 * z, 3 * z);
+      const [cx, cy] = at(0.32, 0.3);
+      this.box(ctx, cx, cy, z, 0.09, 0.05, 5, '#f4f4f4', '#2f5fb0', '#244a8a');
+      ctx.fillStyle = '#ff3030'; ctx.fillRect(cx - 1.5 * z, cy - 7 * z, 3 * z, 2 * z);
+    } else if (key === 'herbal') {
+      // 漢藥舖：店面＋綠色招牌
+      this.box(ctx, sx, sy, z, 0.18, 0.14, 8, null, '#e8dcc0', '#c8bca0');
+      this.gable(ctx, sx, sy, z, 0.18, 0.14, 8, 5, '#5a5a52', '#46463e');
+      sign(0, 0.15, 7, '#2f8a4a', 10);
+    } else if (key === 'hospital') {
+      // 醫院：白色兩層樓＋紅十字
+      this.box(ctx, sx, sy, z, 0.28, 0.18, 16, '#f2f2ee', '#f6f6f2', '#d4d4ce');
+      this.floorLines(ctx, sx, sy, z, 0.28, 0.18, 16, 2, 'rgba(80,120,160,0.45)', 6);
+      const [cx, cy] = at(0, 0.19);
+      cross(cx, cy - 18 * z, 2.5);
+    } else if (key === 'medcenter') {
+      // 醫學中心：白色高樓＋紅十字＋頂樓停機坪
+      this.box(ctx, ...at(-0.05, -0.05), z, 0.26, 0.2, 40, '#e8ecf0', '#f4f6f8', '#cdd2d8');
+      this.floorLines(ctx, ...at(-0.05, -0.05), z, 0.26, 0.2, 40, 8, 'rgba(80,130,180,0.4)', 5);
+      const [hx, hy] = at(-0.05, -0.05);
+      ctx.fillStyle = '#3a8a4a'; ctx.beginPath(); ctx.ellipse(hx, hy - 40 * z, 7 * z, 3.5 * z, 0, 0, Math.PI * 2); ctx.fill();
+      ctx.fillStyle = '#fff'; ctx.font = `bold ${Math.max(5, 5 * z)}px system-ui, sans-serif`; ctx.textAlign = 'center';
+      ctx.fillText('H', hx, hy - 38.5 * z);
+      const [cx, cy] = at(-0.05, 0.16);
+      cross(cx, cy - 34 * z, 2.5);
+    }
+  }
+
   drawRail(ctx, i, sx, sy, z) {
     const g = this.sim.s.grid, m = this.map, w = m.w, x = i % w, y = (i / w) | 0;
     const ex = [TW / 2 * z, TH / 2 * z], ey = [-TW / 2 * z, TH / 2 * z];
-    // 每個方向：沿線向量 a（半格）、垂直向量 p（格子單位）
+    const el = !!g.relev[i];
+    const lift = el ? ELEV_LIFT_RAIL * z : 0;
+    // 每個方向：沿線向量 a（半格）、垂直向量 p（格子單位）、正負號、鄰格那端的高度（高架接地面＝引道）
     const segs = [];
-    if (x < w - 1 && g.rail[i + 1]) segs.push([ex, ey, 1]);
-    if (x > 0 && g.rail[i - 1]) segs.push([ex, ey, -1]);
-    if (y < m.h - 1 && g.rail[i + w]) segs.push([ey, ex, 1]);
-    if (y > 0 && g.rail[i - w]) segs.push([ey, ex, -1]);
-    if (!segs.length) segs.push([ex, ey, 1], [ex, ey, -1]);
+    const add = (j, a, p, sg) => segs.push([a, p, sg, el && !g.relev[j] ? 0 : lift]);
+    if (x < w - 1 && g.rail[i + 1]) add(i + 1, ex, ey, 1);
+    if (x > 0 && g.rail[i - 1]) add(i - 1, ex, ey, -1);
+    if (y < m.h - 1 && g.rail[i + w]) add(i + w, ey, ex, 1);
+    if (y > 0 && g.rail[i - w]) add(i - w, ey, ex, -1);
+    if (!segs.length) segs.push([ex, ey, 1, lift], [ex, ey, -1, lift]);
+    // 沿線 t（0 = 格子中心、0.5 = 格子邊）的位置與高度
+    const pt = (a, sg, endUp, t, off = [0, 0]) => {
+      const up = lift + (endUp - lift) * (t / 0.5);
+      return [sx + a[0] * t * sg + off[0], sy + a[1] * t * sg + off[1] - up];
+    };
+    const line = (color, width, cap = 'butt') => {
+      ctx.strokeStyle = color; ctx.lineWidth = width; ctx.lineCap = cap;
+      ctx.beginPath();
+      for (const [a, , sg, e] of segs) { ctx.moveTo(...pt(a, sg, e, 0)); ctx.lineTo(...pt(a, sg, e, 0.5)); }
+      ctx.stroke();
+    };
     const active = this.sim.railActive[i];
-    if (g.rail[i] === 2 && z >= 0.3) {
-      ctx.strokeStyle = '#5a5048'; ctx.lineWidth = Math.max(2, 14 * z); ctx.lineCap = 'butt';
-      ctx.beginPath();
-      for (const [a, , sg] of segs) { ctx.moveTo(sx, sy); ctx.lineTo(sx + a[0] * 0.5 * sg, sy + a[1] * 0.5 * sg); }
-      ctx.stroke();
-    }
-    if (z < 0.3) {
-      ctx.strokeStyle = active ? '#5a4030' : '#6a6058'; ctx.lineWidth = Math.max(1, 3 * z); ctx.lineCap = 'round';
-      ctx.beginPath();
-      for (const [a, , sg] of segs) { ctx.moveTo(sx, sy); ctx.lineTo(sx + a[0] * 0.5 * sg, sy + a[1] * 0.5 * sg); }
-      ctx.stroke();
-      return;
-    }
+    if (el) {
+      // 高架鐵路：柱子（每 N 格一根）＋混凝土橋身
+      if (this.sim.railPillar[i]) {
+        const pw = Math.max(1.5, 5 * z);
+        ctx.fillStyle = '#b8b6ae'; ctx.fillRect(sx - pw, sy - lift, pw, lift);
+        ctx.fillStyle = '#8e8c84'; ctx.fillRect(sx, sy - lift, pw, lift);
+        ctx.fillStyle = '#cfcdc4'; ctx.fillRect(sx - pw * 1.8, sy - lift - 2 * z, pw * 3.6, 3 * z);
+      }
+      line('#8a8880', Math.max(2, 13 * z));
+    } else if (g.rail[i] === 2 && z >= 0.3) line('#5a5048', Math.max(2, 14 * z));
+    if (z < 0.3) { line(active ? '#5a4030' : '#6a6058', Math.max(1, 3 * z), 'round'); return; }
     // 道碴
-    ctx.strokeStyle = '#9a9286'; ctx.lineWidth = 9 * z; ctx.lineCap = 'butt';
-    ctx.beginPath();
-    for (const [a, , sg] of segs) { ctx.moveTo(sx, sy); ctx.lineTo(sx + a[0] * 0.5 * sg, sy + a[1] * 0.5 * sg); }
-    ctx.stroke();
+    line('#9a9286', 9 * z);
     // 枕木
     ctx.strokeStyle = '#6b4a2e'; ctx.lineWidth = Math.max(1, 2 * z);
     ctx.beginPath();
-    for (const [a, p, sg] of segs) for (const t of [0.08, 0.25, 0.42]) {
-      const cx = sx + a[0] * t * sg, cy = sy + a[1] * t * sg;
-      ctx.moveTo(cx - p[0] * 0.13, cy - p[1] * 0.13); ctx.lineTo(cx + p[0] * 0.13, cy + p[1] * 0.13);
+    for (const [a, p, sg, e] of segs) for (const t of [0.08, 0.25, 0.42]) {
+      ctx.moveTo(...pt(a, sg, e, t, [-p[0] * 0.13, -p[1] * 0.13])); ctx.lineTo(...pt(a, sg, e, t, [p[0] * 0.13, p[1] * 0.13]));
     }
     ctx.stroke();
     // 鐵軌
     ctx.strokeStyle = active ? '#3a3c40' : '#6e6c68'; ctx.lineWidth = Math.max(0.8, 1.3 * z);
     ctx.beginPath();
-    for (const [a, p, sg] of segs) for (const o of [-0.08, 0.08]) {
-      ctx.moveTo(sx + p[0] * o, sy + p[1] * o); ctx.lineTo(sx + a[0] * 0.5 * sg + p[0] * o, sy + a[1] * 0.5 * sg + p[1] * o);
+    for (const [a, p, sg, e] of segs) for (const o of [-0.08, 0.08]) {
+      ctx.moveTo(...pt(a, sg, e, 0, [p[0] * o, p[1] * o])); ctx.lineTo(...pt(a, sg, e, 0.5, [p[0] * o, p[1] * o]));
     }
     ctx.stroke();
     ctx.lineCap = 'round';
@@ -688,6 +814,8 @@ export class Renderer {
       this.box(ctx, sx - 7 * z, sy, z, 0.015, 0.015, 12, null, '#6b4a2a', '#5a3d22');
       this.box(ctx, sx + 7 * z, sy, z, 0.015, 0.015, 12, null, '#6b4a2a', '#5a3d22');
       this.gable(ctx, sx, sy, z, 0.16, 0.08, 12, 4, '#a0522d', '#7a3e22');
+    } else if (FACILITIES[key]?.kind === 'service') {
+      this.drawService(ctx, key, sx, sy, z, at);
     } else if (key === 'railstop') {
       // 車站：月台＋雨棚＋站名牌
       this.box(ctx, sx, sy, z, 0.36, 0.16, 3, '#c8c2b4', '#aaa496', '#8e887a');
@@ -976,6 +1104,11 @@ export class Renderer {
     for (const ship of sim.s.ships) this.drawShip(ctx, ship, now);
     // 移民
     this.drawWalkers(ctx, now);
+    // 路上的車、火車、行人
+    const dt = (now - (this._agentT || now)) / 1000;
+    this._agentT = now;
+    this.agents.update(dt, now);
+    this.agents.draw(ctx, now);
     // 煙
     this.drawEffects(ctx, now);
     // 預覽
