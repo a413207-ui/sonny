@@ -120,7 +120,7 @@ export default {
     const wrap = h('div', { class: 'map-wrap', id: 'map-wrap' });
     const cv = h('canvas', { id: 'map-canvas' });
     wrap.append(cv);
-    const status = h('div', { class: 'muted', id: 'map-status' }, '滑鼠滾輪 / 按住空白鍵或中鍵拖曳：移動畫面');
+    const status = h('div', { class: 'muted', id: 'map-status' }, '滑鼠滾輪 / 按住空白鍵或中鍵拖曳 / 觸控雙指拖曳：移動畫面');
     el.append(wrap, status);
     const g = cv.getContext('2d');
     const cam = (app.tabState.mapCam ||= {});
@@ -259,9 +259,20 @@ export default {
       return x >= 0 && y >= 0 && x < map.w && y < map.h ? [x, y] : null;
     };
     cv.addEventListener('contextmenu', (e) => e.preventDefault());
+    // 觸控：單指 = 繪製，雙指 = 移動畫面（原本單指一律移動畫面，導致手機/平板無法換地形）
+    const touches = new Set();
     cv.addEventListener('pointerdown', (e) => {
       cv.setPointerCapture(e.pointerId);
-      if (e.button === 1 || spaceDown || (e.pointerType === 'touch' && ts.layer !== 'stage')) {
+      if (e.pointerType === 'touch') {
+        touches.add(e.pointerId);
+        if (touches.size >= 2) {
+          // 第二指落下：取消這一筆繪製，改成移動畫面
+          if (painting || rectDrag) { painting = false; rectDrag = null; undo(); history.get(map.id)?.redo.pop(); }
+          pan = { at: local(e), x: cam.x, y: cam.y, id: e.pointerId };
+          return;
+        }
+      }
+      if (e.button === 1 || spaceDown) {
         pan = { at: local(e), x: cam.x, y: cam.y };
         return;
       }
@@ -277,6 +288,7 @@ export default {
     });
     cv.addEventListener('pointermove', (e) => {
       if (pan) {
+        if (pan.id != null && e.pointerId !== pan.id) return;
         const [x, y] = local(e);
         cam.x = pan.x - (x - pan.at[0]) / cam.scale; cam.y = pan.y - (y - pan.at[1]) / cam.scale;
         clampCam(map, cam, vw, vh); dirty = true;
@@ -294,8 +306,9 @@ export default {
       if (rectDrag) { rectDrag[1] = c; dirty = true; }
       else if (painting) { layerArr()[c[1] * map.w + c[0]] = paintValue(); dirty = true; }
     });
-    const up = () => {
-      if (pan) { pan = null; return; }
+    const up = (e) => {
+      touches.delete(e.pointerId);
+      if (pan) { if (!touches.size) pan = null; return; }
       if (rectDrag) {
         const [x0, y0, x1, y1] = rectBounds();
         const v = paintValue();
