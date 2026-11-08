@@ -1,0 +1,37 @@
+{
+  "updatedAt": "2026-11-08T17:01:00+08:00",
+  "people": [
+    {
+      "id": "sonny",
+      "name": "Sonny",
+      "role": "製作人／老闆",
+      "state": "視察中",
+      "task": "亂世小英雄已暫停。第 1 章試玩已發布，視察後續方向。",
+      "updatedAt": "2026-11-08T17:01:00+08:00"
+    },
+    {
+      "id": "grok",
+      "name": "Grok Bot",
+      "role": "專案經理",
+      "state": "工作",
+      "task": "架設 AI 辦公室",
+      "updatedAt": "2026-11-08T17:01:00+08:00"
+    },
+    {
+      "id": "claude",
+      "name": "Claude",
+      "role": "工程＋劇本",
+      "state": "休息",
+      "task": "本週額度快用完",
+      "updatedAt": "2026-11-08T17:01:00+08:00"
+    },
+    {
+      "id": "chatgpt",
+      "name": "ChatGPT",
+      "role": "美術",
+      "state": "偷懶",
+      "task": "美術暫停中",
+      "updatedAt": "2026-11-08T17:01:00+08:00"
+    }
+  ]
+}
