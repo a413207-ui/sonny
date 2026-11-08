@@ -1,0 +1,51 @@
+{
+  "title": "本週進度",
+  "week": "2026-11-02 – 2026-11-08",
+  "items": [
+    {
+      "project": "AI 辦公室",
+      "owner": "Grok Bot",
+      "status": "進行中",
+      "done": [
+        "面板可以收合",
+        "偷懶時螢幕播小遊戲「小跳」",
+        "檔案櫃、想法筆記本與派工作",
+        "視角修正，以及搖桿操作自己"
+      ],
+      "next": "待確認",
+      "percent": 70
+    },
+    {
+      "project": "亂世小英雄",
+      "owner": "Claude",
+      "status": "暫停",
+      "done": ["第 1 章可試玩版已上線，Sonny 已暫停後續"],
+      "next": "暫停中，先不做",
+      "percent": 100
+    },
+    {
+      "project": "台灣模擬",
+      "owner": "Claude",
+      "status": "閒置",
+      "done": [],
+      "next": "本週沒有新進度",
+      "percent": 0
+    },
+    {
+      "project": "果凍大陸",
+      "owner": "Claude",
+      "status": "閒置",
+      "done": [],
+      "next": "本週沒有新進度",
+      "percent": 0
+    },
+    {
+      "project": "戰棋 RPG 編輯器",
+      "owner": "Claude",
+      "status": "閒置",
+      "done": [],
+      "next": "本週沒有新進度",
+      "percent": 0
+    }
+  ]
+}
