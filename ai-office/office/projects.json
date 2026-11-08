@@ -1,0 +1,60 @@
+{
+  "updatedAt": "2026-11-08",
+  "projects": [
+    {
+      "id": "luanshi-hero",
+      "name": "亂世小英雄",
+      "folder": "projects/luanshi-hero",
+      "status": "暫停",
+      "summary": "Q 版三國回合制 RPG。第 1 章可從標題玩到章節完成。",
+      "stoppedAt": "第 1 章可試玩版已完成並上線（PR #27，repo 最後改動 2026-11-08）。Sonny 於 2026-11-08 暫停後續。",
+      "next": "暫停中先不做：3 張補的 NPC 立繪、第 2–11 章劇本修改、後續 GPT 圖。",
+      "updatedAt": "2026-11-08",
+      "playUrl": "https://a413207-ui.github.io/sonny/luanshi-hero/"
+    },
+    {
+      "id": "taiwan-city-builder",
+      "name": "台灣模擬",
+      "folder": "projects/taiwan-city-builder",
+      "status": "閒置",
+      "summary": "在台灣地形上，從帆船時代蓋到現代的城市建造遊戲。第四版已有通勤。",
+      "stoppedAt": "第四版 T-TW-04（通勤、建築裡的住戶與公司、存檔 v4）已在 main。repo 最後改動 2026-11-04。",
+      "next": "還沒做：污染與交通的微調、稅率微調、多港口、機場、雲端存檔。",
+      "updatedAt": "2026-11-04",
+      "playUrl": "https://a413207-ui.github.io/sonny/taiwan-sim/"
+    },
+    {
+      "id": "jelly-survivors",
+      "name": "果凍大陸",
+      "folder": "projects/jelly-survivors",
+      "status": "閒置",
+      "summary": "在果凍大陸打怪、升級、轉職的倖存者遊戲。",
+      "stoppedAt": "技能特效 G-VFX-01 已合併。包圍突襲 G-WAVE-01 也已合併（PR #8）。repo 最後改動 2026-11-04。",
+      "next": "待確認",
+      "updatedAt": "2026-11-04",
+      "playUrl": "https://a413207-ui.github.io/sonny/jelly-survivors/"
+    },
+    {
+      "id": "tactics-rpg",
+      "name": "戰棋 RPG 編輯器",
+      "folder": "projects/tactics-rpg",
+      "status": "閒置",
+      "summary": "在瀏覽器裡做俯視方格戰棋，可匯出成單一 HTML。",
+      "stoppedAt": "編輯器 T-EDITOR-01 已上線。其後同日合併角色動作 T-ANIM-01（PR #11）。repo 最後改動 2026-11-04，沒有更新的提交。",
+      "next": "設計文件下一項是 T-EDITOR-02（技能／計謀、道具、裝備）。目前沒有人在做。",
+      "updatedAt": "2026-11-04",
+      "playUrl": "https://a413207-ui.github.io/sonny/tactics-rpg/"
+    },
+    {
+      "id": "ai-office",
+      "name": "AI 辦公室",
+      "folder": "projects/ai-office",
+      "status": "進行中",
+      "summary": "即時 3D 辦公室，看 Sonny、Grok、Claude、ChatGPT 現在在做什麼。",
+      "stoppedAt": "已可看四人狀態、面板可收合，偷懶時螢幕會播小遊戲「小跳」。repo 最後改動 2026-11-08。",
+      "next": "待確認",
+      "updatedAt": "2026-11-08",
+      "playUrl": "https://a413207-ui.github.io/sonny/ai-office/"
+    }
+  ]
+}
