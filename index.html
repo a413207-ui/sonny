@@ -2,136 +2,212 @@
 <html lang="zh-Hant">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<meta name="description" content="Sonny Studio — AI 做的小遊戲，點開就能玩。">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <title>Sonny Studio</title>
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,800&family=Noto+Sans+TC:wght@400;500;700;900&family=JetBrains+Mono:wght@500&display=swap">
+<meta name="description" content="Sonny Studio — 把點子變成好玩的日常。AI 一起做的小遊戲，點開就能玩。">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22%3E%3Ctext y=%22.9em%22 font-size=%2290%22%3E🎣%3C/text%3E%3C/svg%3E">
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Serif+TC:wght@600;700;900&family=Noto+Sans+TC:wght@400;500;700&display=swap">
 <style>
-/* Layout: one narrow column — intro on top, then a game grid that stacks to one column on phones */
+/* 版型：像一本攤開的手作筆記本——米色紙面、細框卡片、墨綠與磚紅點綴；電腦三欄，手機一欄 */
 :root{
-  --bg:#F5F6F4; --surface:#FFFFFF; --ink:#16191C; --muted:#5E6670; --line:#DDE1E3;
-  --accent:#2F4BD8; --accent-soft:#E6EAFB;
-  --f-display:"Bricolage Grotesque","Noto Sans TC",system-ui,sans-serif;
-  --f-body:"Noto Sans TC","PingFang TC","Microsoft JhengHei",system-ui,sans-serif;
-  --f-mono:"JetBrains Mono",ui-monospace,Menlo,monospace;
+  --paper:#f6f1e6; --card:#fbf8f1; --ink:#2e2a24; --muted:#6b6257; --line:#dcd2bf; --line2:#e9e1d1;
+  --green:#3d5a3a; --green-soft:#e7eedf; --rust:#c2582f; --rust-dark:#a6461f; --gold:#e8c46a;
+  --serif:"Noto Serif TC","Songti TC","PMingLiU",serif; --sans:"Noto Sans TC",system-ui,"PingFang TC","Microsoft JhengHei",sans-serif;
 }
-@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){
-  --bg:#121417; --surface:#1A1D21; --ink:#ECEEF0; --muted:#98A0A9; --line:#2A2F35;
-  --accent:#7D92FF; --accent-soft:#232A4A; color-scheme:dark}}
-:root[data-theme="dark"]{
-  --bg:#121417; --surface:#1A1D21; --ink:#ECEEF0; --muted:#98A0A9; --line:#2A2F35;
-  --accent:#7D92FF; --accent-soft:#232A4A; color-scheme:dark}
 *{box-sizing:border-box}
-body{margin:0}
-[hidden]{display:none!important}
-img{max-width:100%}
-body{background:var(--bg);color:var(--ink);font-family:var(--f-body);font-size:16px;line-height:1.7}
-.wrap{max-width:1040px;margin:0 auto;padding-block:28px 64px;
-  padding-left:max(20px,env(safe-area-inset-left,0px));padding-right:max(20px,env(safe-area-inset-right,0px))}
-header.top{display:flex;justify-content:space-between;align-items:center;gap:16px}
-.logo{font-family:var(--f-display);font-weight:800;font-size:22px;letter-spacing:-.02em;display:flex;align-items:center;gap:8px}
-.logo i{width:10px;height:10px;border-radius:50%;background:var(--accent);display:inline-block}
-nav.top{display:flex;gap:20px;font-size:14px;color:var(--muted)}
-nav.top a{color:inherit;text-decoration:none}
-nav.top a:hover{color:var(--ink)}
-
-.intro{padding-block:72px 56px;border-bottom:1px solid var(--line);display:grid;gap:20px}
-.eyebrow{font-family:var(--f-mono);font-size:12px;letter-spacing:.14em;color:var(--accent);text-transform:uppercase}
-h1{font-family:var(--f-display);font-weight:800;font-size:clamp(40px,8vw,76px);line-height:1.02;letter-spacing:-.035em;margin:0;text-wrap:balance}
-h1 .tc{font-family:var(--f-body);font-weight:900;font-size:.62em;letter-spacing:0;display:block;margin-top:14px}
-.intro p{max-width:34em;color:var(--muted);margin:0;font-size:17px}
-.stats{display:flex;gap:32px;flex-wrap:wrap;margin-top:8px}
-.stats div{display:grid}
-.stats b{font-family:var(--f-display);font-size:28px;font-variant-numeric:tabular-nums}
-.stats span{font-size:13px;color:var(--muted)}
-
-.sec-head{display:flex;justify-content:space-between;align-items:baseline;gap:12px;padding-block:44px 22px;flex-wrap:wrap}
-h2{font-size:24px;margin:0;font-weight:700}
-.filters{display:flex;gap:6px;flex-wrap:wrap}
-.filters button{font:inherit;font-size:13px;border:1px solid var(--line);background:transparent;color:var(--muted);padding:5px 14px;border-radius:99px;cursor:pointer}
-.filters button[aria-pressed="true"]{background:var(--ink);color:var(--bg);border-color:var(--ink)}
-.filters button:focus-visible,.card:focus-visible{outline:2px solid var(--accent);outline-offset:3px}
-
-.grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:22px}
-.card{background:var(--surface);border:1px solid var(--line);border-radius:14px;overflow:hidden;display:flex;flex-direction:column;text-decoration:none;color:inherit;transition:transform .2s,border-color .2s}
-.card:hover{transform:translateY(-3px);border-color:var(--accent)}
-.thumb{aspect-ratio:16/10;max-width:100%;position:relative;overflow:hidden;background:var(--accent-soft)}
-.thumb svg{width:100%;height:100%;display:block}
-.thumb img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;image-rendering:pixelated}
-.body{padding:18px 20px 20px;display:grid;gap:8px;flex:1;align-content:start}
-.meta{display:flex;justify-content:space-between;align-items:center;font-family:var(--f-mono);font-size:11px;letter-spacing:.08em;color:var(--muted);text-transform:uppercase}
-.chip{font-family:var(--f-body);letter-spacing:0;text-transform:none;font-size:12px;padding:2px 10px;border-radius:99px;background:var(--accent-soft);color:var(--accent)}
-.chip.soon{background:transparent;border:1px dashed var(--line);color:var(--muted)}
-.card h3{margin:0;font-size:19px;font-weight:700}
-.card p{margin:0;font-size:14px;color:var(--muted)}
-.card .gc-views{font-size:12px;color:var(--muted);font-variant-numeric:tabular-nums}
-footer .gc-views{font-variant-numeric:tabular-nums}
-.card.empty{grid-column:1 / -1;border-style:dashed;background:transparent;justify-content:center;align-items:center;min-height:0;padding:28px 20px;text-align:center;color:var(--muted)}
-.card.empty:hover{transform:none;border-color:var(--line)}
-
-footer{margin-top:64px;padding-top:24px;border-top:1px solid var(--line);font-size:13px;color:var(--muted);display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap}
-@media (max-width:720px){.grid{grid-template-columns:1fr}}
-@media (max-width:520px){nav.top{display:none}.intro{padding-block:48px 40px}footer .gc-views{flex-basis:100%}}
-@media (prefers-reduced-motion:reduce){.card{transition:none}.card:hover{transform:none}}
+html{scroll-behavior:smooth}
+body{margin:0;background:var(--paper);color:var(--ink);font-family:var(--sans);line-height:1.6;
+  background-image:radial-gradient(rgba(120,100,70,.06) 1px,transparent 1px);background-size:4px 4px}
+a{color:inherit}
+img{max-width:100%;display:block}
+.page{max-width:1240px;margin:0 auto;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
+/* 頂欄 */
+header{border-bottom:2px solid var(--ink);display:flex;align-items:center;gap:16px;padding-block:14px 12px;flex-wrap:wrap}
+.brand{display:flex;align-items:center;gap:12px;text-decoration:none}
+.brand .s{font-family:var(--serif);font-weight:900;font-style:italic;font-size:34px;color:var(--green);line-height:1;position:relative}
+.brand .s::after{content:"✦";position:absolute;font-size:13px;color:var(--rust);top:-4px;right:-10px;font-style:normal}
+.brand .bar{width:1px;height:26px;background:var(--line)}
+.brand b{font-family:var(--serif);font-weight:900;font-size:22px;letter-spacing:.02em}
+header nav{margin-left:auto;display:flex;align-items:center;gap:6px;flex-wrap:wrap}
+header nav a{text-decoration:none;font-weight:700;font-size:15px;padding:6px 12px;border-radius:6px}
+header nav a:hover{background:var(--line2)}
+.btn{display:inline-flex;align-items:center;gap:6px;border:0;cursor:pointer;text-decoration:none;font:700 14px var(--sans);
+  background:var(--rust);color:#fff;padding:7px 14px;border-radius:7px;box-shadow:0 2px 0 var(--rust-dark)}
+.btn:hover{background:var(--rust-dark)}
+.btn:focus-visible,a:focus-visible,button:focus-visible{outline:3px solid var(--gold);outline-offset:2px}
+/* 三欄 */
+.grid{display:flex;flex-direction:column;gap:18px;padding-block:20px 24px}
+.left,.right{display:contents}
+.grid>*,.left>*,.right>*{min-width:0}
+/* 手機：主打和遊戲先，其他往下排 */
+#about{order:1}.main{order:2}#news{order:3}.notes{order:4}#feedback{order:5}.catbox{order:6}.linkbox{order:7}.deco{order:8}
+@media (min-width:760px){.grid{display:grid;grid-template-columns:240px 1fr;align-items:start}
+  .left{display:flex;flex-direction:column;gap:18px;grid-column:1;grid-row:1 / span 2}.main{grid-column:2;grid-row:1}
+  .right{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:18px;grid-column:2;grid-row:2}}
+@media (min-width:1080px){.grid{grid-template-columns:250px 1fr 250px}.left{grid-row:1}.right{display:flex;flex-direction:column;grid-column:3;grid-row:1}}
+.box{background:var(--card);border:1.5px solid var(--line);border-radius:10px;padding:14px;box-shadow:0 1px 0 rgba(0,0,0,.03)}
+.box h3{font-family:var(--serif);font-weight:900;font-size:19px;margin:0 0 10px;display:flex;align-items:center;gap:8px;padding-bottom:8px;border-bottom:1px solid var(--line2)}
+.box h3 .ic{color:var(--green)}
+.sec-title{font-family:var(--serif);font-weight:900;font-size:22px;margin:0;padding-left:12px;border-left:5px solid var(--rust);line-height:1.2;text-wrap:balance}
+.sec-sub{color:var(--muted);font-size:14px;margin:4px 0 12px 17px}
+/* 個人卡 */
+.profile{display:flex;gap:12px;align-items:center}
+.profile img{width:88px;height:96px;object-fit:cover;border-radius:8px;border:1.5px solid var(--line);flex:none}
+.profile b{font-family:var(--serif);font-size:24px;display:block;line-height:1.2}
+.profile p{margin:2px 0 8px;font-size:13px;color:var(--muted)}
+.pill{display:inline-block;white-space:nowrap;font-size:11px;font-weight:700;background:var(--green-soft);color:var(--green);padding:2px 9px;border-radius:999px}
+/* 分類 */
+.cats{display:grid;gap:6px}
+.cats button{all:unset;cursor:pointer;display:flex;align-items:center;gap:10px;padding:8px 10px;border-radius:7px;border:1px solid var(--line2);font-weight:700;font-size:14px}
+.cats button .n{margin-left:auto;font-family:var(--serif);font-size:13px;color:var(--muted);font-variant-numeric:tabular-nums}
+.cats button[aria-pressed="true"]{background:var(--green);color:#fff;border-color:var(--green)}
+.cats button[aria-pressed="true"] .n{color:#e7eedf}
+.cats button:not([aria-pressed="true"]):hover{background:var(--line2)}
+/* 連結 */
+.links{display:grid;gap:2px;margin:0;padding:0;list-style:none}
+.links li{display:flex;align-items:center;gap:10px;padding:7px 4px;font-size:14px;font-weight:500;border-bottom:1px dashed var(--line2)}
+.links li:last-child{border-bottom:0}
+.links small{margin-left:auto;color:var(--muted);font-size:12px}
+.deco{text-align:center}
+.deco img{margin:0 auto;width:100%;max-width:200px}
+.deco p{font-family:var(--serif);font-weight:700;color:var(--green);margin:6px 0 0;background:#efe5cf;display:inline-block;padding:3px 14px;border-radius:6px;transform:rotate(-2deg)}
+/* 主打 */
+.hero{position:relative;border-radius:12px;overflow:hidden;border:1.5px solid var(--line);min-height:250px;display:flex;align-items:flex-end;
+  background:#17576b}
+.hero .pic{position:absolute;top:0;right:0;height:100%}
+.hero .pic img{height:100%;width:auto;max-width:none}
+.hero .pic::before{content:"";position:absolute;inset:0 auto 0 0;width:45%;background:linear-gradient(90deg,#17576b,rgba(23,87,107,0))}
+.hero .txt{position:relative;padding:22px 24px;color:#fff;max-width:420px}
+.hero .tag{display:inline-flex;gap:4px;align-items:center;background:#fbf0d5;color:var(--rust-dark);font-size:12px;font-weight:700;padding:3px 10px;border-radius:999px}
+.hero h2{font-family:var(--serif);font-weight:900;font-size:clamp(28px,4vw,38px);margin:8px 0 2px;letter-spacing:.04em;text-shadow:0 2px 0 rgba(0,0,0,.25)}
+.hero p{margin:0 0 14px;font-size:15px;opacity:.95}
+.hero .btn{font-size:15px;padding:9px 18px}
+/* 遊戲卡片 */
+.games{display:grid;gap:14px;grid-template-columns:repeat(auto-fill,minmax(250px,1fr));margin-top:4px}
+.game{background:var(--card);border:1.5px solid var(--line);border-radius:10px;padding:8px;display:flex;flex-direction:column}
+.game[hidden]{display:none}
+.game .thumb{border-radius:6px;overflow:hidden;aspect-ratio:300/127;background:var(--line2)}
+.game .thumb img{width:100%;height:100%;object-fit:cover;transition:transform .35s}
+.game:hover .thumb img{transform:scale(1.04)}
+.game .row{display:flex;align-items:center;gap:6px;margin:10px 6px 4px;flex-wrap:wrap}
+.game h4{font-family:var(--serif);font-weight:900;font-size:20px;margin:0 auto 0 0}
+.chip{font-size:12px;font-weight:700;background:var(--line2);color:var(--muted);padding:1px 9px;border-radius:999px}
+.game p{font-size:14px;color:var(--muted);margin:0 6px 10px;flex:1}
+.game .foot{display:flex;align-items:center;gap:10px;margin:0 6px 4px}
+.game .foot .gc-views{font-size:12px;color:var(--muted)}
+.next{margin-top:14px;border:1.5px dashed var(--line);border-radius:10px;text-align:center;padding:9px;color:var(--muted);font-size:14px}
+/* 右欄 */
+.news{margin:0;padding:0;list-style:none;display:grid;gap:6px}
+.news li{border:1px solid var(--line2);border-radius:7px;padding:7px 10px;font-size:14px;display:flex;gap:8px;align-items:baseline}
+.news li::before{content:"";flex:none;width:7px;height:7px;border-radius:50%;background:var(--rust);transform:translateY(-1px)}
+.news time{display:block;font-size:12px;color:var(--muted)}
+.notes{text-align:center}
+.notes img{width:100%;max-width:190px;margin:0 auto}
+.notes p{margin:8px 0 0;font-size:14px}
+.feedback{background:var(--green-soft);border-color:#cfdcc3;text-align:center}
+.feedback h3{justify-content:center;border-bottom:0;padding-bottom:0;margin-bottom:4px}
+.feedback p{margin:0 0 10px;font-size:14px;color:var(--muted)}
+.feedback .btn{width:100%;justify-content:center;font-size:15px;padding:9px}
+.feedback .btn[aria-disabled="true"]{background:#c9a493;box-shadow:none;cursor:default}
+.feedback small{display:block;margin-top:8px;color:var(--muted);font-size:12px}
+footer{border-top:2px solid var(--ink);display:flex;flex-wrap:wrap;gap:6px 14px;justify-content:space-between;padding-block:10px 24px;font-size:13px;color:var(--muted);font-family:var(--serif)}
+@media (max-width:759px){header nav a:not(.btn){padding:6px 8px;font-size:14px}.brand b{font-size:19px}.hero{min-height:230px}.hero .pic{opacity:.55}.hero .txt{text-shadow:0 1px 3px rgba(0,0,0,.4)}}
+@media (prefers-reduced-motion:reduce){*{transition:none!important;scroll-behavior:auto!important}}
 </style>
 </head>
 <body>
+<div class="page">
+<header>
+  <a class="brand" href="./" aria-label="Sonny Studio 首頁"><span class="s">S</span><span class="bar"></span><b>Sonny STUDIO</b></a>
+  <nav aria-label="主選單"><a href="#games">遊戲作品</a><a href="#news">最新消息</a><a href="#about">關於我</a><a class="btn" href="#feedback">💬 給我建議</a></nav>
+</header>
 
-<div class="wrap">
-  <header class="top">
-    <div class="logo"><i></i>Sonny</div>
-    <nav class="top"><a href="#games">遊戲</a><a href="#about">關於</a></nav>
-  </header>
+<div class="grid">
+  <aside class="left">
+  <section class="box" id="about">
+    <div class="profile"><img src="assets/home/avatar.webp" width="188" height="208" alt="Sonny 的頭像插圖">
+      <div><b>Sonny</b><p>把點子變成好玩的日常。</p><span class="pill">獨立遊戲 × AI 創作</span></div></div>
+  </section>
 
-  <section class="intro" id="about">
-    <div class="eyebrow">Sonny Studio · 獨立遊戲</div>
-    <h1>Small games,<br>made by AI.<span class="tc">AI 做的小遊戲，點開就能玩。</span></h1>
-    <p>嗨，我是 Sonny。這裡收藏的遊戲都是 AI 做的，每一款都是我的一個想法，交給 AI 慢慢長成的樣子。不用下載、不用註冊，打開瀏覽器就能玩。</p>
-    <div class="stats">
-      <div><b>2</b><span>已上線作品</span></div>
-      <div><b>0 元</b><span>免費遊玩</span></div>
-      <div><b>手機 / 電腦</b><span>都能玩</span></div>
+  <section class="box catbox">
+    <h3><span class="ic">🎮</span>遊戲分類</h3>
+    <div class="cats" role="group" aria-label="依分類篩選遊戲">
+      <button type="button" data-cat="all" aria-pressed="true">▶ 全部遊戲<span class="n">02</span></button>
+      <button type="button" data-cat="casual" aria-pressed="false">🎣 休閒・釣魚<span class="n">01</span></button>
+      <button type="button" data-cat="strategy" aria-pressed="false">♜ 策略・歷史<span class="n">01</span></button>
     </div>
   </section>
 
-  <div class="sec-head" id="games">
-    <h2>遊戲作品</h2>
-  </div>
+  <section class="box linkbox">
+    <h3><span class="ic">🔗</span>我的連結</h3>
+    <ul class="links"><li>🖼️ 作品集<small>即將加入</small></li><li>👥 社群連結<small>即將加入</small></li></ul>
+  </section>
 
-  <div class="grid">
-    <a class="card" href="fishing/">
-      <div class="thumb">
-        <img src="assets/thumb-fishing.webp" width="960" height="600" alt="深海暴雨中，黃色釣竿從船頭斜拋向起伏的海面">
-      </div>
-      <div class="body">
-        <div class="meta"><span>休閒 · 釣魚</span><span class="chip">點我開始玩</span></div>
-        <h3>釣魚遊戲</h3>
-        <p>海灣釣魚日記：開船到港灣、深海、珊瑚礁、湖泊和溪谷，釣魚、賣魚、升級釣竿與船，收集整本魚類圖鑑。</p>
-        <span class="gc-views" data-gc="href" data-gc-href="fishing/" hidden></span>
-      </div>
-    </a>
+  <div class="deco" aria-hidden="true"><img src="assets/home/deco.webp" width="500" height="296" alt=""><p>小小工作室，大大想像。</p></div>
+  </aside>
 
-    <a class="card" href="sgz5/">
-      <div class="thumb">
-        <img src="assets/thumb-sgz5.webp" width="960" height="600" alt="三國鼎立標題畫面：羊皮紙地圖上的直書題名、亂世群雄，以及右側的選單">
-      </div>
-      <div class="body">
-        <div class="meta"><span>策略 · 歷史</span><span class="chip">點我開始玩</span></div>
-        <h3>三國鼎立</h3>
-        <p>從黃巾之亂到星落五丈原，8 個史實劇本、400 位武將。內政、外交、計謀、六角格戰場，還有每年的天下武鬥大會。</p>
-        <span class="gc-views" data-gc="href" data-gc-href="sgz5/" hidden></span>
-      </div>
-    </a>
+  <main class="main">
+    <h2 class="sec-title">今天，想玩點什麼？</h2>
+    <p class="sec-sub">挑一款遊戲，展開你的小冒險。</p>
+    <section class="hero" aria-label="本日主打"><div class="pic" aria-hidden="true"><img src="assets/home/hero-fishing.webp" width="417" height="276" alt=""></div>
+      <div class="txt"><span class="tag">★ 本日主打</span><h2>海灣釣魚日記</h2><p>放慢腳步，等一條魚上鉤。</p><a class="btn" href="fishing/">開始釣魚 →</a></div>
+    </section>
 
-    <div class="card empty">
-      <div><strong style="display:block;color:var(--ink);font-size:16px">下一款，敬請期待</strong><span style="font-size:14px">新遊戲完成後會放在這裡</span></div>
+    <h2 class="sec-title" id="games" style="margin-top:22px">遊戲作品</h2>
+    <p class="sec-sub">點下去就能玩，手機電腦都可以。</p>
+    <div class="games">
+      <article class="game" data-cat="casual">
+        <a class="thumb" href="fishing/"><img src="assets/home/fishcard.webp" width="650" height="274" alt="海灣釣魚日記：在碼頭釣魚的小孩" loading="lazy"></a>
+        <div class="row"><h4>海灣釣魚日記</h4><span class="chip">休閒</span><span class="chip">收集</span></div>
+        <p>一款輕鬆自在的釣魚小遊戲。探索海灣、收集魚種，享受屬於自己的悠閒時光。</p>
+        <div class="foot"><a class="btn" href="fishing/">開始玩 ↗</a><span class="gc-views" data-gc="href" data-gc-href="fishing/" hidden></span></div>
+      </article>
+      <article class="game" data-cat="strategy">
+        <a class="thumb" href="sgz5/"><img src="assets/home/sgzcard.webp" width="650" height="274" alt="三國鼎立：魏蜀吳的武將與地圖" loading="lazy"></a>
+        <div class="row"><h4>三國鼎立</h4><span class="chip">策略</span><span class="chip">歷史</span></div>
+        <p>以三國時代為舞台的策略遊戲。招募名將、經營城池，在亂世中寫下屬於你的篇章。</p>
+        <div class="foot"><a class="btn" href="sgz5/">開始玩 ↗</a><span class="gc-views" data-gc="href" data-gc-href="sgz5/" hidden></span></div>
+      </article>
     </div>
-  </div>
+    <div class="next">🌱 下一個點子，正在發芽。</div>
+  </main>
 
-  <footer><span>© 2026 Sonny Studio</span><span class="gc-views" data-gc="total" hidden></span><span>Made with ❤ and a lot of ideas</span></footer>
+  <aside class="right">
+
+  <section class="box" id="news">
+    <h3><span class="ic" style="color:var(--rust)">📣</span>最新公告</h3>
+    <ul class="news">
+      <li><span>網站換上新版首頁<time datetime="2026-11-10">2026-11-10</time></span></li>
+      <li><span>海灣釣魚日記：大瀑布山區製作中<time datetime="2026-11-08">2026-11-08</time></span></li>
+    </ul>
+  </section>
+
+  <section class="box notes">
+    <h3><span class="ic">📒</span>開發筆記</h3>
+    <img src="assets/home/note.webp" width="376" height="242" alt="" aria-hidden="true">
+    <p>新的冒險，慢慢製作中。</p>
+  </section>
+
+  <section class="box feedback" id="feedback">
+    <h3>💬 一起讓遊戲更好玩</h3>
+    <p>遇到問題，或有新點子？</p>
+    <a class="btn" role="link" aria-disabled="true">回報問題／給我建議</a>
+    <small>回饋功能準備中，很快開放</small>
+  </section>
+  </aside>
 </div>
 
-
+<footer><span>© 2026 Sonny Studio　｜　Made with curiosity &amp; AI.</span><span class="gc-views" data-gc="total" hidden></span></footer>
+</div>
+<script>
+// 遊戲分類篩選
+document.querySelectorAll('.cats button').forEach(b => b.addEventListener('click', () => {
+  const cat = b.dataset.cat;
+  document.querySelectorAll('.cats button').forEach(x => x.setAttribute('aria-pressed', String(x === b)));
+  document.querySelectorAll('.game').forEach(g => { g.hidden = cat !== 'all' && g.dataset.cat !== cat; });
+}));
+</script>
 <script src="view-count.js"></script>
 <script data-goatcounter="https://sonnystudio.goatcounter.com/count"
         async src="//gc.zgo.at/count.js"></script>
