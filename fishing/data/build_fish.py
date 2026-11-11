@@ -238,6 +238,30 @@ CRATER_FISH = [
     ("crater_lord", "火口湖之主", "L", "crater", "any", (80.0, 300.0), (250, 500), "myth", "#1a6a5a", "#ffd040", "守護火山山頂的巨魚，火山噴發就是牠在打呵欠。"),
 ]
 
+# ── 🏞️ 大瀑布山區（2026-11-08）：從柳河機場搭飛機去的新地圖 ──
+FALLS_FISH = [
+    ("coco_damsel", "椰影雀鯛", "C", "fbeach", "any", (0.02, 0.1), (5, 10), "flat", "#3ab8e0", "#ffe060", "在椰子樹影下的淺灘成群游動。"),
+    ("sand_whiting", "白沙鱚", "C", "fbeach", "any", (0.05, 0.3), (12, 25), "slim", "#e8dcc0", "#ffffff", "身體跟沙灘一樣白，一緊張就鑽進沙裡。"),
+    ("surf_parrot", "浪花鸚哥魚", "U", "fbeach", "any", (1.0, 5.0), (30, 60), "round", "#3ac8a0", "#ff8ac0", "用嘴喀滋喀滋啃珊瑚，沙灘的白沙有一半是牠做的。"),
+    ("beach_ray", "沙灘魟", "R", "fbeach", "dawn,day,dusk", (3.0, 20.0), (50, 120), "flat", "#c8a878", "#5a4a3a", "退潮時像一片沙子貼在海底，踩到會被嚇一跳。"),
+    ("sunset_sail", "夕陽旗魚", "E", "fbeach", "dusk,day", (30.0, 120.0), (150, 300), "long", "#2a5aa0", "#ff9a4a", "背鰭在夕陽下會變成橘紅色。"),
+    ("stone_carp", "溪石苦花", "C", "fstream", "any", (0.05, 0.4), (10, 25), "slim", "#6a7a6a", "#c8d0a0", "用嘴刮石頭上的青苔，留下一道道白痕。"),
+    ("falls_minnow", "溪哥仔", "C", "fstream", "any", (0.02, 0.1), (6, 14), "slim", "#8ab0c0", "#ff7a5a", "繁殖季身上會出現紅藍色的婚姻色。"),
+    ("moss_goby", "青苔鰕虎", "U", "fstream", "any", (0.05, 0.2), (8, 15), "slim", "#5a8a3a", "#c8ff8a", "吸盤緊緊吸在激流裡的石頭上。"),
+    ("sakura_trout", "櫻花鱒", "R", "fstream", "dawn,day,dusk", (0.5, 2.0), (25, 45), "slim", "#7a8aa0", "#ffb0c8", "身上的斑點像落在溪面的櫻花瓣。"),
+    ("rapid_pike", "激流狼魚", "E", "fstream", "any", (5.0, 20.0), (80, 140), "long", "#3a4a3a", "#e0f0ff", "逆著激流往上衝，力氣大得嚇人。"),
+    ("mist_minnow", "霧珠魚", "C", "fpool", "any", (0.01, 0.05), (4, 8), "slim", "#c8e8f0", "#ffffff", "瀑布的水霧裡，閃著一顆顆小光點。"),
+    ("pool_catfish", "瀑潭鯰", "U", "fpool", "any", (2.0, 10.0), (40, 90), "slim", "#4a5a5a", "#a8c0c0", "躲在瀑布底下的深潭，鬍鬚可以感覺水流。"),
+    ("rainbow_trout2", "彩虹潭鱒", "R", "fpool", "dawn,day", (2.0, 8.0), (40, 75), "slim", "#6a9a7a", "#ff8ad8", "晴天早上瀑布出現彩虹時，牠身上的彩虹最亮。"),
+    ("gate_carp", "躍門金鯉", "E", "fpool", "any", (8.0, 25.0), (70, 120), "round", "#e0a020", "#fff0a0", "每天練習往瀑布上跳，總有一天要跳過去。"),
+    ("falls_dragon", "瀑布龍鯉", "L", "fpool", "any", (150.0, 500.0), (300, 600), "myth", "#c84a2a", "#ffd040", "傳說鯉魚跳過大瀑布就會變成龍，牠只差一片鱗。"),
+    ("cloud_smelt", "雲影銀魚", "C", "flake", "any", (0.01, 0.05), (5, 10), "slim", "#d8e8f8", "#8ac8ff", "湖面倒映著雲，牠就在雲影裡游。"),
+    ("alpine_trout", "高山鱒", "U", "flake", "any", (0.5, 3.0), (25, 50), "slim", "#5a7a9a", "#e0f0ff", "只住在又冷又清的高山湖。"),
+    ("star_char", "星空紅點鮭", "R", "flake", "dusk,night,dawn", (1.0, 4.0), (30, 55), "slim", "#2a3a5a", "#ffe880", "身上的斑點像星星，晚上才浮到湖面。"),
+    ("mirror_carp", "天池鏡鯉", "E", "flake", "any", (10.0, 30.0), (70, 110), "round", "#c8d8e8", "#ffffff", "鱗片像鏡子，從湖邊看下去只看得到天空。"),
+    ("sky_lord", "天池之主", "L", "flake", "any", (100.0, 400.0), (250, 500), "myth", "#3a6a9a", "#c0f0ff", "守護山頂天池的巨魚，雲是牠吐出來的泡泡。"),
+]
+
 WEATHER_FISH = [
     ("kelp_drifter", "漂流藻魚", "C", "harbor,reef", "any", (0.05, 0.2), (6, 14), "flat", "#8a8a3a", "#d8d870", "躲在漂流海藻下面，跟著浪一起漂來。", "rain,storm,waves,typhoon"),
     ("rain_ayu", "雨香魚", "U", "river", "any", (0.1, 0.4), (15, 30), "slim", "#7a9aa8", "#a0e0ff", "下雨溪水變涼時成群出現。", "rain,storm,typhoon"),
@@ -250,7 +274,7 @@ WEATHER_FISH = [
 ]
 WEATHERS = ["sunny", "cloudy", "rain", "storm", "waves", "typhoon"]
 
-REGIONS = ["harbor", "lake", "river", "reef", "deep", "cold", "mangrove", "volcano", "wreck", "cave", "lagoon", "frozen", "bigriver", "upriver", "ucave", "ulake", "ucrystal", "ulava", "crater"]
+REGIONS = ["harbor", "lake", "river", "reef", "deep", "cold", "mangrove", "volcano", "wreck", "cave", "lagoon", "frozen", "bigriver", "upriver", "ucave", "ulake", "ucrystal", "ulava", "crater", "fbeach", "fstream", "fpool", "flake"]
 TIMES = ["dawn", "day", "dusk", "night"]
 
 
@@ -266,7 +290,7 @@ def shade(hex_color, k):
 
 def build():
     out = []
-    for row in FISH + WEATHER_FISH + UNDER_FISH + CRATER_FISH:
+    for row in FISH + WEATHER_FISH + UNDER_FISH + CRATER_FISH + FALLS_FISH:
         (fid, name, rar, region, times, w, l, shape, body, accent, desc) = row[:11]
         f = {
             "id": fid,
