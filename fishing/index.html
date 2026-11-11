@@ -1323,8 +1323,9 @@ function savePos() {   // 在地底時，地面位置記洞口，另外記地底
   return { x: b.door[0], y: b.door[1] + .2, bx: OVERW.boat.x, by: OVERW.boat.y, onBoat: false, world: 'under', ux: state.player.x, uy: state.player.y };
 }
 let resumeUnder = null, resumeFalls = null;
+let devTest = false;   // 🧪 測試模式：錢無限、完全不存檔（原本的紀錄不會被動到）
 function save() {
-  if (loadingOn) return;
+  if (loadingOn || devTest) return;
   try { prog.ufog = fogPack(uFog); prog.fog = fogPack(); prog.fogN = N; localStorage.setItem(SAVE_KEY, JSON.stringify({ v: 1, mapV: 3, coins: state.coins, bag: state.bag, prog, pos: savePos() })); } catch (e) {}
 }
 function load() {
@@ -3866,12 +3867,24 @@ function update(dt) {
   const an = areaName(); if (an !== lastArea) { if (lastArea) toast('📍 ' + an); lastArea = an; updateHud(); }
 }
 let hudTick = 0;
+// 隱藏的測試開關：3 秒內連點金幣 7 下。開啟後錢無限、不存檔；要回到原本的紀錄，重新整理頁面就好
+{ let taps = [];
+  document.getElementById('coinChip').style.pointerEvents = 'auto';
+  document.getElementById('coinChip').addEventListener('click', () => {
+    const now = Date.now(); taps = taps.filter(t => now - t < 3000); taps.push(now);
+    if (taps.length < 7) return; taps = [];
+    if (devTest) { toast('🧪 重新整理頁面就會回到原本的紀錄', 3000); return; }
+    save(); devTest = true; updateHud();   // 先把目前進度存好，之後就不再存
+    toast('🧪 測試模式：錢無限，這段期間完全不存檔。重新整理就回到原本的紀錄', 4200);
+  });
+}
 function updateHud() {
   phase = phaseNow();
   const d = new Date();
   document.getElementById('timeChip').textContent = `${PHASE[phase].name} ${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}・${WEATHER[weather].name}`;
   document.getElementById('areaChip').textContent = '📍 ' + areaName() + (FALLS ? `・⛰️${fallsAlt()}m` : '');
-  document.getElementById('coinChip').textContent = '🪙 ' + state.coins;
+  if (devTest) state.coins = Math.max(state.coins, 999999);
+  document.getElementById('coinChip').textContent = devTest ? '🪙 ∞ 🧪測試' : '🪙 ' + state.coins;
   document.getElementById('bagChip').textContent = '🐟 ' + state.bag.length;
   document.getElementById('baitChip').textContent = '🪱 ' + prog.bait;
   const a = contextA(), b = contextB();
