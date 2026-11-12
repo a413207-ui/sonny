@@ -153,9 +153,10 @@ footer{border-top:2px solid var(--ink);display:flex;flex-wrap:wrap;gap:6px 14px;
   <section class="box catbox">
     <h3><span class="ic">🎮</span>遊戲分類</h3>
     <div class="cats" role="group" aria-label="依分類篩選遊戲">
-      <button type="button" data-cat="all" aria-pressed="true">▶ 全部遊戲<span class="n">02</span></button>
+      <button type="button" data-cat="all" aria-pressed="true">▶ 全部遊戲<span class="n">03</span></button>
       <button type="button" data-cat="casual" aria-pressed="false">🎣 休閒・釣魚<span class="n">01</span></button>
       <button type="button" data-cat="strategy" aria-pressed="false">♜ 策略・歷史<span class="n">01</span></button>
+      <button type="button" data-cat="puzzle" aria-pressed="false">🧩 益智・解謎<span class="n">01</span></button>
     </div>
   </section>
 
@@ -189,6 +190,12 @@ footer{border-top:2px solid var(--ink);display:flex;flex-wrap:wrap;gap:6px 14px;
         <p>以三國時代為舞台的策略遊戲。招募名將、經營城池，在亂世中寫下屬於你的篇章。</p>
         <div class="foot"><a class="btn" href="sgz5/">開始玩 ↗</a><span class="gc-views" data-gc="href" data-gc-href="sgz5/" hidden></span></div>
       </article>
+      <article class="game" data-cat="puzzle">
+        <a class="thumb" href="cube/"><img src="assets/home/cubecard.webp" width="650" height="274" alt="指尖魔方：打亂的三階魔術方塊" loading="lazy"></a>
+        <div class="row"><h4>指尖魔方</h4><span class="chip">益智</span><span class="chip">3D</span></div>
+        <p>用手指直接轉的 3D 魔術方塊。有 2×2、3×3、4×4 三種，還附一步步的圖解教學。</p>
+        <div class="foot"><a class="btn" href="cube/">開始玩 ↗</a><span class="gc-views" data-gc="href" data-gc-href="cube/" hidden></span></div>
+      </article>
     </div>
     <div class="next">🌱 下一個點子，正在發芽。</div>
   </main>
@@ -198,6 +205,7 @@ footer{border-top:2px solid var(--ink);display:flex;flex-wrap:wrap;gap:6px 14px;
   <section class="box" id="news">
     <h3><span class="ic" style="color:var(--rust)">📣</span>最新公告</h3>
     <ul class="news">
+      <li><span>新遊戲上架：指尖魔方<time datetime="2026-11-12">2026-11-12</time></span></li>
       <li><span>網站換上新版首頁<time datetime="2026-11-10">2026-11-10</time></span></li>
       <li><span>海灣釣魚日記：大瀑布山區製作中<time datetime="2026-11-08">2026-11-08</time></span></li>
     </ul>
@@ -220,7 +228,7 @@ footer{border-top:2px solid var(--ink);display:flex;flex-wrap:wrap;gap:6px 14px;
       <div class="cm-row">
         <input id="cmName" maxlength="20" required placeholder="暱稱" aria-label="暱稱" autocomplete="nickname">
         <select id="cmGame" aria-label="留言對象">
-          <option>網站</option><option>海灣釣魚日記</option><option>三國鼎立</option>
+          <option>網站</option><option>海灣釣魚日記</option><option>三國鼎立</option><option>指尖魔方</option>
         </select>
       </div>
       <textarea id="cmText" rows="3" maxlength="500" required placeholder="遇到的問題，或想要的新功能…" aria-label="留言內容"></textarea>

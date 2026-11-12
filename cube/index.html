@@ -1,0 +1,325 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
+<title>指尖魔方</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@500;700;900&family=Chakra+Petch:wght@600;700&display=swap">
+<style>
+/* 版面：整個畫面是 3D 魔方，上方是計時與步數，下方是三個按鈕。單一深色主題，讓六個顏色最顯眼。 */
+:root{color-scheme:dark;--bg:#14171c;--bg2:#232a33;--fg:#eef1f5;--muted:#93a0b0;--line:#34404d;--accent:#ffd500;
+ --ui:"Noto Sans TC","PingFang TC","Microsoft JhengHei",system-ui,sans-serif;--num:"Chakra Petch","Noto Sans TC",monospace}
+*{box-sizing:border-box}
+[hidden]{display:none!important}
+html,body{height:100%;overflow:hidden;overscroll-behavior:none}
+body{margin:0;background:radial-gradient(120% 90% at 50% 35%,var(--bg2),var(--bg) 70%);color:var(--fg);font-family:var(--ui);-webkit-user-select:none;user-select:none;-webkit-tap-highlight-color:transparent}
+button{font:inherit;color:inherit;border:none;background:none;cursor:pointer}
+button:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+button:disabled{opacity:.4;cursor:default}
+#gl{position:fixed;inset:0;width:100%;height:100%;display:block;touch-action:none}
+.top{position:fixed;left:0;right:0;top:0;display:flex;justify-content:center;gap:10px;pointer-events:none;
+ padding:calc(12px + env(safe-area-inset-top,0px)) max(16px,env(safe-area-inset-right,0px)) 0 max(16px,env(safe-area-inset-left,0px))}
+.stat{background:rgba(20,23,28,.72);border:1px solid var(--line);border-radius:14px;padding:5px 16px;text-align:center;min-width:104px}
+.stat small{display:block;font-size:11px;color:var(--muted);font-weight:700;letter-spacing:.08em}
+.stat b{font-family:var(--num);font-size:24px;font-variant-numeric:tabular-nums;line-height:1.1}
+.stat.best b{font-size:17px;line-height:1.55;color:var(--accent)}
+.bot{position:fixed;left:0;right:0;bottom:0;display:flex;flex-direction:column;align-items:center;gap:8px;pointer-events:none;
+ padding:0 max(16px,env(safe-area-inset-right,0px)) calc(14px + env(safe-area-inset-bottom,0px)) max(16px,env(safe-area-inset-left,0px))}
+.hint{font-size:12.5px;color:var(--muted);text-align:center}
+.btns{display:flex;gap:8px;pointer-events:auto}
+.btns button{background:rgba(35,42,51,.9);border:1px solid var(--line);border-radius:14px;padding:11px 18px;font-weight:900;font-size:15px}
+.btns button.pri{background:var(--accent);color:#1b1a05;border-color:var(--accent)}
+.pill{position:fixed;right:max(12px,env(safe-area-inset-right,0px));top:calc(74px + env(safe-area-inset-top,0px));background:rgba(35,42,51,.9);border:1px solid var(--line);border-radius:999px;padding:5px 14px;font-weight:900;font-size:13.5px}
+.pill.p2{top:calc(110px + env(safe-area-inset-top,0px))}
+.pill.p3{top:calc(146px + env(safe-area-inset-top,0px))}
+.pill.on{background:var(--accent);color:#1b1a05;border-color:var(--accent)}
+#tut{pointer-events:auto;width:min(560px,100%);background:rgba(20,23,28,.94);border:1px solid var(--line);border-radius:16px;padding:10px 12px;max-height:46vh;overflow-y:auto;font-size:13.5px;line-height:1.6}
+#tut .th{display:flex;align-items:center;gap:8px;margin-bottom:4px}
+#tut .th b{flex:1;font-size:15.5px;font-weight:900}
+#tut .th small{font-family:var(--num);color:var(--accent);font-weight:700}
+#tut .nav{width:30px;height:30px;border-radius:50%;background:var(--bg2);border:1px solid var(--line);font-weight:900}
+#tut p{margin:0 0 6px;color:#d5dbe3}
+.dg{display:flex;gap:6px;align-items:center;justify-content:center;flex-wrap:wrap;margin:4px 0 8px;background:var(--bg2);border-radius:12px;padding:8px 6px}
+.dg figure{margin:0;width:clamp(78px,24%,112px);text-align:center}
+.dg svg{width:100%;height:auto;display:block}
+.dg figcaption{font-size:11.5px;line-height:1.35;color:var(--muted);margin-top:3px}
+.dg .ar{font-size:20px;color:var(--accent);font-weight:900}
+#tut .alg{display:flex;align-items:center;gap:8px;background:var(--bg2);border-radius:10px;padding:5px 6px 5px 10px;margin-top:5px}
+#tut .alg span{flex:1;min-width:0}
+#tut .alg span small{display:block;color:var(--muted);font-size:12px}
+#tut .alg code{font-family:var(--num);font-size:15px;color:var(--accent);font-weight:700;letter-spacing:.04em}
+#tut .alg button{background:var(--accent);color:#1b1a05;border-radius:999px;padding:4px 12px;font-weight:900;font-size:13px;white-space:nowrap}
+#menu{position:fixed;inset:0;z-index:20;background:rgba(14,16,20,.82);display:flex;align-items:center;justify-content:center;
+ padding:calc(16px + env(safe-area-inset-top,0px)) max(16px,env(safe-area-inset-right,0px)) calc(16px + env(safe-area-inset-bottom,0px)) max(16px,env(safe-area-inset-left,0px))}
+.mbox{width:min(380px,100%);display:flex;flex-direction:column;gap:10px;text-align:center}
+.mbox h1{margin:0;font-size:34px;font-weight:900;letter-spacing:.1em}
+.mbox p{margin:0 0 6px;color:var(--muted)}
+.mbox button{display:flex;align-items:center;gap:14px;text-align:left;background:var(--bg2);border:1px solid var(--line);border-radius:16px;padding:14px 16px}
+.mbox button b{font-family:var(--num);font-size:26px;color:var(--accent);min-width:64px}
+.mbox button span{font-size:13.5px;color:#d5dbe3}
+#msg{position:fixed;left:50%;top:22%;transform:translate(-50%,-50%);background:rgba(20,23,28,.92);border:2px solid var(--accent);border-radius:16px;padding:12px 22px;font-weight:900;font-size:20px;text-align:center;opacity:0;transition:opacity .25s;pointer-events:none;white-space:nowrap}
+#msg small{display:block;font-size:13px;font-weight:700;color:var(--muted)}
+@media (prefers-reduced-motion:reduce){#msg{transition:none}}
+</style>
+<canvas id="gl"></canvas>
+<div class="top">
+  <div class="stat"><small>時間</small><b id="time">0:00.0</b></div>
+  <div class="stat"><small>步數</small><b id="moves">0</b></div>
+  <div class="stat best"><small>最佳</small><b id="best">—</b></div>
+</div>
+<button class="pill" id="bTut">教學</button>
+<button class="pill p2" id="bView">視角歸位</button>
+<button class="pill p3" id="bType">換類型</button>
+<div class="bot">
+  <div id="tut" hidden></div>
+  <div class="hint" id="hint">單指在方塊上滑動＝轉那一層　兩指（或滑空白處）＝轉動整顆魔方</div>
+  <div class="btns"><button id="bScr" class="pri">打亂</button><button id="bUndo">退一步</button><button id="bReset">還原</button></div>
+</div>
+<div id="msg" role="status"></div>
+<div id="menu">
+  <div class="mbox">
+    <h1>指尖魔方</h1>
+    <p>選一種魔術方塊</p>
+    <button data-n="2"><b>2×2</b><span>口袋魔方・只有 8 個角塊，適合入門</span></button>
+    <button data-n="3"><b>3×3</b><span>標準魔方・附解法教學</span></button>
+    <button data-n="4"><b>4×4</b><span>復仇魔方・附降階解法教學</span></button>
+  </div>
+</div>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/0.160.0/three.min.js"></script>
+<script>
+"use strict";
+var $=function(id){return document.getElementById(id)};
+/* ── 場景 ── */
+var R=new THREE.WebGLRenderer({canvas:$("gl"),antialias:true,alpha:true});R.setPixelRatio(Math.min(2,devicePixelRatio||1));
+var SC=new THREE.Scene(),CAM=new THREE.PerspectiveCamera(32,1,0.1,100);
+SC.add(new THREE.HemisphereLight(0xffffff,0x555a66,2.2));var DL=new THREE.DirectionalLight(0xffffff,1.6);DL.position.set(4,7,6);SC.add(DL);
+var CUBE=new THREE.Group();SC.add(CUBE);
+CUBE.quaternion.setFromEuler(new THREE.Euler(0.5,-0.65,0));
+var HOMEQ=CUBE.quaternion.clone(),viewTo=null;
+function resize(){var w=innerWidth,h=innerHeight;R.setSize(w,h,false);CAM.aspect=w/h;
+ /* 讓魔方在直式、橫式都剛好放得下 */
+ var half=0.9*(typeof N==="undefined"?3:N),d=half/Math.tan(CAM.fov*Math.PI/360)/Math.min(1,CAM.aspect*0.92);CAM.position.set(0,0,d);CAM.updateProjectionMatrix()}
+addEventListener("resize",resize);
+
+/* ── 27 顆小方塊 ── 面的順序：+x 右紅、-x 左橘、+y 上白、-y 下黃、+z 前綠、-z 後藍 */
+var COL=[0xd92b2b,0xff8a1e,0xf7f7f2,0xffd500,0x1fa64a,0x1f5fd0];
+var DIRS=[[1,0,0],[-1,0,0],[0,1,0],[0,-1,0],[0,0,1],[0,0,-1]];
+var bodyGeo=new THREE.BoxGeometry(0.98,0.98,0.98),bodyMat=new THREE.MeshStandardMaterial({color:0x15171a,roughness:0.6});
+var stGeo=(function(){var s=0.41,r=0.09,sh=new THREE.Shape();sh.moveTo(-s+r,-s);sh.lineTo(s-r,-s);sh.quadraticCurveTo(s,-s,s,-s+r);sh.lineTo(s,s-r);sh.quadraticCurveTo(s,s,s-r,s);sh.lineTo(-s+r,s);sh.quadraticCurveTo(-s,s,-s,s-r);sh.lineTo(-s,-s+r);sh.quadraticCurveTo(-s,-s,-s+r,-s);return new THREE.ShapeGeometry(sh,4)})();
+var stMat=COL.map(function(c){return new THREE.MeshStandardMaterial({color:c,roughness:0.35})});
+var CUBIES=[],BODIES=[],N=3,HALF=1;
+function snap(v){return Math.round(v+HALF)-HALF}
+function build(n){
+ CUBIES.forEach(function(c){CUBE.remove(c)});CUBIES=[];BODIES=[];N=n;HALF=(n-1)/2;
+ for(var i=0;i<n;i++)for(var j=0;j<n;j++)for(var k=0;k<n;k++){
+  var x=i-HALF,y=j-HALF,z=k-HALF,g=new THREE.Group();g.position.set(x,y,z);g.userData.home=new THREE.Vector3(x,y,z);g.userData.st=[];
+  var b=new THREE.Mesh(bodyGeo,bodyMat);b.userData.cubie=g;g.add(b);BODIES.push(b);
+  DIRS.forEach(function(d,di){if(Math.abs(d[0]*x+d[1]*y+d[2]*z-HALF)>0.1)return;
+   var s=new THREE.Mesh(stGeo,stMat[di]);s.position.set(d[0]*0.495,d[1]*0.495,d[2]*0.495);s.lookAt(d[0]*2,d[1]*2,d[2]*2);g.add(s);g.userData.st.push({d:new THREE.Vector3(d[0],d[1],d[2]),c:di})});
+  CUBE.add(g);CUBIES.push(g);
+ }
+ resize();
+}
+var PIVOT=new THREE.Object3D();CUBE.add(PIVOT);
+
+/* ── 轉一層 ── move = {a:軸(0x 1y 2z), l:層(-1,0,1), s:方向(±1)} */
+var queue=[],cur=null,hist=[],moves=0,scrambled=false,running=false,t0=0,elapsed=0;
+var AX=[new THREE.Vector3(1,0,0),new THREE.Vector3(0,1,0),new THREE.Vector3(0,0,1)];
+function comp(v,a){return a===0?v.x:a===1?v.y:v.z}
+function startMove(m){
+ cur=m;m.t=0;m.list=CUBIES.filter(function(c){return Math.abs(comp(c.position,m.a)-m.l)<0.1});
+ PIVOT.rotation.set(0,0,0);m.list.forEach(function(c){PIVOT.attach(c)});
+}
+function endMove(){
+ var m=cur;PIVOT.quaternion.setFromAxisAngle(AX[m.a],m.s*Math.PI/2);PIVOT.updateMatrixWorld(true);
+ m.list.forEach(function(c){CUBE.attach(c);c.position.set(snap(c.position.x),snap(c.position.y),snap(c.position.z));
+  /* 把角度對齊到 90 度的倍數，避免誤差累積 */
+  var e=new THREE.Matrix4().makeRotationFromQuaternion(c.quaternion).elements;for(var i=0;i<16;i++)e[i]=Math.round(e[i]);
+  c.quaternion.setFromRotationMatrix(new THREE.Matrix4().fromArray(e))});
+ PIVOT.rotation.set(0,0,0);cur=null;
+ if(m.user){moves++;if(scrambled&&!running){running=true;t0=performance.now()}
+  if(isSolved()&&scrambled){running=false;scrambled=false;win()}}
+ hud();
+}
+function push(m){queue.push(m)}
+function isSolved(){ /* 六個方向上，每一面的貼紙都同一個顏色就算完成 */
+ var seen={},ok=true,v=new THREE.Vector3();
+ CUBIES.forEach(function(c){c.userData.st.forEach(function(st){v.copy(st.d).applyQuaternion(c.quaternion).round();var k=v.x+","+v.y+","+v.z;
+  if(seen[k]==null)seen[k]=st.c;else if(seen[k]!==st.c)ok=false})});
+ return ok;
+}
+function fmt(ms){var s=ms/1000,m=Math.floor(s/60);return m+":"+(s%60<10?"0":"")+(s%60).toFixed(1)}
+var BEST=null;function loadBest(){BEST=null;try{BEST=JSON.parse(localStorage.getItem("cube_best_"+N))||(N===3?JSON.parse(localStorage.getItem("cube3_best")):null)}catch(e){}}
+function hud(){$("moves").textContent=moves;$("best").textContent=BEST?fmt(BEST.t)+"・"+BEST.m+" 步":"—";$("bUndo").disabled=!hist.length}
+var msgT=0;function msg(html,ms){var el=$("msg");el.innerHTML=html;el.style.opacity=1;clearTimeout(msgT);msgT=setTimeout(function(){el.style.opacity=0},ms||1600)}
+function win(){
+ elapsed=performance.now()-t0;var rec=!BEST||elapsed<BEST.t;if(rec){BEST={t:elapsed,m:moves};try{localStorage.setItem("cube_best_"+N,JSON.stringify(BEST))}catch(e){}}
+ hist=[];msg("完成！"+(rec?" 新紀錄":"")+"<small>"+fmt(elapsed)+"・"+moves+" 步</small>",3500);hud();
+}
+function scramble(){
+ if(cur||queue.length)return;var last=-1;
+ for(var i=0;i<(N===2?12:N===3?25:45);i++){var a;do{a=Math.floor(Math.random()*3)}while(a===last);last=a;push({a:a,l:Math.floor(Math.random()*N)-HALF,s:Math.random()<0.5?1:-1,fast:true})}
+ hist=[];moves=0;elapsed=0;running=false;scrambled=true;$("time").textContent="0:00.0";$("hint").textContent="打亂完成後，轉第一步開始計時";hud();
+}
+function reset(){
+ queue=[];if(cur){cur.list.forEach(function(c){CUBE.attach(c)});cur=null}
+ CUBIES.forEach(function(c){c.position.copy(c.userData.home);c.quaternion.identity()});
+ hist=[];moves=0;elapsed=0;running=false;scrambled=false;$("time").textContent="0:00.0";hud();
+}
+$("bView").onclick=function(){viewTo=HOMEQ.clone()};
+$("bScr").onclick=scramble;$("bReset").onclick=reset;
+$("bUndo").onclick=function(){if(cur||queue.length||!hist.length)return;var m=hist.pop();push({a:m.a,l:m.l,s:-m.s,undo:true});moves=Math.max(0,moves-1);hud()};
+
+/* ── 教學 ── 公式裡的 U、R、F… 是照「你現在看到的方向」：最朝上的面是 U、最朝右的是 R、正對你的是 F */
+var TUT=[
+ {t:"認識記號",d:"字母代表轉哪一面：U 上、D 下、R 右、L 左、F 前、B 後。單一個字母＝順時針轉 90 度（從那一面的外側看），加撇號 ' ＝逆時針，加 2 ＝轉兩次。方向以你現在看到的魔方為準。先按下面的示範看看。",a:[["R","右面順時針"],["U'","上面逆時針"],["F2","前面轉兩次"]]},
+ {t:"白色十字",d:"先在白色那一面拼出十字，而且每個白色邊塊的另一色，要和側面的中心塊同色。這一步沒有固定公式，多轉幾次找感覺：把白邊塊先轉到黃色面，對齊側面中心，再把那一面轉 180 度送下去。",a:[["F2","對齊後把邊塊送到白色面"]]},
+ {t:"白色角塊",d:"之後都把白色面朝下。找一個在上層、有白色的角塊，轉 U 讓它停在目標位置的正上方（右前角），重複下面的公式，直到它落下去而且白色朝下。四個角都做完，第一層就完成了。",a:[["R U R' U'","重複 1～5 次"]]},
+ {t:"第二層邊塊",d:"白色面朝下。在上層找一個沒有黃色的邊塊，轉 U 讓它的側面顏色對上中心塊，成一條直線。看它要往右還是往左放。如果邊塊卡在第二層但位置不對，先用同一個公式把它換出來。",a:[["U R U' R' U' F' U F","放到右邊"],["U' L' U L U F U' F'","放到左邊"]]},
+ {t:"黃色十字",d:"看上面的黃色：只有中心一點、L 形、一直線、或已經是十字。L 形時把 L 的兩邊放在左邊和後面；一直線時讓它橫著。做公式，最多做三次就會出現十字。",a:[["F R U R' U' F'","重複到出現黃色十字"]]},
+ {t:"十字對齊側面",d:"轉 U，看十字四個邊塊的側面顏色有幾個能對上中心塊。讓對上的那一面朝後（或朝右後），做公式；做完再轉 U 檢查，直到四個都對上。",a:[["R U R' U R U2 R' U","交換上層的邊塊"]]},
+ {t:"角塊放到正確位置",d:"先不管黃色朝哪，只看角塊的三個顏色是不是屬於那個角落。找一個位置正確的角塊，把它放在右前上方，做公式，其他三個角會輪換；最多做兩次。如果沒有任何一個正確，先隨便做一次。",a:[["U R U' L' U R' U' L","三個角輪換"]]},
+ {t:"角塊轉正",d:"最後一步。把一個黃色沒朝上的角塊放在右前上方，重複公式直到它的黃色朝上（2 或 4 次）。接著「只轉 U」，把下一個沒轉正的角塊帶到右前上方，再重複公式。過程中下面兩層會看起來亂掉，不要管它，全部角塊轉正後就會恢復，最後再轉 U 對齊即可。",a:[["R' D' R D","重複 2 或 4 次，再只轉 U 換下一個角"]]}
+];
+var tutI=0;
+function viewAxes(){ /* 找出目前最朝右、朝上、朝前（面向你）的是哪個軸、哪個方向 */
+ var out={},best={x:-9,y:-9,z:-9};
+ DIRS.forEach(function(d){var v=new THREE.Vector3(d[0],d[1],d[2]).applyQuaternion(CUBE.quaternion),a=d[0]?0:d[1]?1:2,sg=d[0]+d[1]+d[2];
+  ["x","y","z"].forEach(function(k){if(v[k]>best[k]){best[k]=v[k];out[k]={a:a,sg:sg}}})});
+ return out;
+}
+function runAlg(str){
+ /* 記號：R＝最外層；Rw＝外面兩層一起；2R＝只轉從外面數來第二層。後面加 ' 逆時針、加 2 轉兩次 */
+ if(cur||queue.length)return;var V=viewAxes(),map={R:[V.x,1],L:[V.x,-1],U:[V.y,1],D:[V.y,-1],F:[V.z,1],B:[V.z,-1]};
+ str.split(/\s+/).forEach(function(tk){var mt=/^(2?)([RLUDFB])(w?)(2|')?$/.exec(tk);if(!mt)return;
+  var f=map[mt[2]],ax=f[0],side=f[1],n=mt[4]==="2"?2:1,inv=mt[4]==="'"?-1:1,ls=mt[1]?[HALF-1]:mt[3]?[HALF,HALF-1]:[HALF];
+  for(var i=0;i<n;i++)ls.forEach(function(L){var m={a:ax.a,l:ax.sg*side*L,s:-ax.sg*side*inv,user:true};hist.push(m);push(m)})});
+}
+var TUT4=[
+ {t:"4×4 的記號",d:"4×4 的解法是「降階」：先拼好六面的中心、再把邊塊兩兩配對，它就變成一顆 3×3。記號多兩種：Rw＝右邊兩層一起轉；2R＝只轉右邊數來第二層（其他面同理）。方向一樣以你現在看到的為準。",a:[["Rw","右邊兩層一起"],["2R","只轉右邊第二層"],["Uw'","上面兩層逆時針"]]},
+ {t:"拼六面的中心",d:"每一面中間的 2×2 要拼成同一色。4×4 的中心塊不固定，所以要自己記住配色：白對黃、紅對橘、綠對藍。先拼白色，再拼對面的黃色，最後拼側面四色。做法是先在某一面湊出 1×2 的一條，再用兩層轉動把兩條併在一起；用完記得把轉過的兩層轉回去，才不會弄壞已經拼好的中心。",a:[["Rw U Rw'","把前面的一條送到上面"],["Rw U2 Rw'","上面轉半圈再接回來"],["Rw U Rw' U Rw U2 Rw'","最後兩面中心互換一條"]]},
+ {t:"配對邊塊",d:"把同樣兩色的兩個邊塊湊成一對，一共 12 對。先找一對還沒配好的：把其中一個放在右前方那條邊，另一個放在左前方，高度錯開。轉 Uw 讓它們在右前方併成一對，再用下面的公式把這一對存到上面，最後一定要 Uw' 把中心轉回來。做之前，先在上層後方放一條「還沒配對」的邊，免得拆掉配好的。",a:[["Uw R U R' Uw'","配對後存到上層，並還原中心"],["Dw R F' U R' F Dw'","只剩最後兩組時用"]]},
+ {t:"當成 3×3 來解",d:"現在每面的中心是一整塊、每條邊是一整條，只轉最外層就跟 3×3 一樣。接下來七步和 3×3 的教學相同，公式都只轉外層。途中可能遇到兩種 3×3 不會出現的狀況，放在最後兩頁。",a:[]}
+];
+var TUT4B=[
+ {t:"特殊狀況一：黃色十字少一條",d:"做黃色十字時，如果怎麼做都剩一條邊翻不過來（黃色朝上的邊是 1 條或 3 條），這在 3×3 不可能出現。把那條翻錯的邊放在前面上方，做這條公式，它會原地翻面，其他地方不變。",a:[["2R2 B2 U2 2L U2 2R' U2 2R U2 F2 2R F2 2L' B2 2R2","翻轉前上方那條邊"]]},
+ {t:"特殊狀況二：最後剩兩條邊互換",d:"全部快完成時，如果只剩兩條相對的邊塊位置對調（或兩個角對調），也是 4×4 才有的狀況。把要交換的兩條邊放在上層的前面和後面，做這條公式，然後繼續用 3×3 的最後幾步收尾。",a:[["2R2 U2 2R2 Uw2 2R2 Uw2 U2","交換上層前、後兩條邊"]]}
+];
+/* ── 教學圖解 ── 每張圖用三個面（上 U、前 F、右 R）的顏色字串描述，一列一列用 / 分開。
+   w 白 y 黃 r 紅 o 橘 g 綠 b 藍 x 灰（這一步不用管的格子） */
+var DGC={w:"#f7f7f2",y:"#ffd500",r:"#d92b2b",o:"#ff8a1e",g:"#1fa64a",b:"#1f5fd0",x:"#4a525c"};
+function dgIso(o){
+ var n=o.n||3,s=66/n,c=0.866*s,h=0.5*s,W=2*c*n+8,H=h*2*n+s*n+8,ox=W/2,oy=4,out="";
+ function P(a,b,d){return[(ox+a*c-b*c).toFixed(1),(oy+a*h+b*h+d*s).toFixed(1)]}
+ function quad(p,col,hl){return'<polygon points="'+p.map(function(q){return q.join(",")}).join(" ")+'" fill="'+col+'" stroke="'+(hl?"#fff":"#14171c")+'" stroke-width="'+(hl?2.5:1.6)+'" stroke-linejoin="round"/>'}
+ function rows(str){return(str||"").split("/")}
+ var U=rows(o.U),F=rows(o.F),R=rows(o.R),hl=o.hl||{};
+ for(var r=0;r<n;r++)for(var k=0;k<n;k++){
+  out+=quad([P(k,r,0),P(k+1,r,0),P(k+1,r+1,0),P(k,r+1,0)],DGC[(U[r]||"")[k]||"x"],hl.U&&hl.U[0]===r&&hl.U[1]===k);
+  out+=quad([P(k,n,r),P(k+1,n,r),P(k+1,n,r+1),P(k,n,r+1)],DGC[(F[r]||"")[k]||"x"],hl.F&&hl.F[0]===r&&hl.F[1]===k);
+  out+=quad([P(n,n-k,r),P(n,n-k-1,r),P(n,n-k-1,r+1),P(n,n-k,r+1)],DGC[(R[r]||"")[k]||"x"],hl.R&&hl.R[0]===r&&hl.R[1]===k);
+ }
+ if(o.lab){var m=n/2,t=function(p,ch){return'<text x="'+p[0]+'" y="'+(+p[1]+7)+'" text-anchor="middle" font-size="20" font-weight="700" fill="#fff" font-family="Chakra Petch,sans-serif">'+ch+'</text>'};
+  out+=t(P(m,m,0),"U")+t(P(m,n,m),"F")+t(P(n,m,m),"R")}
+ return'<figure><svg viewBox="0 0 '+W.toFixed(0)+' '+H.toFixed(0)+'" role="img" aria-label="'+o.cap+'">'+out+'</svg><figcaption>'+o.cap+'</figcaption></figure>';
+}
+function dgTop(o){ /* 從正上方看頂面 */
+ var n=o.n||3,s=66/n,W=66+8,out="",U=o.U.split("/");
+ for(var r=0;r<n;r++)for(var k=0;k<n;k++){var hl=o.hl&&o.hl[0]===r&&o.hl[1]===k;
+  out+='<rect x="'+(4+k*s+1).toFixed(1)+'" y="'+(4+r*s+1).toFixed(1)+'" width="'+(s-2).toFixed(1)+'" height="'+(s-2).toFixed(1)+'" rx="3" fill="'+DGC[U[r][k]]+'" stroke="'+(hl?"#fff":"none")+'" stroke-width="2.5"/>'}
+ return'<figure><svg viewBox="0 0 '+W+' '+W+'" role="img" aria-label="'+o.cap+'">'+out+'</svg><figcaption>'+o.cap+'</figcaption></figure>';
+}
+function dgHTML(list){return'<div class="dg">'+list.map(function(o){return o.arrow?'<span class="ar">→</span>':o.top?dgTop(o):dgIso(o)}).join("")+'</div>'}
+TUT[0].g=[{cap:"上 U、前 F、右 R",U:"xxx/xxx/xxx",F:"xxx/xxx/xxx",R:"xxx/xxx/xxx",lab:true}];
+TUT[1].g=[{cap:"目標：白色十字，側面對上中心",U:"xwx/www/xwx",F:"xgx/xgx/xxx",R:"xrx/xrx/xxx"}];
+TUT[2].g=[{cap:"角塊在目標正上方",U:"xxx/xxx/xxr",F:"xxw/xgx/ggx",R:"gxx/xrx/xrr",hl:{F:[2,2]}},{arrow:1},{cap:"目標：第一層完成",U:"xxx/xxx/xxx",F:"xxx/xgx/ggg",R:"xxx/xrx/rrr"}];
+TUT[3].g=[{cap:"邊塊和中心成一直線",U:"xxx/xxx/xrx",F:"xgx/ggx/ggg",R:"xxx/xrr/rrr",hl:{F:[1,2]}},{arrow:1},{cap:"目標：前兩層完成",U:"xxx/xxx/xxx",F:"xxx/ggg/ggg",R:"xxx/rrr/rrr"}];
+TUT[4].g=[{top:1,cap:"一點",U:"xxx/xyx/xxx"},{top:1,cap:"L 形放左後",U:"xyx/yyx/xxx"},{top:1,cap:"一直線放橫",U:"xxx/yyy/xxx"},{arrow:1},{top:1,cap:"目標：十字",U:"xyx/yyy/xyx"}];
+TUT[5].g=[{cap:"目標：十字的側面也對上中心",U:"xyx/yyy/xyx",F:"xgx/ggg/ggg",R:"xrx/rrr/rrr"}];
+TUT[6].g=[{cap:"位置正確的角放右前（顏色對就好，方向不管）",U:"xyx/yyy/xyg",F:"xgr/ggg/ggg",R:"yrx/rrr/rrr",hl:{U:[2,2]}}];
+TUT[7].g=[{cap:"右前角的黃色沒朝上",U:"yyy/yyy/yyg",F:"ggr/ggg/ggg",R:"yrr/rrr/rrr",hl:{R:[0,0]}},{arrow:1},{cap:"目標：頂面全黃",U:"yyy/yyy/yyy",F:"ggg/ggg/ggg",R:"rrr/rrr/rrr"}];
+TUT4[0].g=[{n:4,cap:"Rw＝右邊兩層",U:"xxww/xxww/xxww/xxww",F:"xxww/xxww/xxww/xxww",R:"wwww/wwww/wwww/wwww"},{n:4,cap:"2R＝只有第二層",U:"xxwx/xxwx/xxwx/xxwx",F:"xxwx/xxwx/xxwx/xxwx",R:"xxxx/xxxx/xxxx/xxxx"}];
+TUT4[1].g=[{n:4,cap:"先湊出 1×2 的一條",U:"xxxx/xxxx/xxxx/xxxx",F:"xxxx/xggx/xxxx/xxxx",R:"xxxx/xxxx/xxxx/xxxx"},{arrow:1},{n:4,cap:"目標：每面中間 2×2 同色",U:"xxxx/xwwx/xwwx/xxxx",F:"xxxx/xggx/xggx/xxxx",R:"xxxx/xrrx/xrrx/xxxx"}];
+TUT4[2].g=[{n:4,cap:"同色的兩塊高度錯開",U:"xxxx/xwwx/xwwx/xxxx",F:"xxxx/xggg/gggx/xxxx",R:"xxxx/rrrx/xrrx/xxxx",hl:{F:[1,3]}},{arrow:1},{n:4,cap:"目標：兩塊併成一對",U:"xxxx/xwwx/xwwx/xxxx",F:"xxxx/xggg/xggg/xxxx",R:"xxxx/rrrx/rrrx/xxxx"}];
+TUT4[3].g=[{n:4,cap:"中心一整塊、邊一整條",U:"xwwx/wwww/wwww/xwwx",F:"xggx/gggg/gggg/xggx",R:"xrrx/rrrr/rrrr/xrrx"},{arrow:1},{cap:"就等於一顆 3×3",U:"xwx/www/xwx",F:"xgx/ggg/xgx",R:"xrx/rrr/xrx"}];
+TUT4B[0].g=[{top:1,n:4,cap:"前面那條翻不過來",U:"xyyx/yyyy/yyyy/xxxx"},{arrow:1},{top:1,n:4,cap:"目標：十字",U:"xyyx/yyyy/yyyy/xyyx"}];
+TUT4B[1].g=[{n:4,cap:"只剩前、後兩條邊對調",U:"yyyy/yyyy/yyyy/yyyy",F:"gbbg/gggg/gggg/gggg",R:"rrrr/rrrr/rrrr/rrrr",hl:{F:[0,1]}}];
+function tutList(){return N===4?TUT4.concat(TUT.slice(1),TUT4B):TUT}
+function renderTut(){
+ var TL=tutList(),T=TL[tutI];
+ $("tut").innerHTML='<div class="th"><button class="nav" data-t="-1" aria-label="上一步"'+(tutI?"":" disabled")+'>◀</button><b>'+T.t+'</b><small>'+(tutI?"步驟 "+tutI+" / "+(TL.length-1):"開始之前")+'</small><button class="nav" data-t="1" aria-label="下一步"'+(tutI<TL.length-1?"":" disabled")+'>▶</button></div>'+(T.g?dgHTML(T.g):'')+'<p>'+T.d+'</p>'+
+  T.a.map(function(a,i){return'<div class="alg"><span><code>'+a[0]+'</code><small>'+a[1]+'</small></span><button data-alg="'+i+'">示範</button></div>'}).join("");
+ $("tut").scrollTop=0;
+}
+$("bTut").onclick=function(){var t=$("tut"),on=t.hidden;t.hidden=!on;$("hint").hidden=on;this.classList.toggle("on",on);var pt=on&&innerHeight>innerWidth;CUBE.position.y=pt?0.5*N:0;CUBE.scale.setScalar(pt?0.72:1);if(on)renderTut()};
+$("tut").addEventListener("click",function(e){var b=e.target.closest("button");if(!b)return;
+ if(b.dataset.t){tutI=Math.max(0,Math.min(tutList().length-1,tutI+(+b.dataset.t)));renderTut()}
+ else if(b.dataset.alg)runAlg(tutList()[tutI].a[+b.dataset.alg][0])});
+
+/* ── 手勢 ── */
+var RAY=new THREE.Raycaster(),P={},mode=null,face=null,last=null,pinch=null;
+function ndc(e){return new THREE.Vector2(e.clientX/innerWidth*2-1,-(e.clientY/innerHeight)*2+1)}
+function toScreen(vLocal){var v=CUBE.localToWorld(vLocal.clone()).project(CAM);return new THREE.Vector2((v.x+1)/2*innerWidth,(1-v.y)/2*innerHeight)}
+function orbit(dx,dy,tw){
+ var q=new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0,1,0),dx*0.008);
+ q.multiply(new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(1,0,0),dy*0.008));
+ if(tw)q.multiply(new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0,0,1),-tw));
+ CUBE.quaternion.premultiply(q).normalize();
+}
+var cv=$("gl");
+cv.addEventListener("pointerdown",function(e){
+ viewTo=null;cv.setPointerCapture&&cv.setPointerCapture(e.pointerId);P[e.pointerId]={x:e.clientX,y:e.clientY};
+ var ids=Object.keys(P);
+ if(ids.length>=2){mode="two";face=null;var a=P[ids[0]],b=P[ids[1]];pinch={cx:(a.x+b.x)/2,cy:(a.y+b.y)/2,ang:Math.atan2(b.y-a.y,b.x-a.x)};return}
+ last={x:e.clientX,y:e.clientY};
+ RAY.setFromCamera(ndc(e),CAM);var hit=RAY.intersectObjects(BODIES,false)[0];
+ if(hit&&e.button!==2){
+  var c=hit.object.userData.cubie,n=hit.face.normal.clone().applyQuaternion(c.quaternion).round();
+  /* 只有朝外的面才算（避免點到縫裡面） */
+  if(Math.abs(c.position.dot(n)-HALF)<0.1){mode="face";face={c:c,n:n,p:CUBE.worldToLocal(hit.point.clone()),x:e.clientX,y:e.clientY,done:false};return}
+ }
+ mode="orbit";
+});
+cv.addEventListener("pointermove",function(e){
+ if(!P[e.pointerId])return;P[e.pointerId]={x:e.clientX,y:e.clientY};var ids=Object.keys(P);
+ if(mode==="two"&&ids.length>=2){var a=P[ids[0]],b=P[ids[1]],cx=(a.x+b.x)/2,cy=(a.y+b.y)/2,ang=Math.atan2(b.y-a.y,b.x-a.x),da=ang-pinch.ang;
+  if(da>Math.PI)da-=2*Math.PI;if(da<-Math.PI)da+=2*Math.PI;orbit(cx-pinch.cx,cy-pinch.cy,da);pinch={cx:cx,cy:cy,ang:ang};return}
+ if(mode==="orbit"){orbit(e.clientX-last.x,e.clientY-last.y);last={x:e.clientX,y:e.clientY};return}
+ if(mode==="face"&&!face.done){
+  var dx=e.clientX-face.x,dy=e.clientY-face.y,len=Math.hypot(dx,dy);if(len<16)return;
+  /* 在這個面上找出和手指方向最接近的方向 d，轉軸 = 面的法線 × d */
+  var p0=toScreen(face.p),best=null,bs=0.3;
+  DIRS.forEach(function(d){var v=new THREE.Vector3(d[0],d[1],d[2]);if(Math.abs(v.dot(face.n))>0.5)return;
+   var s=toScreen(face.p.clone().addScaledVector(v,0.6)).sub(p0);if(s.length()<1)return;s.normalize();var k=(s.x*dx+s.y*dy)/len;if(k>bs){bs=k;best=v}});
+  face.done=true;if(!best||cur||queue.length)return;
+  var ax=new THREE.Vector3().crossVectors(face.n,best).round(),a=Math.abs(ax.x)?0:Math.abs(ax.y)?1:2,m={a:a,l:snap(comp(face.c.position,a)),s:comp(ax,a),user:true};
+  hist.push(m);push(m);
+ }
+});
+function up(e){delete P[e.pointerId];if(!Object.keys(P).length){mode=null;face=null}else if(mode==="two"){mode="wait"}}
+cv.addEventListener("pointerup",up);cv.addEventListener("pointercancel",up);
+cv.addEventListener("contextmenu",function(e){e.preventDefault()});
+cv.addEventListener("wheel",function(e){e.preventDefault();orbit(-e.deltaX*0.5,-e.deltaY*0.5)},{passive:false});
+
+/* ── 迴圈 ── */
+var prev=0;
+function loop(ts){
+ var dt=Math.min(0.05,(ts-prev)/1000||0);prev=ts;
+ if(!cur&&queue.length)startMove(queue.shift());
+ if(cur){cur.t+=dt/(cur.fast?0.07:0.16);var k=Math.min(1,cur.t),e=cur.fast?k:1-Math.pow(1-k,3);
+  PIVOT.quaternion.setFromAxisAngle(AX[cur.a],cur.s*Math.PI/2*e);if(k>=1){var f=cur.fast;endMove();if(f&&!queue.length)$("hint").textContent="單指在方塊上滑動＝轉那一層　兩指（或滑空白處）＝轉動整顆魔方"}}
+ if(viewTo){CUBE.quaternion.slerp(viewTo,Math.min(1,dt*10));if(CUBE.quaternion.angleTo(viewTo)<0.005){CUBE.quaternion.copy(viewTo);viewTo=null}}
+ if(running)$("time").textContent=fmt(performance.now()-t0);
+ R.render(SC,CAM);requestAnimationFrame(loop);
+}
+function choose(n){build(n);reset();loadBest();hud();$("menu").hidden=true;$("bTut").hidden=n===2;tutI=0;if(!$("tut").hidden)$("bTut").click();CUBE.quaternion.copy(HOMEQ)}
+$("menu").addEventListener("click",function(e){var b=e.target.closest("[data-n]");if(b)choose(+b.dataset.n)});
+$("bType").onclick=function(){$("menu").hidden=false};
+build(3);loadBest();hud();requestAnimationFrame(loop);
+</script>
+<script data-goatcounter="https://sonnystudio.goatcounter.com/count"
+        async src="//gc.zgo.at/count.js"></script>
+</body>
+</html>
