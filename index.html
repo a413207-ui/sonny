@@ -111,6 +111,26 @@ header nav a:hover{background:var(--line2)}
 .feedback .btn{width:100%;justify-content:center;font-size:15px;padding:9px}
 .feedback .btn[aria-disabled="true"]{background:#c9a493;box-shadow:none;cursor:default}
 .feedback small{display:block;margin-top:8px;color:var(--muted);font-size:12px}
+/* 留言板 */
+.feedback [hidden]{display:none!important}
+.cm-form{display:flex;flex-direction:column;gap:8px;text-align:left}
+.cm-row{display:flex;gap:8px;flex-wrap:wrap}
+.cm-form input,.cm-form select,.cm-form textarea{font:400 16px var(--sans);color:var(--ink);background:var(--card);border:1.5px solid #cfdcc3;border-radius:7px;padding:7px 9px;min-width:0;width:100%}
+.cm-row input{flex:1 1 110px;width:auto}.cm-row select{flex:1 1 110px;width:auto}
+.cm-form textarea{resize:vertical;min-height:76px}
+.cm-form input:focus-visible,.cm-form select:focus-visible,.cm-form textarea:focus-visible{outline:3px solid var(--gold);outline-offset:1px}
+.cm-acts{display:flex;gap:8px;align-items:center;justify-content:space-between}
+.feedback .cm-acts .btn{width:auto;font-size:14px;padding:7px 16px}
+.cm-link{background:none;border:0;padding:4px 2px;font:500 13px var(--sans);color:var(--muted);text-decoration:underline;cursor:pointer}
+.cm-msg{min-height:1.4em;margin:6px 0 0;font-size:13px;color:var(--rust-dark)}
+.cm-list{list-style:none;margin:10px 0 0;padding:0;display:grid;gap:8px;text-align:left}
+.cm-list li{background:var(--card);border:1px solid #cfdcc3;border-radius:8px;padding:8px 10px}
+.cm-head{display:flex;flex-wrap:wrap;align-items:center;gap:4px 8px;font-size:12px;color:var(--muted)}
+.cm-head b{font-size:14px;color:var(--ink)}
+.cm-head .chip{background:var(--green-soft);color:var(--green)}
+.cm-head .cm-link{margin-left:auto;font-size:12px;padding:0}
+.cm-body{margin:4px 0 0;font-size:14px;white-space:pre-wrap;overflow-wrap:anywhere}
+.cm-empty{font-size:13px;color:var(--muted);text-align:center;margin:10px 0 0}
 footer{border-top:2px solid var(--ink);display:flex;flex-wrap:wrap;gap:6px 14px;justify-content:space-between;padding-block:10px 24px;font-size:13px;color:var(--muted);font-family:var(--serif)}
 @media (max-width:759px){header nav a:not(.btn){padding:6px 8px;font-size:14px}.brand b{font-size:19px}.hero{min-height:230px}.hero .pic{opacity:.55}.hero .txt{text-shadow:0 1px 3px rgba(0,0,0,.4)}}
 @media (prefers-reduced-motion:reduce){*{transition:none!important;scroll-behavior:auto!important}}
@@ -192,8 +212,23 @@ footer{border-top:2px solid var(--ink);display:flex;flex-wrap:wrap;gap:6px 14px;
   <section class="box feedback" id="feedback">
     <h3>💬 一起讓遊戲更好玩</h3>
     <p>遇到問題，或有新點子？</p>
-    <a class="btn" role="link" aria-disabled="true">回報問題／給我建議</a>
-    <small>回饋功能準備中，很快開放</small>
+    <div id="cmOut">
+      <button class="btn" type="button" id="cmLogin">用 Google 登入後留言</button>
+      <small>登入只用來確認身分，留言顯示的是你自己取的暱稱</small>
+    </div>
+    <form class="cm-form" id="cmForm" hidden>
+      <div class="cm-row">
+        <input id="cmName" maxlength="20" required placeholder="暱稱" aria-label="暱稱" autocomplete="nickname">
+        <select id="cmGame" aria-label="留言對象">
+          <option>網站</option><option>海灣釣魚日記</option><option>三國鼎立</option>
+        </select>
+      </div>
+      <textarea id="cmText" rows="3" maxlength="500" required placeholder="遇到的問題，或想要的新功能…" aria-label="留言內容"></textarea>
+      <div class="cm-acts"><button class="cm-link" type="button" id="cmLogout">登出</button><button class="btn" type="submit" id="cmSend">送出留言</button></div>
+    </form>
+    <p class="cm-msg" id="cmMsg" role="status"></p>
+    <ul class="cm-list" id="cmList" aria-label="留言"></ul>
+    <p class="cm-empty" id="cmEmpty">留言載入中…</p>
   </section>
   </aside>
 </div>
@@ -207,6 +242,96 @@ document.querySelectorAll('.cats button').forEach(b => b.addEventListener('click
   document.querySelectorAll('.cats button').forEach(x => x.setAttribute('aria-pressed', String(x === b)));
   document.querySelectorAll('.game').forEach(g => { g.hidden = cat !== 'all' && g.dataset.cat !== cat; });
 }));
+</script>
+<script type="module">
+// 留言板：Google 登入後才能留言，所有人都看得到。資料存在 Firebase Firestore 的 comments 集合。
+import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
+import { getAuth, GoogleAuthProvider, signInWithPopup, signOut, onAuthStateChanged }
+  from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
+import { getFirestore, collection, addDoc, deleteDoc, doc, getDocs, query, orderBy, limit, serverTimestamp }
+  from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+
+const ADMIN_UID = "ADMIN_UID_LATER"; // 站長的 UID：可以刪除任何留言（要跟 Firestore 規則裡的一致）
+const COOL = 30000;                  // 兩則留言至少間隔 30 秒
+const app = initializeApp({
+  apiKey: "AIzaSyBUpS38gB5nYS7sXLoaAyhqyugoMz-2OJw",
+  authDomain: "sonny-stock.firebaseapp.com",
+  projectId: "sonny-stock",
+  storageBucket: "sonny-stock.firebasestorage.app",
+  messagingSenderId: "808240313325",
+  appId: "1:808240313325:web:51642500e1d590519b2de4"
+});
+const auth = getAuth(app), db = getFirestore(app);
+const $ = id => document.getElementById(id);
+const msg = $("cmMsg"), list = $("cmList"), empty = $("cmEmpty");
+let user = null;
+const store = { get(k){ try { return localStorage.getItem(k) || ""; } catch { return ""; } },
+                set(k,v){ try { localStorage.setItem(k, v); } catch {} } };
+
+$("cmLogin").addEventListener("click", async () => {
+  msg.textContent = "";
+  try { await signInWithPopup(auth, new GoogleAuthProvider()); }
+  catch (e) {
+    if (e && (e.code === "auth/popup-closed-by-user" || e.code === "auth/cancelled-popup-request")) return;
+    msg.textContent = "登入失敗。如果是從 LINE、IG、Facebook 裡開啟的，請改用 Safari 或 Chrome 開這個網站。";
+    console.error(e);
+  }
+});
+$("cmLogout").addEventListener("click", () => signOut(auth));
+
+onAuthStateChanged(auth, u => {
+  user = u;
+  $("cmOut").hidden = !!u;
+  $("cmForm").hidden = !u;
+  if (u && !$("cmName").value) $("cmName").value = store.get("cm_name");
+  load();
+});
+
+$("cmForm").addEventListener("submit", async e => {
+  e.preventDefault();
+  if (!user) return;
+  const name = $("cmName").value.trim(), text = $("cmText").value.trim();
+  if (!name || !text) { msg.textContent = "暱稱和內容都要填喔。"; return; }
+  if (Date.now() - (+store.get("cm_last") || 0) < COOL) { msg.textContent = "剛剛才留過，請稍等一下再送。"; return; }
+  $("cmSend").disabled = true; msg.textContent = "送出中…";
+  try {
+    await addDoc(collection(db, "comments"), { uid: user.uid, name, game: $("cmGame").value, text, createdAt: serverTimestamp() });
+    store.set("cm_last", String(Date.now())); store.set("cm_name", name);
+    $("cmText").value = ""; msg.textContent = "已留言，謝謝你！";
+    load();
+  } catch (err) { msg.textContent = "送出失敗，請稍後再試。"; console.error(err); }
+  finally { $("cmSend").disabled = false; }
+});
+
+async function load() {
+  try {
+    const snap = await getDocs(query(collection(db, "comments"), orderBy("createdAt", "desc"), limit(30)));
+    list.textContent = "";
+    empty.hidden = !snap.empty;
+    empty.textContent = "還沒有留言，來當第一個吧。";
+    snap.forEach(d => {
+      const c = d.data(), li = document.createElement("li");
+      const head = document.createElement("div"); head.className = "cm-head";
+      const who = document.createElement("b"); who.textContent = c.name;
+      const tag = document.createElement("span"); tag.className = "chip"; tag.textContent = c.game;
+      const when = document.createElement("span");
+      when.textContent = c.createdAt && c.createdAt.toDate ? c.createdAt.toDate().toLocaleDateString("zh-TW") : "";
+      head.append(who, tag, when);
+      if (user && (user.uid === c.uid || user.uid === ADMIN_UID)) {
+        const del = document.createElement("button"); del.type = "button"; del.className = "cm-link"; del.textContent = "刪除";
+        let armed = false;
+        del.addEventListener("click", async () => {
+          if (!armed) { armed = true; del.textContent = "再按一次確認刪除"; return; }
+          try { await deleteDoc(doc(db, "comments", d.id)); load(); }
+          catch (err) { msg.textContent = "刪除失敗。"; console.error(err); }
+        });
+        head.append(del);
+      }
+      const body = document.createElement("p"); body.className = "cm-body"; body.textContent = c.text;
+      li.append(head, body); list.append(li);
+    });
+  } catch (err) { empty.hidden = false; empty.textContent = "留言暫時載入不了，晚點再試試。"; console.error(err); }
+}
 </script>
 <script src="view-count.js"></script>
 <script data-goatcounter="https://sonnystudio.goatcounter.com/count"
