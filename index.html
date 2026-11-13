@@ -128,6 +128,7 @@ header nav a:hover{background:var(--line2)}
 .cm-head{display:flex;flex-wrap:wrap;align-items:center;gap:4px 8px;font-size:12px;color:var(--muted)}
 .cm-head b{font-size:14px;color:var(--ink)}
 .cm-head .chip{background:var(--green-soft);color:var(--green)}
+.cm-head .chip.cm-admin{background:var(--rust);color:#fff}
 .cm-head .cm-link{margin-left:auto;font-size:12px;padding:0}
 .cm-body{margin:4px 0 0;font-size:14px;white-space:pre-wrap;overflow-wrap:anywhere}
 .cm-empty{font-size:13px;color:var(--muted);text-align:center;margin:10px 0 0}
@@ -324,7 +325,12 @@ async function load() {
       const tag = document.createElement("span"); tag.className = "chip"; tag.textContent = c.game;
       const when = document.createElement("span");
       when.textContent = c.createdAt && c.createdAt.toDate ? c.createdAt.toDate().toLocaleDateString("zh-TW") : "";
-      head.append(who, tag, when);
+      head.append(who);
+      if (c.uid === ADMIN_UID) { // 用 uid 判斷，暱稱取成一樣也冒充不了
+        const adm = document.createElement("span"); adm.className = "chip cm-admin"; adm.textContent = "站長";
+        head.append(adm);
+      }
+      head.append(tag, when);
       if (user && (user.uid === c.uid || user.uid === ADMIN_UID)) {
         const del = document.createElement("button"); del.type = "button"; del.className = "cm-link"; del.textContent = "刪除";
         let armed = false;
